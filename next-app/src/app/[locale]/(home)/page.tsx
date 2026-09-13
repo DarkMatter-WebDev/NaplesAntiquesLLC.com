@@ -389,7 +389,7 @@ export default async function HomePage({ params }: Props) {
             <div className="grid items-center gap-10 md:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
               <div className="relative mx-auto aspect-[4/5] w-full max-w-sm overflow-hidden rounded-2xl border" style={{ borderColor: 'var(--color-outline-variant)' }}>
                 <Image
-                  src="/assets/images/pages/chris.webp"
+                  src="/assets/images/pages/chris-owner.webp"
                   alt={isEs ? 'Chris, propietario de Naples Estate Jewelry' : 'Chris, owner of Naples Estate Jewelry'}
                   fill
                   sizes="(max-width: 768px) 90vw, 40vw"

@@ -95,7 +95,7 @@ export default async function AboutPage({ params }: Props) {
                     style={{ background: 'var(--color-primary)', opacity: 0.1 }}
                   />
                   <Image
-                    src="/assets/images/pages/chris.webp"
+                    src="/assets/images/pages/chris-owner.webp"
                     alt={isEs ? 'Chris de Naples Estate Jewelry' : 'Chris of Naples Estate Jewelry'}
                     width={520}
                     height={600}

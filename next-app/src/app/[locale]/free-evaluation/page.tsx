@@ -661,7 +661,7 @@ export default async function FreeEvaluationPage({ params, searchParams }: Props
             <div className="grid md:grid-cols-[280px_1fr] gap-10 md:gap-14 items-center">
               <div className="flex justify-center">
                 <Image
-                  src="/assets/images/pages/chris.webp"
+                  src="/assets/images/pages/chris-owner.webp"
                   alt={isEs ? 'Chris, propietario de Naples Estate Jewelry' : 'Chris, owner of Naples Estate Jewelry'}
                   width={256}
                   height={256}

@@ -297,7 +297,14 @@
 
 [[redirects]]
   from = "/chris.png"
-  to = "/assets/images/pages/chris.webp"
+  to = "/assets/images/pages/chris-owner.webp"
+  status = 301
+
+# Owner photo replaced 2026-09-13 (new file name so the long image cache
+# can't serve the old headshot); old path kept alive for outside links.
+[[redirects]]
+  from = "/assets/images/pages/chris.webp"
+  to = "/assets/images/pages/chris-owner.webp"
   status = 301
 
 [[redirects]]

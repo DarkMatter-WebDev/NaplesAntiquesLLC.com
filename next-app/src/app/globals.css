@@ -133,6 +133,11 @@
      The `100svh` here is the no-JS fallback and is correct everywhere `svh`
      behaves per spec. Do NOT "simplify" a `var(--app-vh)` back to `100svh`. */
   --app-vh: 100svh;
+  /* The same value under a second name, resolved here at the root. The
+     homepage hero (HomeHeroStack) redefines --app-vh for its own subtree as
+     max(page height, a minimum), and a custom property cannot reference
+     itself, so it reads this copy instead. Nothing else should need it. */
+  --app-vh-page: var(--app-vh);
 }
 @media (min-width: 768px) {
   :root {

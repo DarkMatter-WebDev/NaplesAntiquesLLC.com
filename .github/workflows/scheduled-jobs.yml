@@ -1,61 +1,36 @@
-# Scheduled jobs — replacement trigger for the Netlify Scheduled Functions.
+# Scheduled jobs — MANUAL runs only.
 #
-# ⚠️ SUPERSEDED 2026-09-07: Supabase pg_cron now fires all seven jobs
-# (supabase/scheduled-jobs-pg-cron-2026-09.sql). GitHub `schedule` created only
-# 6–16 of ~64 runs/day from 2026-08-27 on (0 failures — it just stopped creating
-# them). The `schedule:` block below is kept for a 1–2 day overlap and is to be
-# DELETED (keep workflow_dispatch for manual runs) — see project-docs/TASKS.md.
+# Supabase pg_cron fires all seven jobs on their schedules
+# (supabase/scheduled-jobs-pg-cron-2026-09.sql). This workflow keeps only the
+# "Run workflow" button for a manual run of any job.
 #
-# WHY THIS EXISTS
-# ---------------
-# As of 2026-08-10 none of the five Netlify scheduled functions in
-# next-app/netlify/functions/ has ever executed. They are deployed, carry the
-# Scheduled badge, show a correct "Next execution", have all four *_CRON_SECRET
-# variables scoped to Functions, and the account has credits — yet nothing runs.
-# Manual "Run now" is dead too: the dashboard's invoke API returns HTTP 202
-# Accepted and the function still never executes. This is a known, recurring
-# Netlify platform fault (same signature reported Apr 2023 → Jul 2026, including
-# a platform-wide incident on 2026-04-12 that their support fixed silently).
+# HISTORY — read before adding a `schedule:` back
+# -----------------------------------------------
+# - 2026-08-11: this workflow replaced the five Netlify scheduled functions, which
+#   had never executed once.
+# - 2026-08-27: GitHub `schedule` degraded — it created only 6–16 of ~64 runs a
+#   day, often hours late.
+# - 2026-09-07: pg_cron took over every trigger; this `schedule:` block and the
+#   Netlify functions were kept for a short overlap.
+# - 2026-09-11/12: Netlify's scheduler started working, so every job fired THREE
+#   times (pg_cron, Netlify ~15–40s later, GitHub late). Found after run #606's
+#   facebook-drip 502 (a late GitHub call). The social drips claim nothing
+#   before publishing, so overlapping triggers could double-post.
+# - 2026-09-13: `schedule:` removed here and next-app/netlify/functions/ deleted.
+#   ONE scheduler, pg_cron. Adding a second one brings the double-post risk back.
 #
-# The five Next routes were built trigger-agnostic and secret-header-guarded on
-# purpose — see the comment in
-# next-app/src/app/api/admin/etsy/price-push/route.ts, which names "any external
-# cron hitting this route with the secret header" as a supported trigger. So
-# this workflow needs NO application code change; it is only a different caller.
-#
-# Verified 2026-08-11: POST https://naplesestatejewelry.com/api/admin/etsy/price-push
-# with no secret returns 401 {"error":"Unauthorized."}, so the routes are
-# reachable from outside Netlify and this approach works.
-#
-# ⚠️ OVERLAP: the Netlify .mts functions are intentionally left in place so this
-# is reversible. If Netlify ever fixes the fault, BOTH triggers will fire and
-# each job will run twice a day. That is tolerable (a second price push finds
-# prices unchanged and no-ops; a second drip finds no due rows; a second token
-# refresh returns `too_young`) but untidy — when the Netlify ticket is resolved,
-# delete either this file or next-app/netlify/functions/*.mts, not both.
-#
-# ⚠️ GitHub caveats, both real:
-#   - `schedule` is best-effort. Runs are commonly 5–15 minutes late and can be
-#     dropped entirely under load. Fine for a daily price push; the social drips
-#     tolerate it because the due-row query prevents posting before a slot.
-#   - GitHub DISABLES scheduled workflows in a repository with 60 days of no
-#     activity. If these silently stop, check that first.
-#
-# SETUP (one time): add four repository secrets under
-# Settings → Secrets and variables → Actions:
+# The routes are trigger-agnostic and guarded by an `x-cron-secret` header.
+# Repository secrets (Settings → Secrets and variables → Actions):
 #   ETSY_CRON_SECRET, EBAY_CRON_SECRET, INSTAGRAM_CRON_SECRET, FACEBOOK_CRON_SECRET
-# Use the SAME values already set in Netlify. Each job fails loudly if its
-# secret is missing rather than silently doing nothing — the whole point.
+# Same values as Netlify and Supabase Vault. Each job fails loudly if its secret
+# is missing.
+#
+# ⚠️ The GitHub mobile app labels these runs "Triggered via pull request"; the web
+# UI and the API show the real event.
 
 name: Scheduled jobs
 
 on:
-  schedule:
-    - cron: '15 11 * * *' # Etsy price push      — 7:15 a.m. EDT / 6:15 EST
-    - cron: '45 11 * * *' # eBay price push      — staggered 30 min after Etsy
-    - cron: '0 0-5,16-23 * * *' # Instagram + Facebook drip
-    - cron: '15 12 * * 1' # Instagram token refresh — Mondays
-    - cron: '*/30 * * * *' # Marketplace status reconcile — every 30 min (see the job comment)
   workflow_dispatch:
     inputs:
       job:
@@ -79,12 +54,12 @@ env:
   SITE_URL: https://naplesestatejewelry.com
 
 concurrency:
-  group: scheduled-jobs-${{ github.event.schedule || inputs.job }}
+  group: scheduled-jobs-${{ inputs.job }}
   cancel-in-progress: false
 
 jobs:
   etsy-price-push:
-    if: github.event.schedule == '15 11 * * *' || contains(fromJSON('["all","etsy-price-push"]'), inputs.job)
+    if: contains(fromJSON('["all","etsy-price-push"]'), inputs.job)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -108,7 +83,7 @@ jobs:
           [ "${code}" -ge 200 ] && [ "${code}" -lt 300 ]
 
   ebay-price-push:
-    if: github.event.schedule == '45 11 * * *' || contains(fromJSON('["all","ebay-price-push"]'), inputs.job)
+    if: contains(fromJSON('["all","ebay-price-push"]'), inputs.job)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -132,7 +107,7 @@ jobs:
           [ "${code}" -ge 200 ] && [ "${code}" -lt 300 ]
 
   instagram-drip:
-    if: github.event.schedule == '0 0-5,16-23 * * *' || contains(fromJSON('["all","instagram-drip"]'), inputs.job)
+    if: contains(fromJSON('["all","instagram-drip"]'), inputs.job)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -156,7 +131,7 @@ jobs:
           [ "${code}" -ge 200 ] && [ "${code}" -lt 300 ]
 
   facebook-drip:
-    if: github.event.schedule == '0 0-5,16-23 * * *' || contains(fromJSON('["all","facebook-drip"]'), inputs.job)
+    if: contains(fromJSON('["all","facebook-drip"]'), inputs.job)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -179,42 +154,11 @@ jobs:
           cat response.json; echo
           [ "${code}" -ge 200 ] && [ "${code}" -lt 300 ]
 
-  # Uses INSTAGRAM_CRON_SECRET, same as the drip — the refresh-token route is
-  # guarded by that same variable.
-  # Status-drift reconcile — the SAFETY NET under the auto-delist hook.
-  #
-  # The hook itself runs post-response via Next's after(), which on Netlify is
-  # best-effort by design: the Lambda freezes when the response flushes, so work
-  # still in flight is suspended and is lost outright if that container is
-  # reclaimed while cold. Measured 2026-08-21 — a log insert landed 127.6s late
-  # on a thaw, and in August two sold products stayed live on both marketplaces
-  # for twelve days because their containers never came back.
-  #
-  # These two jobs ask the question no scheduling primitive can: "is anything
-  # sold still live right now?" — and fix it.
-  #
-  # EVERY 30 MINUTES, chosen deliberately over awaiting the hook in the PayPal
-  # capture path. Awaiting would close the window to ~0 but puts eBay/Etsy in
-  # the buyer's payment path — and since the payment is ALREADY captured by the
-  # time the hook runs, any hang there turns a successful payment into an error
-  # page for the buyer. Neither marketplace client has a request timeout and
-  # both retry with 1s/2s/4s backoff, so that tail is unbounded. Bounding the
-  # exposure from the outside is the trade with no downside.
-  #
-  # Cheap when clean: measured 2026-08-21 at 1131ms (eBay) / 781ms (Etsy) for
-  # 124 + 128 listings, three queries each and NO marketplace calls unless
-  # something actually drifted. Actions minutes are free on this public repo.
-  #
-  # ⚠️ It does write one `reconcile_status` row per channel per run (~96/day).
-  # That is deliberate — a clean run that logs nothing is indistinguishable from
-  # a cron that stopped firing — but it does add to the sync-log volume already
-  # tracked in project-docs/TASKS.md. Lengthen the interval if that becomes the
-  # problem; the sweep is a backstop, and a dropped run costs nothing.
-  #
-  # Each channel uses its OWN existing secret, so no new repository secret is
-  # needed — a new secret is a new way for a cron to 401 silently.
+  # Status-drift reconcile — the safety net under the auto-delist hook, which
+  # runs post-response via Next's after() and is best-effort on Netlify. pg_cron
+  # runs it every 30 minutes; each channel uses its own existing secret.
   ebay-reconcile-status:
-    if: github.event.schedule == '*/30 * * * *' || contains(fromJSON('["all","reconcile-status"]'), inputs.job)
+    if: contains(fromJSON('["all","reconcile-status"]'), inputs.job)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -238,7 +182,7 @@ jobs:
           [ "${code}" -ge 200 ] && [ "${code}" -lt 300 ]
 
   etsy-reconcile-status:
-    if: github.event.schedule == '*/30 * * * *' || contains(fromJSON('["all","reconcile-status"]'), inputs.job)
+    if: contains(fromJSON('["all","reconcile-status"]'), inputs.job)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -261,8 +205,10 @@ jobs:
           cat response.json; echo
           [ "${code}" -ge 200 ] && [ "${code}" -lt 300 ]
 
+  # Uses INSTAGRAM_CRON_SECRET, same as the drip — the refresh-token route is
+  # guarded by that same variable.
   instagram-token-refresh:
-    if: github.event.schedule == '15 12 * * 1' || contains(fromJSON('["all","instagram-token-refresh"]'), inputs.job)
+    if: contains(fromJSON('["all","instagram-token-refresh"]'), inputs.job)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

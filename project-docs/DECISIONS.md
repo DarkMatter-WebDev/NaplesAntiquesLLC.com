@@ -6,6 +6,176 @@
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
 > compaction. Last reconciled: **2026-09-12**.
 
+## The homepage headline shrinks in place on a short window; its position never moves (2026-09-13)
+
+**Owner chose "Option A"** from a before/after mockup
+(https://claude.ai/code/artifact/510369b1-5f31-437c-a48f-d190ca776460) over the
+recommended Option B ("move the headline up into the empty space, then fit").
+Do not re-propose B unprompted.
+
+**The collision is driven by window HEIGHT, not width.** Before the change the
+headline met the sign-up form below about 670px tall at 320 wide, ~710 at 800,
+~762 at 1024, ~792 at 1200 (the worst — 3 lines at nearly full size) and ~704 at
+1366–1440. A 1366×768 laptop leaves ~657px of page: overlapped by 28px.
+1024×609 overlapped by 92px.
+
+**The rule** (`.home-hero-top h1`, `HomeHeroOverlay.tsx`): the font size is the
+LARGEST of a one-, two- and three-line fit inside the headline's room, each
+capped by the width that line count needs, then the old caps (8vw / 5.75rem;
+phones 7vw / 2.5rem), floor 1.5rem. The room is a band centered where the
+headline already sits (a quarter of the overlay down; phones: from the top
+offset down) that stops 1.5rem (phones 1rem) above the sign-up block, minus the
+eyebrow. A window with room renders exactly as before — verified identical at
+1440×900 and 1920×1080.
+
+- ⚠️ **The width ratios are this wording's measurements:** unwrapped, the
+  headline is 22.4em (EN) / 22.1em (ES) wide → 23.5 for one line; 12.6 for two
+  (from the 1152px two-line measurement below). A longer headline must
+  re-measure them or it can wrap onto a line the fit did not budget for.
+- ⚠️ **Never derive the hero height from `var(--app-vh) - var(--site-header-height)`.**
+  The overlay is also short by the promo bar (~36px desktop, ~33px phones), so
+  the fit reads real heights with container units instead.
+- ⚠️ **The structure it depends on:** `.home-hero-overlay` is a size container
+  and a two-row grid; `.home-hero-top-zone` (row 1, wraps the headline) is a
+  size container that MUST carry `z-index: 5` — size containment makes it a
+  stacking context, and without it the headline paints under the halo layers
+  (z-index 4); `--hero-quarter` is registered with `@property` so `25cqh`
+  resolves against the overlay, not the zone; the sign-up block is in flow in
+  row 2 and held off the bottom by **`margin-bottom`, never `bottom:`** — a
+  leftover `bottom:` on the phone rule stacked with the desktop margin and
+  moved the form up 99px at 390×664 until it was removed.
+- The fit sits inside `@supports (height: 1cqh)`; a browser without container
+  units keeps the plain clamp.
+- **Not solved:** an iPhone SE in Safari (375×552) still overlaps by 35px (was
+  85) and 320×568 by 65px (was 87) at the 1.5rem floor. Per the phone rule in the
+  hero-headline entry, that is fixed by shortening the headline, not smaller
+  type — owner's call.
+
+Measured after (gap below the headline; the form did not move at any size):
+1024×609 38.7px, 1 line, 27px · 1366×657 47.7px, 1 line, 51px · 1200×700 and
+1024×700 69.4px, 2 lines, 24px · 1024×768 72.2px, 2 lines, 62px · 1536×730
+85px, 24px · 800×609 30px, 1 line, 32px · 390×664 27.3px, 3 lines, 22px ·
+375×667 26.3px, 29px · Spanish 1024×609 38.7px, 1 line, 27px.
+
+## The hero keeps a minimum height on the tiniest windows; compact heroes get smaller controls and a higher phone headline (2026-09-13)
+
+**Owner approved "all three"** (option 1, smaller controls, option 2) from
+https://claude.ai/code/artifact/6c60b170-a44f-47c5-ac60-c38f005f6cbc, then
+narrowed it: **"keep anything that fits today, the same"** — so the smaller
+controls apply ONLY where the hero does not fit (inside compact mode), not on
+every small phone as the mockup showed. The common iPhone (390×664) keeps its
+stacked fields.
+
+**Smaller controls** (inside every compact band):
+- Phones: Name / Email / Join on one 1.9rem row, Buy / Sell / Visit Us on one
+  row of 0.62rem buttons, consent line 0.62rem.
+- Laptops (and the 640px one-row form): fields and Join 2.25rem, buttons
+  0.4rem padding with an 8rem minimum.
+- Styled through class hooks in `HomeSubscriberForm` (`home-subscriber-label`,
+  `-fields`, `-input`, `-join`, `-privacy`). The hero's rules are unlayered, so
+  they beat the Tailwind utilities on those elements without `!important`.
+
+**Option 1** (compact phones): the headline starts `1.5rem` under the promo bar
+instead of `clamp(3rem, 11% of --app-vh, 6rem)`, and the fit room drops the
+offset accordingly.
+
+**Narrow-phone bands are per headline language** (since 2026-09-13, late). The
+English and Spanish headlines wrap differently below 431px, so one shared band
+either left a language overlapping or changed a size that fit in the other.
+`HomeHeroOverlay` now holds `COMPACT_BANDS_EN` and `COMPACT_BANDS_ES` and each
+page renders only its own (no CSS language selectors). Set from a fine sweep of
+the previous layout at 320–375px wide:
+- English: ≤348 wide at hero ≤580px · 349 at ≤540px · 350–430 at ≤520px.
+- Spanish: ≤335 at ≤600px · 336–339 at ≤580px · 340–350 at ≤560px · 351–368
+  at ≤540px · 369–430 at ≤520px.
+- Widths between measured points (336–338, 369, …) keep the neighbouring limit
+  that cannot change a fitting screen.
+- ⚠️ English 349 wide × 660 tall stays tight (12px, no overlap): it does not fit
+  at 620 or 660 but DOES fit at 640, and a height limit cannot skip 640 without
+  changing a screen that fits.
+From 431px up both languages share the table in the entry below.
+
+**Option 2 — minimum hero height** (`HomeHeroStack`):
+- `.home-hero-stack` redefines `--app-vh` for its subtree as
+  `max(var(--app-vh-page), var(--hero-min-vh))`. `--hero-min-vh`: 400px ≤359
+  wide · 360px 360–619 · 320px 620–639 · 400px 640–767 · 420px 768+ — each the
+  shortest window where headline, compact form and buttons all fit.
+- ⚠️ `--app-vh-page` is a copy of the token on `:root` (`globals.css`). A custom
+  property cannot reference itself, so never write
+  `--app-vh: max(var(--app-vh), …)`.
+- Both runway heights multiply their extra length by a CSS 0-or-1 switch,
+  `min(vh × 2.4 | 2.1, max(0px, (page − minimum + 1px) × 100000))`: 0 below the
+  minimum (nothing pins, the page scrolls normally — the reduced-motion layout
+  in CSS alone), exactly the old runway at or above it.
+- The scroll script's zero-travel path now calls `settleOnPaneA()`, the same
+  reset reduced motion uses, so a window shrunk mid-crossing cannot keep a
+  crossing's transforms. The touch snap already skips a runway without travel.
+- Slideshows B and C still arm on a tiny window (parked below the frame,
+  paused) — deliberately, so a later resize to a tall window has them ready.
+
+**Verified (live sweep, EN + ES, 34 widths × 40 heights):** of 870 (EN) / 867
+(ES) sizes that fit before without compact mode, **0 changed**; every changed
+size was already compact (473) or did not fit (12); 364 compact/short sizes
+identical to the approved mockup; runway travel 0 below each minimum and
+2.1 × window height elsewhere (0 errors). Left at that point: English 5 tight
+windows, Spanish 2 overlaps at 349–350 × 620 and 6 tight — closed the same night
+by the per-language bands above (fine re-sweep: 0 fitting sizes changed in
+either language; only English 349 × 660 tight remains). Also checked then, EN +
+ES at 276 sizes each from 320×240 to 1920×1000: 0 page sideways scroll, 0 hero
+elements past a screen edge, 0 clipped button / label / headline text, 0
+overlaps or cut-off buttons (including every height under 320px), and a window
+shrunk mid-crossing below the minimum clears every pane transform and resumes
+the exact crossing when grown back. Devices: iPhone SE Safari +1 → +191px,
+iPhone sideways −49 → +16px with the buttons 7px below the first screen; the
+other 11 unchanged. Guard: `lib/__tests__/hero-short-screens.test.ts`.
+
+## A hero too short to fit goes "compact" — and a hero that already fits is never touched (2026-09-13)
+
+**Owner: "choice a, leave screens that already fit the way they are (ex.
+common laptop)"**, picked from the mockup
+https://claude.ai/code/artifact/7c2e5401-5bc4-4c22-8bd5-28234b89e3a6 over
+Choice B (compact on short laptops too — bigger headline, no eyebrow on
+1280×720 / 1366×768 / iPad). Do not widen compact mode to screens that fit
+without asking.
+
+**What compact does** (`HomeHeroOverlay.tsx`, after every other hero rule):
+the eyebrow ("One Piece or an Entire Estate") is hidden and the headline fit
+stops reserving its space; the sign-up block's gaps drop 1.5rem → 0.75rem on
+laptops and 0.85rem → 0.5rem on phones; on laptops the space under the
+buttons drops from `clamp(5rem, …, 10rem)` to 1.5rem; New Arrivals' pull-up
+margin is eased so it never touches the buttons.
+
+**When** — a container query on the overlay (`hero-overlay`), at these HERO
+heights, each set at the tallest window where the previous layout measured
+tight (under 16px) or overlapping:
+
+| Width | Compact at hero height | ≈ window height |
+|---|---|---|
+| ≤ 430, English | ≤348: 580px · 349: 540px · 350–430: 520px | per language since 2026-09-13 (late) — entry above |
+| ≤ 430, Spanish | ≤335: 600px · 336–339: 580px · 340–350: 560px · 351–368: 540px · 369–430: 520px | per language since 2026-09-13 (late) — entry above |
+| 431–614 | ≤ 498px | ≤ 580 |
+| 615–639 | ≤ 478px | ≤ 560 |
+| exactly 640 | ≤ 398px | ≤ 480 (the form's `sm` breakpoint puts Name / Email / Join on one row) |
+| ≥ 641 | ≤ 460px | ≤ 560 (641–767 use the phone header) |
+
+- ⚠️ **Never a `max-height` media query.** The overlay height comes from the
+  frozen `--app-vh`; a media query follows the live window, which a mobile
+  toolbar moves mid-scroll, so the hero would flip modes while scrolling.
+- ⚠️ **"Leave what fits" is verified, not assumed** — live sweep 2026-09-13,
+  EN + ES, 33 widths × 40 heights: 879 sizes above the limits identical to
+  before, **0 sizes that already fit changed**, 321 compact sizes identical to
+  the approved mockup. The limits depend on the sign-up block's height, the
+  header and promo bar, and the headline wording — change any of those and
+  re-sweep (method in `CHANGELOG.md` 2026-09-13).
+- The 614/615 split follows the Spanish headline, which fits a few pixels
+  narrower; English 615–619 wide at ~570–580 tall stays tight (5px) but never
+  overlaps.
+- Accepted with Choice A: a jump at the limit — 1366×540 gets a 68px two-line
+  headline while 1366×580 keeps its 24px one-line headline.
+- The leftovers listed here at first (phones upright ≤ ~540 tall, phones
+  sideways, 320-wide phones, desktop windows ≤ ~420 tall) were closed the same
+  day by the entry above; what is still left is recorded there.
+
 ## A marketplace sale marks the product sold on the site through the checkout rule, and only from the moment it was enabled (2026-09-12)
 
 - **Decision.** The 30-minute reconcile sweeps read paid Etsy receipts and
@@ -3026,6 +3196,12 @@ only becomes two at 20px — which is body-text size, not a hero. Smaller type
 buys a ~20% shorter block and no fewer lines. If the phone rendering ever needs
 fixing, cut characters, not points.
 
+↳ **Amended 2026-09-13:** on a SHORT window the headline now does shrink
+(phones ~30px → 26–27px, desktop more) so it clears the sign-up form — owner's
+"Option A". The finding above still holds for the phones that remain
+overlapped at the 1.5rem floor: shorten the copy there. See *"The homepage
+headline shrinks in place on a short window"*.
+
 ⚠️ **`line-height` on this headline is 1.15 and must not go below ~1.1.** It was
 `0.95`, which advances the baseline LESS than the font's own ink occupies, so on
 a two-line headline the descenders of line 1 collided with the ascenders of
@@ -5809,12 +5985,23 @@ Supabase project (`supabase/scheduled-jobs-pg-cron-2026-09.sql`), secrets in
 Vault, same routes and UTC schedules, zero app change. Chosen over cron-job.org:
 no new vendor or account, secrets stay in-house, minute-accurate, run history
 in the dashboard. A rotated cron secret now has a FOURTH home: Supabase Vault.
+
+**2026-09-13: pg_cron is the ONLY scheduler.** Netlify's scheduler began
+executing the old `.mts` functions around 2026-09-11 and GitHub `schedule` still
+fired late, so every job ran three times (found after GitHub run #606's
+`facebook-drip` 502 — a late GitHub call; pg_cron's runs that hour were fine).
+The social drips read due rows and publish without claiming them, so two
+overlapping triggers could double-post a queued item. The `schedule:` block was
+removed from `scheduled-jobs.yml` (the manual "Run workflow" button stays) and
+`next-app/netlify/functions/` was deleted. **Never add a second scheduler** — if
+pg_cron ever needs replacing, cut over and delete, do not overlap.
 The paragraph below is the 2026-08-11 record.
 
 **GitHub Actions owns the daily trigger** — one staggered job per marketplace in
 `.github/workflows/scheduled-jobs.yml` (Etsy 11:15 UTC, eBay 11:45 UTC). It
 replaced the Netlify scheduled functions on 2026-08-11 because those never
-executed even once; the `.mts` files remain only so the change is reversible.
+executed even once; the `.mts` files were kept for reversibility until they were
+deleted on 2026-09-13 (above).
 The trigger is deliberately interchangeable: the routes are secret-header-guarded
 and trigger-agnostic, so any external cron can drive them. **Never assume a
 scheduler works because its dashboard says it is registered** — a Netlify

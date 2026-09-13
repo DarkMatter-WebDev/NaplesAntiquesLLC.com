@@ -223,10 +223,11 @@ select jobid, runid, status, return_message, start_time, end_time
 -- select cron.unschedule(jobname) from cron.job where jobname like 'nej-%';
 
 
--- ---------- AFTER 1–2 clean days ----------
--- Delete the `schedule:` block from .github/workflows/scheduled-jobs.yml
--- (keep workflow_dispatch for manual runs) and delete the five dead
--- next-app/netlify/functions/*.mts, or jobs will double-fire if either
--- scheduler ever wakes up. Proof of "clean": 48 reconcile_status rows per
--- channel per day in ebay_sync_log / etsy_sync_log, and price-push rows at
--- 11:15 / 11:45 UTC sharp.
+-- ---------- overlap cleanup — DONE 2026-09-13 ----------
+-- The `schedule:` block is gone from .github/workflows/scheduled-jobs.yml
+-- (manual "Run workflow" kept) and next-app/netlify/functions/ is deleted.
+-- It was overdue: Netlify's scheduler started working around 2026-09-11, so
+-- every job was firing three times. pg_cron is now the ONLY scheduler — do not
+-- add another. Proof of "clean" going forward: one scheduled_drip row per
+-- channel per hour in the drip window, one price-push row per channel per day
+-- at 11:15 / 11:45 UTC, 48 reconcile_status rows per channel per day.

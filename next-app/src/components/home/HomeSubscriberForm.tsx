@@ -58,14 +58,17 @@ export default function HomeSubscriberForm({ locale }: { locale: string }) {
         fontFamily: 'var(--font-label)',
       }}
     >
+      {/* The home-subscriber-* class names are hooks for the hero's compact
+          mode (HomeHeroOverlay), which shrinks these controls on screens too
+          short to fit them. They carry no styles of their own. */}
       <p
-        className="mb-2 text-[0.6rem] sm:mb-3 sm:text-[0.68rem] font-bold uppercase tracking-[0.24em]"
+        className="home-subscriber-label mb-2 text-[0.6rem] sm:mb-3 sm:text-[0.68rem] font-bold uppercase tracking-[0.24em]"
         style={{ color: 'var(--hero-eyebrow)', textShadow: '0 1px 10px rgba(var(--hero-fade), 0.9)' }}
       >
         {isEs ? 'Reciba nuevas piezas primero' : 'Get first look at new pieces'}
       </p>
       <div
-        className="grid gap-1.5 sm:gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)_auto]"
+        className="home-subscriber-fields grid gap-1.5 sm:gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)_auto]"
         style={{ alignItems: 'stretch' }}
       >
         {/* aria-label, not a visible <label>: the design is a compact inline row
@@ -78,7 +81,7 @@ export default function HomeSubscriberForm({ locale }: { locale: string }) {
           placeholder={isEs ? 'Nombre' : 'Name'}
           aria-label={isEs ? 'Nombre' : 'Name'}
           autoComplete="name"
-          className="h-9 min-w-0 rounded-xl border px-3 text-xs outline-none placeholder:text-black/50 sm:h-11 sm:text-sm"
+          className="home-subscriber-input h-9 min-w-0 rounded-xl border px-3 text-xs outline-none placeholder:text-black/50 sm:h-11 sm:text-sm"
           style={inputStyle}
         />
         <input
@@ -89,7 +92,7 @@ export default function HomeSubscriberForm({ locale }: { locale: string }) {
           placeholder={isEs ? 'Correo electrónico' : 'Email address'}
           aria-label={isEs ? 'Correo electrónico' : 'Email address'}
           autoComplete="email"
-          className="h-9 min-w-0 rounded-xl border px-3 text-xs outline-none placeholder:text-black/50 sm:h-11 sm:text-sm"
+          className="home-subscriber-input h-9 min-w-0 rounded-xl border px-3 text-xs outline-none placeholder:text-black/50 sm:h-11 sm:text-sm"
           style={inputStyle}
         />
         <button
@@ -109,7 +112,7 @@ export default function HomeSubscriberForm({ locale }: { locale: string }) {
           {message}
         </p>
       )}
-      <FormPrivacyNotice locale={locale} className="mt-2" color="var(--hero-text)" linkColor={GOLD} />
+      <FormPrivacyNotice locale={locale} className="home-subscriber-privacy mt-2" color="var(--hero-text)" linkColor={GOLD} />
     </form>
   );
 }

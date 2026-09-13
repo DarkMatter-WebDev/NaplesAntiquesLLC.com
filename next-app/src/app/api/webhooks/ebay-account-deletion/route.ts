@@ -3,7 +3,6 @@ import crypto from 'node:crypto';
 import { createServiceClient } from '@/lib/supabase/service';
 import { getSiteUrl } from '@/lib/order-email-branding';
 import { EBAY_API_BASE, getApplicationToken } from '@/lib/ebay/client';
-import { insertSyncLog } from '@/lib/ebay/store';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 // Phase 0 compliance endpoint (ebay-sync-plan/09-api-routes.md,
@@ -243,13 +242,25 @@ export async function POST(req: Request) {
 
   const service = createServiceClient();
 
+  // Nothing to delete on our side (no eBay buyer PII stored — see
+  // ebay-sync-plan/15-compliance.md). No eBay username/user-id is resolved by
+  // this build's OAuth flow (see lib/ebay/auth.ts), so we cannot positively
+  // match the deleted account to our own connection. The sanitized
+  // webhook_events row IS the receipt, so it is written already 'processed'.
+  //
+  // 2026-09-13: this used to also write an `account_deletion` row to
+  // ebay_sync_log and then update the receipt — ~1,760 notices/day, three
+  // writes each, 97% of that log and never read (the admin log filters them
+  // out). Do not add a sync-log write back here; retention for old receipts
+  // is supabase/log-retention-2026-09.sql.
   // Idempotency: the unique (provider, event_id) constraint rejects duplicates.
   const { error: insertError } = await service.from('webhook_events').insert({
     provider: 'ebay',
     event_id: notificationId,
     event_type: 'MARKETPLACE_ACCOUNT_DELETION',
     payload: sanitizeAccountDeletionEvent(event),
-    status: 'received',
+    status: 'processed',
+    processed_at: new Date().toISOString(),
   });
 
   if (insertError) {
@@ -259,28 +270,6 @@ export async function POST(req: Request) {
     console.error('webhook_events insert error:', insertError.message);
     return NextResponse.json({ error: { code: 'log_failed', message: 'Could not record event.' } }, { status: 500 });
   }
-
-  // Nothing to delete on our side (no eBay buyer PII stored — see
-  // ebay-sync-plan/15-compliance.md). No eBay username/user-id is resolved by
-  // this build's OAuth flow (see lib/ebay/auth.ts), so we cannot positively
-  // match the deleted account to our own connection — just log for owner
-  // review rather than guessing at a connection reset.
-  try {
-    await insertSyncLog(service, {
-      action: 'account_deletion',
-      outcome: 'ok',
-      message: `Received eBay account-deletion notification ${notificationId}.`,
-      detail: { notificationId },
-    });
-  } catch (err) {
-    console.error('eBay account-deletion logging error:', err);
-  }
-
-  await service
-    .from('webhook_events')
-    .update({ status: 'processed', processed_at: new Date().toISOString() })
-    .eq('provider', 'ebay')
-    .eq('event_id', notificationId);
 
   return NextResponse.json({ success: true });
 }

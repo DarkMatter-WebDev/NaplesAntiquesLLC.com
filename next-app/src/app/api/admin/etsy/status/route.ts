@@ -7,7 +7,8 @@ import { hasSalesScope } from '@/lib/marketplace-sales';
 
 export const runtime = 'nodejs';
 
-// Matches netlify/functions/etsy-price-push.mts (`schedule: '15 11 * * *'`).
+// Matches the pg_cron Etsy price-push job in
+// supabase/scheduled-jobs-pg-cron-2026-09.sql (`'15 11 * * *'`, UTC).
 const SCHEDULE_UTC_HOUR = 11;
 const SCHEDULE_UTC_MINUTE = 15;
 

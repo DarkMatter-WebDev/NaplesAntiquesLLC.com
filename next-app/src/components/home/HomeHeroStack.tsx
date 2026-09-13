@@ -531,38 +531,46 @@ export default function HomeHeroStack({
     // and reset to NaN by `remeasure` whenever the geometry or the active curve
     // changes underneath it.
     let lastP = NaN;
-    // Latch for the reduced-motion branch below, same purpose as `lastP`.
-    let reducedApplied = false;
+    // Latch for the resting branch below, same purpose as `lastP`.
+    let restingApplied = false;
+
+    // Hold the hero still on slideshow A. Used by reduced motion AND by a
+    // runway with no travel — a window shorter than the hero's minimum height,
+    // where CSS collapses the runway so the page scrolls normally.
+    const settleOnPaneA = () => {
+      // Idempotent, and this runs on the same page-wide scroll listener as the
+      // main path — so without a latch a visitor in either mode pays for
+      // clearing already-cleared styles on every frame of the whole page.
+      // Reset by `remeasure`, which the reduced-motion and resize listeners call.
+      if (restingApplied) return;
+      restingApplied = true;
+      // CSS has collapsed the runway to the plain hero; clear any transforms
+      // left over from before the preference flipped or the window shrank.
+      paneA.style.transform = '';
+      paneB.style.transform = '';
+      paneC.style.transform = '';
+      setRingPull(paneA, 0);
+      setRingPull(paneB, 0);
+      setRingPull(paneC, 0);
+      paneA.style.opacity = '';
+      paneB.style.opacity = '';
+      setPaneMask(paneA, 0, 0);
+      setPaneMask(paneB, 0, 0);
+      setPaneMask(paneC, 0, 0);
+      paneA.inert = false;
+      // Only pane A shows: B and C are display:none under reduced motion and
+      // parked below the frame (their resting transform) with no travel.
+      if (!liveRef.current.a) { liveRef.current.a = true; setLiveA(true); }
+      if (liveRef.current.b) { liveRef.current.b = false; setLiveB(false); }
+      if (liveRef.current.c) { liveRef.current.c = false; setLiveC(false); }
+      dominantRef.current = 'a';
+      setOverlayDark(paneDarkRef.current.a);
+    };
 
     const apply = () => {
       queued = false;
       if (reduceMotion.matches) {
-        // Idempotent, and this runs on the same page-wide scroll listener as the
-        // main path — so without a latch a reduced-motion visitor pays for
-        // clearing already-cleared styles on every frame of the whole page.
-        // Reset by `remeasure`, which the reduced-motion listener calls.
-        if (reducedApplied) return;
-        reducedApplied = true;
-        // CSS has collapsed the runway to the plain hero; clear any transforms
-        // left over from before the preference flipped.
-        paneA.style.transform = '';
-        paneB.style.transform = '';
-        paneC.style.transform = '';
-        setRingPull(paneA, 0);
-        setRingPull(paneB, 0);
-        setRingPull(paneC, 0);
-        paneA.style.opacity = '';
-        paneB.style.opacity = '';
-        setPaneMask(paneA, 0, 0);
-        setPaneMask(paneB, 0, 0);
-        setPaneMask(paneC, 0, 0);
-        paneA.inert = false;
-        // Reduced motion shows only pane A; B and C are display:none.
-        if (!liveRef.current.a) { liveRef.current.a = true; setLiveA(true); }
-        if (liveRef.current.b) { liveRef.current.b = false; setLiveB(false); }
-        if (liveRef.current.c) { liveRef.current.c = false; setLiveC(false); }
-        dominantRef.current = 'a';
-        setOverlayDark(paneDarkRef.current.a);
+        settleOnPaneA();
         return;
       }
       // The sticky frame translates from 0 to (runway height - frame height)
@@ -577,7 +585,13 @@ export default function HomeHeroStack({
         travel = runway.offsetHeight - frame.offsetHeight;
         travelRef.current = travel;
       }
-      if (travel <= 0) return;
+      // No travel: the window is shorter than the hero's minimum height and CSS
+      // has collapsed the runway (.home-hero-stack below). Clear anything left
+      // from before a resize and hold on slideshow A.
+      if (travel <= 0) {
+        settleOnPaneA();
+        return;
+      }
       const offset = frame.getBoundingClientRect().top - runway.getBoundingClientRect().top;
       const p = Math.min(Math.max(offset / travel, 0), 1);
       // Everything below is a pure function of `p`, so an unchanged `p` can only
@@ -727,7 +741,7 @@ export default function HomeHeroStack({
       // pointer-type change) is about to differ, so the same `p` no longer
       // implies the same rendered result.
       lastP = NaN;
-      reducedApplied = false;
+      restingApplied = false;
       schedule();
     };
 
@@ -963,6 +977,16 @@ export default function HomeHeroStack({
       <style>{`
         .home-hero-stack {
           position: relative;
+          /* Short-screen minimum (owner, 2026-09-13, "option 2"). Inside the
+             hero, the viewport token is never below --hero-min-vh, so on a
+             window shorter than that the frame, panes and overlay all lay out
+             as if the window were that tall and the page scrolls a little to
+             reach the buttons. It reads --app-vh-page (the page copy of the
+             token, globals.css) because a custom property cannot reference
+             itself. A window at or above the minimum computes exactly as
+             before. Per-width minimums are set further down. */
+          --hero-min-vh: 420px;
+          --app-vh: max(var(--app-vh-page), var(--hero-min-vh));
           /* Frame height + scroll runway.
 
              The runway is ONLY the scroll budget. It does not change what the
@@ -987,8 +1011,13 @@ export default function HomeHeroStack({
              half the experience.
 
              The PHASE_* fractions divide whatever budget is set here, so they do
-             not need re-tuning alongside it. */
-          height: calc((var(--app-vh) - var(--site-header-height)) + (var(--app-vh) * 2.4));
+             not need re-tuning alongside it.
+
+             The min() / max() wrapper is a 0-or-1 switch: on a window shorter
+             than --hero-min-vh the extra runway is 0, so nothing pins and the
+             page scrolls normally (the reduced-motion layout, in CSS alone);
+             at or above it the term is exactly the runway above. */
+          height: calc((var(--app-vh) - var(--site-header-height)) + min(var(--app-vh) * 2.4, max(0px, (var(--app-vh-page) - var(--hero-min-vh) + 1px) * 100000)));
         }
 
         /* DESKTOP ONLY: a slightly shorter runway, i.e. a slightly faster hero
@@ -1020,8 +1049,25 @@ export default function HomeHeroStack({
            only. */
         @media not all and (pointer: coarse) {
           .home-hero-stack {
-            height: calc((var(--app-vh) - var(--site-header-height)) + (var(--app-vh) * 2.1));
+            height: calc((var(--app-vh) - var(--site-header-height)) + min(var(--app-vh) * 2.1, max(0px, (var(--app-vh-page) - var(--hero-min-vh) + 1px) * 100000)));
           }
+        }
+
+        /* Minimum hero heights by width, measured 2026-09-13: the shortest
+           window at which the headline, the compact sign-up block and the
+           buttons all fit, English and Spanish. Below it the runway above
+           collapses and the hero keeps this height. */
+        @media (max-width: 359px) {
+          .home-hero-stack { --hero-min-vh: 400px; }
+        }
+        @media (min-width: 360px) and (max-width: 619px) {
+          .home-hero-stack { --hero-min-vh: 360px; }
+        }
+        @media (min-width: 620px) and (max-width: 639px) {
+          .home-hero-stack { --hero-min-vh: 320px; }
+        }
+        @media (min-width: 640px) and (max-width: 767px) {
+          .home-hero-stack { --hero-min-vh: 400px; }
         }
 
         .home-hero-stack-frame {

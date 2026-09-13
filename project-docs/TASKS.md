@@ -5,26 +5,176 @@
 
 ## ◻ OPEN — needs a human
 
-### 🔴 DEPLOY the 2026-09-12 (night) addition: marketplace sale → site SOLD → other marketplace ended — needs ONE SQL run + TWO reconnects (no env vars)
+### 🟡 RUN BY OWNER 2026-09-13 evening (blocks 1–12: indexes, procedure, one-batch test, job `nej-log-retention` scheduled) — ◻ first nightly run 2026-09-14 07:20 UTC; check it after that ("check the retention run")
+
+`supabase/log-retention-2026-09.sql` — batched retention procedure + one new
+pg_cron job `nej-log-retention` (07:20 UTC). Independent of the site deploy
+(pure SQL). Audit + reasoning: `CHANGELOG.md` 2026-09-13 (log retention audit).
+The report's cause was wrong: the growth is eBay's account-deletion broadcast
+(~1,760/day, written to BOTH `webhook_events` and `ebay_sync_log`), not
+listing reconcile. Nothing urgent (DB 156 MB of 8 GB). ◻ Owner: approve the
+windows, then run steps 0-4 one at a time. ◻ Optional code follow-up (not
+built): stop the duplicate `account_deletion` row in `ebay_sync_log`
+(`ebay-account-deletion/route.ts:268-277`) — the preferred option already
+noted further down ("eBay `account_deletion` webhook rows are 97%…"). Closes the
+owed identifier scrub (22,552 rows, 07-10 → 07-23) when the 30-day rule runs.
+Double-checked 09-13: draft bug fixed (SET clause would have blocked COMMIT);
+pg_cron/editor COMMIT, triggers, publications, readers all verified safe.
+Staging (fix): ✅ synced — dry run exactly 3 (SQL, CHANGELOG, TASKS), 0 extras;
+copied 3; follow-up 0; SHA-256 MATCH ×3; staged SQL has 0 `set search_path`
+lines. Docs-only re-sync after this line.
+
+**Staging (retention draft):** ✅ synced 2026-09-13 — dry run exactly 3
+(`supabase/log-retention-2026-09.sql` new, CHANGELOG, TASKS), 0 extras; real run
+copied 3; follow-up dry run 0; SHA-256 MATCH on all 3; leak check 0 `.env*`.
+Docs-only re-sync after this line.
+
+### 🔴 STAGED 2026-09-13 — eBay account-deletion webhook writes once per notice (rides with the same push; no SQL, no env vars)
+
+`ebay-account-deletion/route.ts` now inserts the receipt already `processed`.
+It no longer writes an `ebay_sync_log` row or a follow-up update, cutting
+~3,500 writes/day. New `__tests__/post-success.test.ts` covers the signed happy
+path. Gate: tsc 0 · `npm run lint` 0 · **1329/1329 (135 files)** · build 0 · no
+Turbopack build cache. `CHANGELOG.md` 2026-09-13 (late night, webhook).
+Dev smoke on :3007: GET without code → 400 `missing_challenge_code`; unsigned
+POST → 412 `invalid_signature` (rejected before any DB access).
+
+**Staging (webhook fix):** ✅ synced 2026-09-13 — dry run exactly the 7 expected
+(route.ts, post-success.test.ts new, CHANGELOG, CURRENT_STATUS, TASKS,
+features/ebay-sync.md, log-retention SQL), 0 extras; copied 7; follow-up 0;
+SHA-256 MATCH ×7; staged route has 0 `insertSyncLog`; leak check 0 `.env*` /
+`.log`; 208 = 208 `.tsx`. Docs-only re-sync after this line.
+
+- ◻ After the push (read-only, next day): new eBay receipts keep arriving in
+  `webhook_events` (~1,760/day, status `processed`), and `ebay_sync_log` gets
+  no new `account_deletion` rows. Ask and I'll read both tables.
+
+### 🔴 STAGED 2026-09-13 — owner photo replaced on About, homepage and Free Appraisal (rides with the same push; no SQL, no env vars)
+
+New `public/assets/images/pages/chris-owner.webp` (showroom-table WhatsApp
+photo, WebP q80, 140 KB) replaces the deleted `chris.webp` at
+`about/page.tsx:98`, `(home)/page.tsx:392`, `free-evaluation/page.tsx:664`;
+`netlify.toml` 301s `/chris.png` and the old `chris.webp` path to the new file.
+Verified on dev in Chrome (all three render). ◻ After the push: glance at the
+three pages on the live site (EN + ES). `CHANGELOG.md` 2026-09-13 (late night).
+Gate: tsc 0 · eslint (3 pages) 0 · vitest 1326/1326. Pre-push full gate over
+the whole staged batch (dev server stopped first, restarted after): `npm run
+lint` exit 0 · `npm run build` exit 0 · no `.next/cache/turbopack/` (secrets
+scan). **Nothing else outstanding before the push** — no SQL, no env vars
+(`ETSY_REDIRECT_URI` already set in Netlify, goes live with this deploy).
+
+**Staging:** ✅ synced 2026-09-13 — dry run listed exactly the 9 expected entries
+(3 pages, `chris-owner.webp` new, `chris.webp` extra, `netlify.toml`, CHANGELOG,
+CURRENT_STATUS, TASKS); real run copied 8 / extras 1 removed / 0 FAILED, 1081
+total; follow-up dry run 0; SHA-256 MATCH on all 8; old `chris.webp` gone from
+staging; leak check 0 `.env*` / `.log`; 208 = 208 `.tsx`; staged pages carry
+`chris-owner.webp` ×3. Docs-only re-sync after this line.
+
+### 🔴 STAGED 2026-09-13 — one scheduler: GitHub `schedule:` removed + Netlify scheduled functions deleted (rides with the same push; no SQL, no env vars)
+
+Why: GitHub run #606's `facebook-drip` 502 (a late scheduled GitHub call;
+nothing lost) led to finding every job firing THREE times — pg_cron, the old
+Netlify `.mts` functions (executing since ~09-11) and GitHub's late
+`schedule`. The drips claim nothing before publishing, so overlap could
+double-post. pg_cron stays the only scheduler; the GitHub workflow keeps its
+manual "Run workflow" button. This closes the long-parked "pg_cron overlap
+cleanup" items further down. Detail + evidence: `CHANGELOG.md` 2026-09-13
+(late); rule: `DECISIONS.md` scheduling entry ("pg_cron is the ONLY
+scheduler"). Gate: YAML valid · tsc 0 · lint 0 · **1326/1326** · build exit 0.
+
+- ◻ After the push (read-only, any time the next day): Netlify → Functions
+  lists only "Next.js Server Handler" (no scheduled functions); GitHub Actions
+  shows no new scheduled "Scheduled jobs" runs; the sync logs show ONE drip row
+  per channel per hour (~:00:0x) and ONE price-push row per channel per day
+  (11:15 / 11:45 UTC). Ask and I will read the logs.
+
+**Staging (one scheduler):** ✅ synced 2026-09-13 (late) — dry run listed exactly the 14 changed files (scheduled-jobs.yml, three admin routes, pg_cron SQL, ARCHITECTURE, CHANGELOG, CURRENT_STATUS, DECISIONS, STRUCTURE, TASKS, features/ebay-sync, etsy-sync, facebook-posting) and exactly the 5 deleted `next-app/netlify/functions/*.mts` as extras (1 extra dir); real run copied 14 and removed the 5 + the folder (robocopy exit 3 = copied + extras); follow-up dry run 0/0; SHA-256 MATCH on all 14; staged `functions/` gone, `edge-functions/` 2 files intact, staged workflow has no `schedule:`; leak check 0 `.env*` / `.log` / `.git`; positive control 208 = 208 `.tsx`. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+### 🔴 STAGED 2026-09-13 — homepage hero on short screens, three owner-approved steps in one push: headline shrinks in place ("Option A") · compact mode where it cannot fit ("Choice A") · smaller controls, higher phone headline and a minimum hero height on the tiniest windows (no SQL, no env vars)
+
+Files: `components/home/HomeHeroOverlay.tsx`, `components/home/HomeHeroStack.tsx`,
+`components/home/HomeSubscriberForm.tsx`, `app/globals.css`, new
+`lib/__tests__/hero-short-screens.test.ts`. Mockups:
+headline fit https://claude.ai/code/artifact/510369b1-5f31-437c-a48f-d190ca776460 ·
+compact mode https://claude.ai/code/artifact/7c2e5401-5bc4-4c22-8bd5-28234b89e3a6 ·
+last short screens https://claude.ai/code/artifact/6c60b170-a44f-47c5-ac60-c38f005f6cbc ·
+overlap map https://claude.ai/code/artifact/a7a0f0e6-5e08-4a87-9417-3485da8e3ac3.
+Gate after the last step: tsc 0 · eslint 0 · `npm run lint` 0 · **1326/1326
+(134 files)** · build exit 0 · live sweep EN + ES, 34 widths × 40 heights:
+**0 sizes that fit before without compact mode changed**, 364 compact /
+minimum-height sizes identical to the mockup, runway travel correct everywhere
+(`CHANGELOG.md` 2026-09-13 (evening)). Owner rule: anything that fits today
+stays the same — the common iPhone, laptops and the iPad are unchanged.
+
+- ◻ After the push (owner, 2 minutes): (1) a very short laptop browser window
+  (under ~560px tall) — eyebrow gone, larger headline clear of a slimmer form;
+  (2) a phone turned sideways — headline clear of the form, a short scroll
+  reaches Buy / Sell / Visit Us, the hero does not pin; (3) a normal phone and a
+  normal laptop window look exactly as before.
+- ✅ Closed the same night (`CHANGELOG.md` 2026-09-13 (night)): per-language
+  compact limits fixed the English tight windows and both Spanish overlaps with
+  0 fitting sizes changed; overflow, clipped-text, under-320px-tall and
+  mid-scroll-resize checks all came back clean in both languages. Left by
+  design: English 349 wide × 660 tall stays tight (12px, no overlap) because its
+  640 fits. Gate: tsc 0 · lint 0 · **1326/1326** · build exit 0.
+- ◻ Owner, after the push: one look on a real iPhone in Safari, upright and
+  turned sideways (Chrome cannot stand in for WebKit scrolling).
+
+**Staging (per-language compact limits):** ✅ synced 2026-09-13 (night) — dry run listed exactly the 7 touched files (HomeHeroOverlay.tsx, hero-short-screens.test.ts, CHANGELOG, CURRENT_STATUS, DECISIONS, STRUCTURE, TASKS), 0 file extras, 0 dir extras; real run copied 7 / 0 FAILED; follow-up dry run 0/0; SHA-256 MATCH on all 7; staged overlay carries `COMPACT_BANDS_EN` and `COMPACT_BANDS_ES`; leak check 0 `.env*` / `.log` / `.git`; positive control 208 = 208 `.tsx`. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+- Also goes live with this push: Netlify `ETSY_REDIRECT_URI` (item below).
+
+**Staging (headline fit):** ✅ synced 2026-09-13 — dry run listed exactly the 6 touched files (HomeHeroOverlay.tsx, CHANGELOG, CURRENT_STATUS, DECISIONS, STRUCTURE, TASKS), 0 Extras, 1085 total; real run copied 6 / 0 FAILED; follow-up dry run 0; SHA-256 MATCH on all 6; leak check 0 `.env*` / `.log` / `.git`; positive control 208 = 208 `.tsx`; staged file carries `home-hero-top-zone`. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+**Staging (compact mode):** ✅ synced 2026-09-13 (afternoon) — dry run listed exactly the 6 touched files (HomeHeroOverlay.tsx, CHANGELOG, CURRENT_STATUS, DECISIONS, STRUCTURE, TASKS), 0 Extras, 1085 total; real run copied 6 / 0 FAILED; follow-up dry run 0; SHA-256 MATCH on all 6; leak check 0 `.env*` / `.log` / `.git` / `sweep*`; positive control 208 = 208 `.tsx`; staged file carries the 5 `@container hero-overlay` blocks. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+**Staging (last short screens):** ✅ synced 2026-09-13 (evening) — dry run listed exactly the 10 touched files (globals.css, HomeHeroOverlay.tsx, HomeHeroStack.tsx, HomeSubscriberForm.tsx, hero-short-screens.test.ts NEW, CHANGELOG, CURRENT_STATUS, DECISIONS, STRUCTURE, TASKS), 0 Extras, 1086 total; real run copied 10 / 0 FAILED; follow-up dry run 0; SHA-256 MATCH on all 10; leak check 0 `.env*` / `.log` / `.git` / `sweep*`; positive control 208 = 208 `.tsx`; staged files carry 7 `@container hero-overlay` blocks, the `--hero-min-vh` rules and `--app-vh-page` in globals.css. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+### 🟢 LIVE + ARMED 2026-09-13 04:00Z — marketplace sale → site SOLD → other marketplace ended (SQL run, deployed, both reconnected); ◻ read the 04:30Z log rows, then the first real sale is the proof
 
 Built + gated (tsc 0 · lint 0 · **1319/1319 (133 files)** · build exit 0)
 and staged with the batch below. `CHANGELOG.md` 2026-09-12 (night); rule in
 `DECISIONS.md` → *"A marketplace sale marks the product sold"*. Owner steps,
 in this order:
 
-1. ◻ **Supabase → SQL editor → run `supabase/marketplace-sales-2026-09.sql`**
-   (idempotent). Adds `auto_mark_sold` + `sales_cursor` to `etsy_connection`,
-   `auto_mark_sold` to `ebay_connection`, table `marketplace_sale_events`,
-   function `apply_marketplace_sale()`. Until it is run the sweeps log
-   "waiting for the database migration" once and otherwise behave as before.
-2. ◻ **Push + deploy** (the batch below plus this).
-3. ◻ **Admin → Settings → Etsy Sync → "Reconnect Etsy"** (the gold callout
-   under the new "Mark sold on the site when it sells on Etsy" switch) —
-   Etsy's consent screen now lists order access. Listings are untouched.
-4. ◻ **Admin → Settings → eBay Sync → "Reconnect eBay"** — same callout.
-5. ◻ Within 30 min each panel's line reads "Watching Etsy/eBay sales since
-   <time> ET" and the activity log shows "Auto-mark-sold armed — … sales
-   from <time>". Sales before that instant are ignored (your call 09-12).
+1. ✅ SQL run (09-13 ~03:20Z — columns and table confirmed in the DB).
+2. ✅ Pushed + deployed (the 03:30Z sweeps logged "waiting for order
+   permission" on both channels = the new code is live).
+3. ✅ Etsy reconnected 03:50:46Z — scopes now include `transactions_r`.
+   ⚠️ NOT from production: production's button redirected to
+   `localhost:3002` (Netlify `ETSY_REDIRECT_URI` was the dev callback). Done
+   from a local dev server on port 3002 instead (`.claude/launch.json` →
+   "Next.js Dev (port 3002 — marketplace OAuth callbacks)"), which writes
+   into the shared DB — `CHANGELOG.md` 2026-09-13.
+4. ✅ eBay reconnected 03:51:10Z the same way — scopes include
+   `sell.fulfillment.readonly`.
+5. ✅ **ARMED 04:00:02Z on both channels** (log rows "Auto-mark-sold armed
+   — Etsy sales from 2026-09-13T04:00:02Z…" / eBay 04:00:01Z; cursors set).
+   Sales before that instant are ignored (your call 09-12).
+   ✅ **04:30Z and every half-hour after it CHECKED (read 09-13 13:55Z,
+   service-role REST on `etsy_sync_log` / `ebay_sync_log`):** both channels
+   logged "sales: 0 orders read, 0 marked sold, 0 quantity reduced, 0 already
+   handled, 0 not ours, 0 failed" with outcome ok at 04:30:02Z (Etsy) /
+   04:30:02Z (eBay), and on all 20 half-hours 04:30 → 13:30Z. 22 sales rows +
+   22 reconcile rows per channel, no missed slot, **0 warning/error rows**;
+   reconcile steady at Etsy 133 scanned / eBay 127 scanned, all zeros. So the
+   order-read calls authenticate with the new scopes. ⚠️ 0 orders read cannot
+   prove the parser — no sale happened in the window, and an unexpected
+   response shape also reads as 0 — step 6 remains the proof.
+   Staging (this docs note): ✅ synced 09-13 — dry run exactly 2
+   (CURRENT_STATUS, TASKS), 0 Extras, 1085 total; copied 2 / 0 FAILED;
+   follow-up dry run 0; SHA-256 MATCH on both. Docs-only re-sync after this
+   line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+**Proper fix so the production Reconnect buttons work next time:**
+- ✅ Netlify `ETSY_REDIRECT_URI` (Production) →
+  `https://naplesestatejewelry.com/api/admin/etsy/callback` (set 09-12
+  23:56 ET). The Etsy app already lists that callback. **Live on the next
+  deploy** (no deploy spent on it alone).
+- ✅ **eBay needs nothing** (read in the owner's signed-in developer.ebay.com,
+  09-13 04:10Z): the one production RuName `Christopher_Sur-Christop-PostnS-ubfab`
+  already has auth accepted URL `https://naplesestatejewelry.com/api/admin/ebay/callback`
+  and declined URL `…/admin/settings?ebay=declined`, OAuth enabled, every
+  sell/commerce scope ticked. Production's Reconnect eBay lands on production
+  — tonight's reconnect (started at localhost:3002) completed on production's
+  callback, which is why it worked. Nothing changed there.
 6. ◻ **First real sale = the proof.** After the next Etsy or eBay sale wait
    for the half-hour: the activity log shows "Sold on Etsy — marked sold on
    the site at $X (Etsy order …)", the product reads Sold in Admin →
@@ -398,9 +548,9 @@ paths first — do not add `SECRETS_SCAN_OMIT_PATHS`.
   process; invite honest reviews from genuine customers without incentives or
   selective positive-review requests; pursue legitimate local business mentions
   and relevant links. Reassess these after deployment, separate from this batch.
-- Reassess the pre-existing **320×660 homepage H1/newsletter overlap** afterward:
-  English 8.3px, Spanish 27.8px. HomeHeroOverlay was unchanged; no fix in this
-  batch. Follow-up seller/card/link checks pass; the homepage hero itself is unchanged.
+- ✅ (superseded 2026-09-13) The **320×660 homepage H1/newsletter overlap** turned
+  out to be height-driven and site-wide on short windows; fixed by the headline
+  fit (top item). 320×568 and 375×552 still overlap at the type floor — see there.
 
 Latest checks after the three-file follow-up, from `next-app/`:
 `npm test -- --maxWorkers=4` — **1276/1276 tests, 130 files, 18.24s**;

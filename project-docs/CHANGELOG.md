@@ -1,6 +1,479 @@
 
 # Changelog
 
+## 2026-09-13 (late night, STAGED) — eBay account-deletion webhook: one write per notice instead of three
+
+**Why.** Owner: "build it and fold it into this deploy". The log retention
+audit (entry below) found ~1,760 eBay account-deletion notices a day. Each one
+cost three writes: a `webhook_events` insert (`received`), an `ebay_sync_log`
+`account_deletion` row that nothing reads, and an update to `processed`.
+
+**Built (`app/api/webhooks/ebay-account-deletion/route.ts`):**
+- The receipt is inserted already `status: 'processed'` with `processed_at`.
+- The `insertSyncLog` call, its import and the follow-up update are removed.
+- Signature check, sanitizing, duplicate response (`23505` → 200
+  `duplicate: true`), 500 on a failed write (so eBay retries) and the GET
+  challenge are unchanged.
+- The comment says never to add the sync-log write back.
+
+**New guard: `__tests__/post-success.test.ts`.** It covers the signed happy path
+through the REAL signature check: a throwaway P-256 key signs with SHA1, and
+the key endpoint and Supabase client are stubbed. Three cases:
+1. 200 with exactly one `webhook_events` insert, `processed`, no identifiers,
+   no `ebay_sync_log` write.
+2. A redelivery gets `duplicate: true` with one write.
+3. A failed write returns 500.
+
+**Safety checks:**
+- The only `account_deletion` reader is the admin exclude filter, which stays
+  for the old rows.
+- No code reads eBay receipt `status`.
+- The existing route tests cover GET and the signature-failure paths only.
+
+**Verification:**
+- Webhook tests 13/13 (3 files).
+- `npx tsc --noEmit` 0, `npm run lint` 0.
+- **vitest 1329/1329 (135 files)**.
+- `npm run build` 0 with the dev server stopped and restarted after.
+- No `.next/cache/turbopack/`.
+
+Docs: `features/ebay-sync.md`.
+
+## 2026-09-13 (late night) — Log retention audit of an outside billing report; retention SQL drafted, NOT run
+
+**Why.** Owner asked to check an outside agent's billing report before deploying
+("it may not be accurate"). Read-only queries in the Supabase SQL editor
+(owner's Chrome, 20:46Z) plus a code sweep of every reader/writer.
+
+**What the report got right:** counts (`ebay_sync_log` 120,563, `webhook_events`
+117,178); 8 pg_cron jobs, 127 runs in 24h, 0 failures; job 8 only prunes
+`cron.job_run_details`; growth is years from the 8 GB ceiling (DB 156 MB).
+
+**What it got wrong:**
+- **Cause.** Not "~50 listings × 2 reconcile runs/hour". All but 50
+  `webhook_events` rows and 117,136 `ebay_sync_log` rows are eBay
+  `MARKETPLACE_ACCOUNT_DELETION` broadcasts (~1,760/day, every day since 07-10),
+  written twice per notice by `ebay-account-deletion/route.ts:247-283`.
+  Reconcile adds ~55 eBay rows/day.
+- **"Nothing ever deletes old rows."** The four sync logs already prune at 90
+  days in app code (`lib/ebay/store.ts:360`, etsy/facebook/instagram stores) —
+  just never triggered yet (oldest eBay row 65 days; first eBay deletions
+  ~10-08). `rate_limits` self-cleans after 1 day. Only `webhook_events` grows
+  forever.
+- `product_sync_events` does not exist. Dates: oldest row 06-30, not 05-30.
+  Growth ≈ 2 MB/day, not 1. The reconcile jobs ARE sub-hourly (`*/30`).
+- The "236k-row backfill" — the windows below remove ~167k.
+
+**Also found.**
+- 22,552 eBay webhook rows (07-10 → 07-23) still hold deleted eBay users'
+  identifiers. That's the scrub still owed from `features/ebay-sync.md:305-308`.
+- 4 PayPal `PAYMENT.CAPTURE.COMPLETED` rows have status `error` (08-12 → 09-12).
+  Not investigated (out of scope).
+- `getLastScheduledPricePush`/`logSkipOnce` filter on `action` with no index.
+
+**Per table (size · 24h · oldest · readers → decision):**
+- `webhook_events` (92 MB · 1,757 · 06-30): dedupe only on `(provider,event_id)`;
+  eBay redelivers ≤4× within 0.2h; PayPal rows feed refund/dispute handling →
+  eBay receipts **30 days**, PayPal **keep all** (50 rows).
+- `ebay_sync_log` (43 MB · 1,861 · 07-10): admin shows newest 25 excluding
+  `account_deletion`; last-run lookups need only the newest row →
+  `account_deletion` **7 days**, rest **90 days** (unchanged rule).
+- `etsy_sync_log` (1 MB · 119 · 07-08), `facebook_sync_log`/`instagram_sync_log`
+  (176 kB · ~32 · 08-01): admin last-25 + social-queues last drip → **90 days**
+  (same as the app prune, now cron-backed).
+- `cloudflare_stream_webhook_events` (0 rows): 5-minute replay window →
+  **30 days**.
+- Not touched (unsafe or pointless): `admin_notifications` (inbox, refund-alert
+  dedupe, Storage GC reference set), `marketplace_sale_events` (once-only sale
+  guard, unbounded look-back, 0 rows), `email_campaign_events` (campaign stats,
+  0 rows), `rate_limits` (self-cleans), `order_emails`/`paypal_refunds`/
+  `discount_code_redemptions`.
+
+**Drafted:** `supabase/log-retention-2026-09.sql`:
+- Six `CREATE INDEX CONCURRENTLY`.
+- Procedure `nej_log_retention` deleting 5,000 at a time with a COMMIT per
+  batch. A DO block would be one transaction.
+- EXECUTE revoked from API roles.
+- One-batch smoke test.
+- Job `nej-log-retention` at `20 7 * * *`.
+- Verification and rollback steps.
+
+Backups: daily physical backups 06 → 13 Sep; point-in-time recovery is OFF
+(add-on not enabled), so a restore is whole-project to the last daily backup.
+pg_cron 1.6.4, PG 17.6. Nothing run; no deletes.
+
+**Double-check (owner: "it won't break anything?"):**
+- Found and fixed a draft bug: the procedure had `set search_path = public`.
+  Postgres forbids COMMIT in a procedure with a SET clause, so every run would
+  have failed and deleted nothing. Removed; tables are already written
+  `public.%I`.
+- Verified read-only: `cron.use_background_workers = off` (COMMIT allowed in
+  jobs); the SQL editor accepts `do $$ begin commit; end $$`; no
+  triggers/rules/publications on the tables; jobs run as `postgres`.
+- Code: sales "armed" state is the `sales_cursor`/`orders_cursor` columns, not
+  log rows. `logSkipOnce` just logs once more when no row exists. PayPal dedupe
+  filters `provider = 'paypal'`. The only `account_deletion` reader is the
+  admin exclude filter.
+- Duplicate-row code fix (not built, awaiting a yes): drop the `insertSyncLog`
+  call at `ebay-account-deletion/route.ts:268-277` and insert the receipt as
+  `processed` directly. Route tests cover only GET and the signature-failure
+  POST paths, so none change.
+
+## 2026-09-13 (late night, STAGED) — Owner photo replaced sitewide with the showroom-table photo
+
+**Why.** Owner: "Anywhere this photo is used, replace it with the WhatsApp photo
+of me with my arms crossed sitting at the white table. Convert / compress to
+Webp as you recommend."
+
+**Where the old photo was used (full search + content-hash scan of all 302
+images in `public/`; no copies under other names, not in OG/schema/emails):**
+About "Meet Chris", homepage "Meet the owner", `/free-evaluation` "You'll Deal
+Directly With Chris" (EN + ES each), plus the legacy `/chris.png` redirect.
+
+**Built:**
+- New file `public/assets/images/pages/chris-owner.webp` from
+  `Pictures/WhatsApp Image 2026-09-13 at 10.05.44 AM.jpeg` (1302×1302 JPEG,
+  327 KB) via the app's sharp: native size kept (under the 2048px cap), WebP
+  q80 effort 6, metadata stripped → 140 KB (q75 115 KB / q85 170 KB tried).
+  Encode verified: sharp reads `webp 1302x1302`, file magic `RIFF/WEBP`.
+- New file name on purpose (long image CDN cache). `src` swapped in
+  `app/[locale]/about/page.tsx:98`, `app/[locale]/(home)/page.tsx:392`,
+  `app/[locale]/free-evaluation/page.tsx:664`. No layout or crop changes.
+- `netlify.toml`: `/chris.png` now → `chris-owner.webp`; new 301
+  `/assets/images/pages/chris.webp` → `chris-owner.webp` for outside links.
+- Old `pages/chris.webp` deleted (owner asked for replacement; backup kept in
+  the session scratchpad, hash-verified before delete).
+
+**Verification (dev :3007, owner's Chrome):** all three pages render the new
+photo (About square card, homepage 4:5 crop with face and arms in frame,
+Free Appraisal 12rem circle); `/_next/image` for the new file 200 at w=640 and
+1080; homepage SSR HTML 12 `chris-owner` references, 0 old. Note: Chrome's
+background tab did not start the lazy homepage image until forced eager —
+debug-only, not a code change.
+
+## 2026-09-13 (night, STAGED) — Last hero overlaps closed with per-language compact limits; overflow, tiny-height and mid-scroll-resize checks all clean
+
+**Why.** After the short-screen work, English had 5 tight windows (340–349 wide
+× 620–660 tall) and Spanish had 2 overlaps (349–350 × 620, −13px) plus 6 tight.
+They survived because the narrow-phone bands were shared: fixing one language
+would have changed a size that fits in the other (owner rule: anything that
+fits today stays the same). Owner: "let's go back to fix the overlap formatting
+issues", including the checks shelved earlier.
+
+**Measured first:** a fine sweep of the staged layout at 320, 325, 330, 335,
+339, 340, 344, 348, 349, 350, 352, 355, 359, 360, 362, 365, 368, 370, 372 and
+375px wide, EN + ES, every height. It located exactly where each language
+stops fitting (e.g. English 340–348 tight only at 660; Spanish 352–368 tight
+only at 620; English 349 fails at 620 and 660 but fits at 640).
+
+**Built (`components/home/HomeHeroOverlay.tsx`):** the compact bands are now
+data — `COMPACT_BANDS_EN`, `COMPACT_BANDS_ES` (narrow phones) over
+`COMPACT_BANDS_SHARED` (431px up), written out by `compactBandCss()`; each page
+renders only its own language's table, so no CSS language selectors are
+needed. English: ≤348 → 580px, 349 → 540px, 350–430 → 520px. Spanish: ≤335 →
+600px, 336–339 → 580px, 340–350 → 560px, 351–368 → 540px, 369–430 → 520px. The
+guard test now checks the table values and the generated container query.
+
+**Verification:**
+- Fine re-sweep against the staged layout: **0 changed** among the sizes that
+  fit without compact mode (474 EN / 464 ES). Fixed: English 340–348 × 660 and
+  349 × 620; Spanish 320–335 × 680, 349–350 × 620 and 640 (both overlaps),
+  352–368 × 620. Left: English 349 × 660 tight (12px) — by design, since its
+  640 fits.
+- New check script, EN + ES, 23 widths (320–1920) × 12 heights (240–1000):
+  **0** page sideways scroll, **0** hero elements past either screen edge,
+  **0** clipped text in buttons / Join / labels / headline, **0** overlaps, cut-off
+  buttons or headlines under the promo bar, **0** tight windows, New Arrivals
+  never within 4px of the buttons. Under 320px tall every size clears the form
+  (16–62px), the page scrolls 18–127px to the buttons and runway travel is 0.
+- Mid-scroll resize, English, desktop pointer, no manual token writes: loaded
+  1366×900, scrolled to 900px (pane A −74.5%, B 7.7%, C 94.6%, A opacity 0.27);
+  shrunk to 1366×380 → `--app-vh` 380px, runway travel 0, every pane transform
+  and opacity cleared, 19px clear; scrolled while short → still clear; grown
+  back to 1366×900 and scrolled to 900 → the identical crossing restored.
+- `npx tsc --noEmit` exit 0 · `npx eslint` (overlay + guard test) exit 0 ·
+  `npm run lint` exit 0 · `npx vitest run` **1326/1326 (134 files)** ·
+  `npm run build` exit 0 (dev server stopped first, restarted after).
+
+Still not verifiable from here: a real iPhone in Safari (owner check after the
+push). No SQL, no env vars.
+
+## 2026-09-13 (late, STAGED) — One scheduler: GitHub `schedule:` removed, Netlify scheduled functions deleted (every job was firing three times)
+
+**Trigger.** Owner sent GitHub Actions run **#606** from the mobile app:
+"Triggered via pull request", `facebook-drip` failed after 5s with `HTTP 502`
+and Netlify's `{"errorType":"Error","errorMessage":"An unknown error…"}`.
+
+**Investigation (read-only):**
+- GitHub public API: run #606 is `event=schedule`, created 18:40:04Z — the
+  hourly drip schedule arriving 40 minutes late; the mobile app mislabels
+  scheduled runs (already recorded in `DECISIONS.md`). `main` head `a985175`
+  is from 03:14Z, so no push or deploy was involved. **1 failure in 400 runs**
+  since 2026-08-23.
+- Sync logs: 149 `facebook_sync_log` drip rows in 7 days, 0 non-ok; the 18:00
+  and 19:00 runs were ok; NO row at 18:40 (Instagram logged 18:40:10Z for the
+  same run) — the request died before the handler ran. Netlify's server-handler
+  log search ("drip", "error", custom range) returned nothing, so the exact
+  platform error is unknown; it fits a one-off function crash on start.
+- **Found:** a second trigger ~40s after pg_cron on every hourly drip since the
+  first window after the 2026-09-11 03:13Z deploy, and ~15s after pg_cron on
+  both daily price pushes since 2026-09-12 (e.g. 11:15:03 + 11:15:18Z). Those
+  are the five `next-app/netlify/functions/*.mts` finally executing. With
+  GitHub's late runs, every job fired three times. All "ok" (queues empty), but
+  `runScheduledDrip` publishes due rows without claiming them, so overlapping
+  triggers could double-post a queued item.
+
+**Owner: "Yes, do the cleanup as you recommend."**
+
+**Changed:**
+- `.github/workflows/scheduled-jobs.yml` — `schedule:` block removed; manual
+  `workflow_dispatch` kept; job `if:` conditions and the concurrency group now
+  read only the chosen job; header rewritten with the history and the
+  one-scheduler rule.
+- `next-app/netlify/functions/` — the five scheduled functions deleted
+  (`ebay-price-push`, `etsy-price-push`, `facebook-drip`, `instagram-drip`,
+  `instagram-token-refresh`), backed up to the session scratchpad first
+  (hashes matched); the empty folder removed; `edge-functions/` untouched.
+- Comments repointed at pg_cron: `api/admin/{etsy,ebay}/status/route.ts`,
+  `api/admin/ebay/reconcile-status/route.ts` (cron secrets now live in four
+  places incl. Supabase Vault); the closing note of
+  `supabase/scheduled-jobs-pg-cron-2026-09.sql` marks the cleanup done.
+- Docs: `ARCHITECTURE.md`, `DECISIONS.md` (scheduling entry), `STRUCTURE.md`,
+  `features/{etsy-sync,ebay-sync,facebook-posting}.md`.
+
+**Verification:** workflow parses as YAML with `workflow_dispatch` as the only
+trigger and all 7 jobs · no remaining code/config reference to the deleted
+functions (only dated history notes and `tsconfig.json`'s general `**/*.mts`
+include) · `npx tsc --noEmit` exit 0 · `npx eslint` on the three routes exit 0
+· `npm run lint` exit 0 · `npx vitest run` **1326/1326 (134 files)** ·
+`npm run build` exit 0 (dev server stopped first, restarted after). No SQL, no
+env vars; nothing to change in Netlify or GitHub settings.
+
+## 2026-09-13 (evening, STAGED) — The last short screens: smaller controls and a higher phone headline in compact mode, a minimum hero height on the tiniest windows
+
+**Why.** After compact mode, the headline still met the form on phones upright
+≤ ~540 tall, sideways phones (buttons past the hero bottom ≤ ~420), 320-wide
+phones up to ~660 and desktop windows ≤ ~420 (map:
+https://claude.ai/code/artifact/a7a0f0e6-5e08-4a87-9417-3485da8e3ac3, updated
+in place). The owner also sent a screenshot of a tiny window where the stacked
+fields and buttons filled the screen: "greatly shrink the size of the text
+input fields and buttons".
+
+**Mockup:** https://claude.ai/code/artifact/6c60b170-a44f-47c5-ac60-c38f005f6cbc
+(option 1 + smaller controls + option 2, screenshots, three-step map). Owner:
+"approve all three, smaller controls on all small phones", then **"keep
+anything that fits today, the same"** — confirmed by question: smaller
+controls **only where the hero does not fit** (compact mode).
+
+**Built:**
+- `HomeHeroOverlay.tsx`: compact bands now built from four shared constants
+  (`COMPACT_PHONE_ROOM`, `COMPACT_PHONE_CONTROLS`, `COMPACT_DESKTOP_ROOM`,
+  `COMPACT_DESKTOP_CONTROLS`). Phones: headline `top: 1.5rem`; Name / Email /
+  Join on one 1.9rem row; Buy / Sell / Visit Us on one row. Laptops: 2.25rem
+  fields, slimmer buttons. New narrow bands: ≤339 wide at hero ≤580px, 340–348
+  at ≤560px, 349–430 at ≤520px.
+- `HomeSubscriberForm.tsx`: class hooks `home-subscriber-label`, `-fields`,
+  `-input`, `-join`, `-privacy` (no styles of their own).
+- `HomeHeroStack.tsx`: `--hero-min-vh` per width band (400 / 360 / 320 / 400 /
+  420px), `--app-vh: max(var(--app-vh-page), var(--hero-min-vh))` for the hero
+  subtree, both runway heights behind a CSS 0-or-1 switch (no travel below the
+  minimum), and `settleOnPaneA()` shared by reduced motion and a zero-travel
+  runway.
+- `globals.css`: `--app-vh-page: var(--app-vh)` on `:root`.
+- New guard `lib/__tests__/hero-short-screens.test.ts` (7 tests).
+
+**Band edges were measured, not guessed:** the first cut (≤359 wide at 580px)
+would have compacted English 350–359px windows that fit at 620–680 tall. Two
+sweeps of the previous layout at 320, 330, 340, 341, 344, 346, 348, 349, 350,
+359 and 360 wide set the 339/340 and 348/349 splits (340–348 Spanish fits at a
+660px window; 349 English fits at 640).
+
+**Verification:**
+- Live sweep of the built code, headless Chrome over CDP, EN + ES, 34 widths ×
+  40 heights + 13 devices: of the sizes that fit before **without** compact mode
+  (870 EN / 867 ES) **0 changed**; every changed size was already compact (473)
+  or did not fit (12); **364 compact / minimum-height sizes identical to the
+  approved mockup**; runway travel 0 below each minimum and 2.1 × window height
+  elsewhere, **0 errors**.
+- Left: English **0 overlaps**, 5 tight (340–349 wide × 620–660 tall); Spanish
+  2 overlaps at 349–350 × 620 (unchanged from before) and 6 tight; buttons cut
+  off nowhere; headline under the promo bar nowhere. Scroll to reach the
+  buttons on a minimum-height hero: at most 47px.
+- Devices: iPhone SE Safari +1 → +191px; iPhone sideways −49 → +16px (buttons
+  7px below the first screen, runway travel 0); common iPhone, Galaxy, Pixel,
+  iPad both ways and all laptops unchanged.
+- `npx tsc --noEmit` exit 0 · `npx eslint` on the four changed files exit 0 ·
+  `npm run lint` exit 0 · `npx vitest run` **1326/1326 (134 files)** ·
+  `npm run build` exit 0 (dev server stopped first, restarted after).
+
+No SQL, no env vars.
+
+## 2026-09-13 (afternoon, STAGED) — Compact hero on windows too short to fit ("Choice A"): eyebrow hidden, sign-up block tightened; screens that already fit untouched
+
+**Why.** After the headline fit, a full sweep of the live dev homepage in
+headless Chrome (EN + ES, 24 widths 320–1920 × 40 heights 320–1100, plus 13
+everyday device page sizes) found the headline still meeting the form on 300
+of 960 sizes: every width at ≤ ~540px tall (phones ≤ ~580), plus sideways
+phones with the buttons past the hero bottom (≤ ~420). Two of 13 devices
+affected: iPhone SE in Safari (−34px) and iPhone sideways (−95px). Overlap
+map: https://claude.ai/code/artifact/a7a0f0e6-5e08-4a87-9417-3485da8e3ac3.
+
+**Mockup** (options 1 + 2 + 3, two switch-on thresholds, screenshots + map):
+https://claude.ai/code/artifact/7c2e5401-5bc4-4c22-8bd5-28234b89e3a6.
+**Owner: "choice a, leave screens that already fit the way they are (ex.
+common laptop)".**
+
+**Built (`components/home/HomeHeroOverlay.tsx`, CSS only):** the overlay is
+named `hero-overlay`; five `@media` width bands each wrap an
+`@container hero-overlay (max-height: …)` block that hides the eyebrow, sets
+the fit room without it, tightens the sign-up block (gap 0.75rem laptops /
+0.5rem phones; laptop bottom margin 1.5rem) and eases New Arrivals' margin.
+Hero-height limits: ≤430 wide 520 · 431–614 498 · 615–639 478 · exactly 640
+398 · 641+ 460 (table + reasons in `DECISIONS.md`).
+
+**Getting the limits right took three passes, all measured:** (1) the
+approved ≤560 / ≤600 window heights, converted to hero heights from the
+sweep (hero = window − 108px desktop, − ~88–92px phones); (2) the first live
+check found 640-wide windows at 500–580 tall compacted although they already
+fit (the form's `sm` breakpoint makes the block shorter there); (3) a
+"compact off" stylesheet reproduced the previous phone layout exactly (0 of 80
+cells differed at 600 and 640) and a fine sweep of 600–640 set the separate
+615–639 and 640 limits.
+
+**Verification:**
+- Live sweep of the final code, EN + ES, 33 widths × 40 heights: **879 sizes
+  above the limits identical to before, 0 sizes that already fit changed,
+  321 compact sizes identical to the mockup**, eyebrow hidden in all of them,
+  headline never under the promo bar, New Arrivals never within 4px of the
+  buttons.
+- Devices: iPhone SE Safari −34 → +1px (tight), iPhone sideways −95 → −49px
+  (still overlaps); the other 11 identical to before (1280×720, 1366×768,
+  1440×900, 1536×864, 1920×1080, iPad both ways, four newer phones).
+- `npx tsc --noEmit` exit 0 · `npx eslint src/components/home/HomeHeroOverlay.tsx`
+  exit 0 · `npm run lint` exit 0 · `npx vitest run` **1319/1319 (133 files)** ·
+  `npm run build` exit 0 (dev server stopped first, restarted after).
+- Sweep tooling lives in the session scratchpad only (headless Chrome over
+  CDP from Node 24): per-size `Emulation.setDeviceMetricsOverride`, set
+  `--app-vh` by hand, measure headline bottom → form top, eyebrow/headline top
+  vs the overlay, buttons vs the hero bottom.
+
+**Left for the owner's re-assessment:** phones upright ≤ ~540 tall, phones
+sideways (overlap; buttons cut off ≤ ~420), 320-wide phones up to ~660 tall,
+desktop windows ≤ ~420 tall. No SQL, no env vars.
+
+## 2026-09-13 (day, STAGED) — Homepage headline shrinks on a short window so it never runs into the sign-up form ("Option A")
+
+Owner, looking at the preview pane: at which width does the hero text run into
+the newsletter form? **Measured: it is the window HEIGHT, not the width.** At
+609px tall every width from 320 to 1440 collided; at 812 none did. Crossover
+heights (loading the page at each size): 320 wide ~670 · 375 ~651 · 800 ~710 ·
+1024 ~762 · 1200 ~792 (worst: 3 lines at nearly full size) · 1366/1440 ~704.
+Real laptops hit it — 1366×657 overlapped by 28px, 1024×609 by 92px (the
+third line, "Buyers", under the form; the eyebrow hidden under the promo bar).
+
+**Mockup** (headless-Chrome screenshots of the real page, now / A / B at
+1024×609, 1366×657, 390×664, 1920×1080, plus a 14-size table):
+https://claude.ai/code/artifact/510369b1-5f31-437c-a48f-d190ca776460 —
+A = shrink the headline only; B (recommended) = move it up into the empty
+space, then fit. **Owner: "i like option a better".**
+
+**Built (one file, `components/home/HomeHeroOverlay.tsx`; no copy, no JS):**
+- `.home-hero-overlay` became a size container and a two-row grid; the headline
+  is wrapped in a new `.home-hero-top-zone` (row 1, size container,
+  `z-index: 5`, registered `--hero-quarter: 25cqh`); the sign-up block moved
+  into row 2 in flow, held off the bottom by `margin-bottom` with the same
+  clamps its `bottom:` offsets used.
+- `.home-hero-top h1` font = largest of a 1-, 2- and 3-line fit inside a band
+  centered where the headline already sits, stopping 1.5rem (phones 1rem)
+  above the sign-up block, each capped by the width that line count needs
+  (23.5 / 12.6, from the measured 22.4em EN / 22.1em ES unwrapped width), then
+  the old 8vw / 5.75rem (phones 7vw / 2.5rem) caps, floor 1.5rem. Inside
+  `@supports (height: 1cqh)`.
+- A comment on the headline copy now warns that the ratios are this wording's.
+
+**Found on the way:** (1) the overlay is shorter than
+`--app-vh - --site-header-height` by the promo bar (792 vs 828 at 1366×900;
+~33px on phones), so the fit reads real heights with container units;
+(2) size containment made the zone a stacking context — `z-index: 5` on the
+zone keeps the text above the halo layers; (3) the first build left the phone
+rule's `bottom:` offset in place, which stacked with the desktop margin and
+moved the form up **99px at 390×664** — replaced with a phone `margin-bottom`
+and re-measured; (4) `--app-vh` ignores height-only resizes under 160px, so
+every measurement set the token by hand (memory `dev-server-gotchas`).
+
+**Measured after, live dev server (gap = headline bottom → form top; form
+top/bottom/left identical to before at every size):**
+
+| Window | Before | After |
+|---|---|---|
+| 1920×1080 | 92px, gap 228 | identical (h1 top 263, form 703/919/617) |
+| 1440×900 | 92px, gap 118 | identical (h1 top 218, form 548/764/377) |
+| 1536×730 | 92px, gap 16 | 85px, 2 lines, gap 24 |
+| 1366×657 | 92px, −28 | 47.7px, 1 line, gap 51 |
+| 1200×700 | 92px, −55 | 69.4px, 2 lines, gap 24 |
+| 1024×768 | 81.9px, gap 4 | 72.2px, 2 lines, gap 62 |
+| 1024×700 | 81.9px, −37 | 69.4px, 2 lines, gap 24 |
+| 1024×609 | 81.9px, −92 | 38.7px, 1 line, gap 27 |
+| 800×609 | 64px, −61 | 30px, 1 line, gap 32 |
+| 641×700 | — | 51.3px, 3 lines, gap 28 |
+| 390×664 | 30.4px, gap 11 | 27.3px, 3 lines, gap 22 (form 304/643/24) |
+| 375×667 | 30.4px, gap 14 | 26.3px, 3 lines, gap 29 (form 307/646/23) |
+| 375×552 | 30.4px, −85 | 24px floor, **−35 — still overlaps** |
+| 320×568 | 30.4px, −87 | 24px floor, **−65 — still overlaps** |
+| ES 1024×609 | 81.9px, −92 | 38.7px, 1 line (858px in a 910px box), gap 27 |
+| ES 390×664 | — | 27.3px, 2 lines, gap 53 |
+
+**Verification (from `next-app/`):** `npx tsc --noEmit` exit 0 ·
+`npx eslint src/components/home/HomeHeroOverlay.tsx` exit 0 (before and after
+the phone fix) · `npm run lint` exit 0 · `npx vitest run` **1319/1319 (133
+files)** · `npm run build` exit 0 (dev server stopped first, restarted after).
+No SQL, no env vars. Rule: `DECISIONS.md` → *"The homepage headline shrinks in
+place on a short window"*.
+
+## 2026-09-13 (~04:00Z) — SQL run, deployed, BOTH marketplaces reconnected with the order scopes; production's "Reconnect Etsy" sent the owner to localhost:3002 — root cause + fix
+
+Owner ran `supabase/marketplace-sales-2026-09.sql`, pushed and deployed, then
+clicked **Reconnect Etsy on production** and landed on
+`http://localhost:3002/api/admin/etsy/callback?code=…` ("This site can't be
+reached"). Diagnosis from the shared DB + Netlify: the July connections were
+made from a LOCAL dev server on port 3002 writing tokens into the shared
+Supabase, and Netlify's `ETSY_REDIRECT_URI` had simply been copied from
+`.env.local` (`http://localhost:3002/…`). Production therefore asked Etsy to
+send the browser back to the developer machine. (The Etsy app already had
+all three callbacks registered: `localhost:3002`, `.co`, `.com`.)
+
+**Reconnect done the way July was done** (no deploy): checked first that the
+local `ETSY_TOKEN_ENC_KEY` / `EBAY_TOKEN_ENC_KEY` decrypt the tokens
+production wrote minutes earlier (both yes — so tokens written locally are
+readable by production), added a `.claude/launch.json` entry
+"Next.js Dev (port 3002 — marketplace OAuth callbacks)", ran it, and the owner
+clicked Reconnect Etsy then Reconnect eBay at `localhost:3002/admin/settings`
+(signed-in cookie carried over — cookies ignore the port). Verified in the DB:
+Etsy scopes now include `transactions_r` (connected 03:50:46Z), eBay scopes
+include `sell.fulfillment.readonly` (03:51:10Z). The Etsy row's shop name
+changed from "RugsAnonymous" to "NaplesEstateJewelryy" — the shop was renamed
+since July; **shop_id 11326431 is unchanged** and Etsy's public API confirms
+it owns the synced listings (three checked). The 03:30Z sweeps had already
+logged "waiting for order permission" on both channels, proving the deployed
+code runs; the 04:00Z sweeps arm the cursors.
+
+**Proper fix so production's own button works next time:**
+- ✅ Netlify `ETSY_REDIRECT_URI` (Production context) →
+  `https://naplesestatejewelry.com/api/admin/etsy/callback` — set 2026-09-12
+  23:56 ET in the owner's Chrome. Other contexts untouched (the Netlify CLI
+  "local development" value stays localhost). **Takes effect on the next
+  deploy** — Netlify bakes env values into the functions bundle.
+- ✅ eBay needed nothing (corrected after the owner signed in to
+  developer.ebay.com, 04:10Z): the production RuName
+  `Christopher_Sur-Christop-PostnS-ubfab` already accepts at
+  `https://naplesestatejewelry.com/api/admin/ebay/callback` (declined →
+  `/admin/settings?ebay=declined`). An eBay reconnect started from the
+  local 3002 server therefore completes on PRODUCTION's callback — which is
+  what happened tonight. The earlier assumption that it accepted at
+  localhost was wrong; nothing was changed on eBay.
+- The local 3002 route stays valid as the Etsy fallback (its callback is
+  registered in the Etsy app); for eBay the production button was always right.
+
 ## 2026-09-12 (night, STAGED — needs SQL + two reconnects) — A sale on Etsy or eBay marks the product sold on the site, which ends it on the other marketplace
 
 Owner: "if an item sells on Etsy, automatically mark it sold on our site,

@@ -64,9 +64,12 @@ Tables: `facebook_connection` / `facebook_posts` / `facebook_sync_log`
 `image_selection` and `image_crops` are baked in from day one. Routes:
 `/api/admin/facebook/{connect,disconnect,status,settings,preview,images,sync,delete,drip,posts,refresh-status}`.
 The crop-suggest endpoint is shared with Instagram (channel-agnostic photo
-analysis). Scheduled function `facebook-drip.mts` runs on the hour across the
-UTC-hour union needed for the allowed Eastern posting times in both EDT and
-EST. The due-row query is authoritative, so extra daylight-saving coverage
+analysis). The scheduled drip (Supabase pg_cron job in
+`supabase/scheduled-jobs-pg-cron-2026-09.sql` — the only scheduler since
+2026-09-13; the old `facebook-drip.mts` Netlify function is deleted) runs on the
+hour across the UTC-hour union needed for the allowed Eastern posting times in
+both EDT and EST. `runScheduledDrip` claims nothing before publishing, so never
+give it a second trigger. The due-row query is authoritative, so extra daylight-saving coverage
 cannot publish early.
 
 ## Operator flow

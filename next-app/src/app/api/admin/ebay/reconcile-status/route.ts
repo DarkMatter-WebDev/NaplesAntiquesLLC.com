@@ -6,9 +6,9 @@ import { sweepEbaySales } from '@/lib/marketplace-sales-sweep';
  * Scheduled status-drift reconcile — the safety net under the auto-delist hook.
  *
  * Trigger-agnostic and secret-header-guarded like the price-push twin, so any
- * external cron can call it. Currently driven by GitHub Actions
- * (.github/workflows/scheduled-jobs.yml, job `ebay-reconcile-status`), because
- * Netlify's own scheduled functions have never executed — see that file.
+ * external cron can call it. Driven every 30 minutes by Supabase pg_cron
+ * (supabase/scheduled-jobs-pg-cron-2026-09.sql) — the ONLY scheduler since
+ * 2026-09-13; .github/workflows/scheduled-jobs.yml keeps a manual run button.
  *
  * WHY IT EXISTS: `handleProductStatusChange` runs post-response via `after()`,
  * which on Netlify is best-effort by design — work still in flight when the
@@ -17,8 +17,8 @@ import { sweepEbaySales } from '@/lib/marketplace-sales-sweep';
  * can answer for us: "is anything sold still live right now?"
  *
  * Reuses EBAY_CRON_SECRET rather than adding a new variable. Rotating a cron
- * secret means updating three places (Netlify, the GitHub repo secret, and
- * .env.local) and a mismatch fails silently as a 401 — so a new secret is a new
+ * secret means updating four places (Netlify, Supabase Vault, the GitHub repo
+ * secret, and .env.local) and a mismatch fails silently as a 401 — so a new secret is a new
  * way for this to break. Etsy has its own route guarded by its own secret,
  * matching the standing "Etsy and eBay remain independent channels" decision.
  *

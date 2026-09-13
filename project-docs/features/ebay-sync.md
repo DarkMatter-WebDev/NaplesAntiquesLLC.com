@@ -302,6 +302,15 @@ user identifiers (`username`, `userId`, `eiasToken`) before persistence. We
 store no eBay buyer data (no Phase 3), so the handler is close to a no-op by
 design.
 
+**2026-09-13:** the receipt is now ONE insert written already `processed`.
+The handler no longer writes an `account_deletion` row to `ebay_sync_log` or
+updates the receipt afterwards. Those rows were ~1,760/day, 97% of the log, and
+never read; the admin log's `excludeActions: ['account_deletion']` filter stays
+for the old rows until retention removes them. Guarded by
+`__tests__/post-success.test.ts`. Retention for old receipts (30 days) and old
+`account_deletion` log rows (7 days) is `supabase/log-retention-2026-09.sql`
+(owner-run SQL).
+
 **2026-07-16 correction:** the first live implementation stored raw
 account-deletion payloads in `webhook_events.payload`; a read-only audit found
 10,922 existing rows with eBay user identifiers. Code is fixed for future rows,
@@ -339,12 +348,12 @@ place).
 - **Product Admin selected Actions** — **Check eBay** reconciles only the
   selected linked offers, reports checked/updated/reset/error/skipped totals,
   refreshes eBay chips on close, and keeps the selection for a follow-up sync.
-- **Price automation:** the daily 11:45 UTC trigger is **GitHub Actions**
-  (`.github/workflows/scheduled-jobs.yml`, job `ebay-price-push`), which POSTs
-  the `EBAY_CRON_SECRET`-guarded route. `netlify/functions/ebay-price-push.mts`
-  still exists with the same schedule but **has never once executed** — a Netlify
-  platform fault, documented in CHANGELOG 2026-08-10; it is kept only so the
-  change is reversible. Scheduled/manual planners bulk-load price inputs, reject
+- **Price automation:** the daily 11:45 UTC trigger is **Supabase pg_cron**
+  (`supabase/scheduled-jobs-pg-cron-2026-09.sql`), which POSTs the
+  `EBAY_CRON_SECRET`-guarded route — the only scheduler since 2026-09-13. The
+  GitHub workflow keeps a manual "Run workflow" button; its `schedule:` and the
+  old `netlify/functions/ebay-price-push.mts` were removed after both started
+  firing alongside pg_cron (history: GitHub 2026-08-11 → pg_cron 2026-09-07). Scheduled/manual planners bulk-load price inputs, reject
   fallback or missing relevant-metal spot values, and use eBay's 25-entry bulk
   update with per-item fallback for mixed failures. Admin Settings shows the last
   scheduled result, and since 2026-08-10 a never-run or overdue schedule renders

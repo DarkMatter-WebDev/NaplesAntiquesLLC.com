@@ -2,13 +2,73 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-09-12**.
+> in `DECISIONS.md`. Last reconciled: **2026-09-13**.
 
 ## Start Here (2026-09-12 — SUPERSEDES the blocks below)
 
 **Read this, then `TASKS.md`.**
 
-🔴 **09-12 (night) — a sale on Etsy or eBay now MARKS THE PRODUCT SOLD ON
+🟡 **09-13 (late night) — eBay account-deletion webhook writes once per notice,
+STAGED with the same push** (no SQL). The receipt is inserted `processed`, with
+no `ebay_sync_log` row and no update (~3,500 fewer writes/day). Guarded by
+`post-success.test.ts`. Gate: lint 0 · 1329/1329 · build 0. Separate and
+owner-run: `supabase/log-retention-2026-09.sql` (draft, double-checked, not run).
+
+🟡 **09-13 (late night) — owner photo replaced sitewide, STAGED with the same
+push.** The showroom-table photo (`pages/chris-owner.webp`, 140 KB WebP) now
+shows on About, the homepage owner block and `/free-evaluation`; old
+`chris.webp` deleted, its path and `/chris.png` 301 to the new file in
+`netlify.toml`. Gate: tsc 0 · eslint 0 · 1326/1326. `CHANGELOG.md` 2026-09-13
+(late night). **Whole staged batch (photo + one scheduler + hero short
+screens) is ready to push:** full `npm run lint` 0 · `npm run build` 0 · no
+Turbopack build cache; no SQL, no env vars.
+
+🟡 **09-13 (late) — scheduled jobs: ONE scheduler, STAGED with the same push
+(no SQL, no env vars).** Investigating GitHub run #606 (`facebook-drip` 502 —
+a late scheduled GitHub call, 1 failure in 400 runs, nothing lost) showed
+every job firing three times: Supabase pg_cron, the old Netlify scheduled
+functions (executing since ~09-11) and GitHub's late `schedule`. The drips
+claim nothing before publishing, so overlap risked double posts. GitHub
+`schedule:` removed (manual "Run workflow" kept) and
+`next-app/netlify/functions/` deleted; pg_cron is the only scheduler. Gate:
+YAML valid · tsc 0 · lint 0 · 1326/1326 · build exit 0. After the push: one
+log row per job per run. `CHANGELOG.md` 2026-09-13 (late).
+
+🟡 **09-13 — homepage hero on short screens, three owner-approved steps, BUILT +
+gated + STAGED, one push (no SQL, no env vars):** (1) the headline shrinks in
+place so it clears the sign-up form; (2) where it still cannot fit, the hero
+goes compact — eyebrow hidden, sign-up block tightened; (3) compact heroes also
+get much smaller fields and buttons and a higher phone headline, and the
+tiniest windows keep a minimum hero height (no pinning there, a short scroll
+reaches the buttons). **Owner rule: anything that fits today stays the same —
+verified: 0 such sizes changed** (live sweep EN + ES, 34 widths × 40 heights).
+Later that night the last overlaps closed with per-language compact limits
+(0 fitting sizes changed): every tested size, 320×240 to 1920×1100, English and
+Spanish, is clear — no overlaps, no cut-off buttons, no sideways scroll, no
+clipped text — except one English window left tight on purpose (349 wide ×
+660 tall, 12px). Mid-scroll resizing verified. Owner check after the push: a
+real iPhone in Safari.
+Files: `HomeHeroOverlay.tsx`, `HomeHeroStack.tsx`, `HomeSubscriberForm.tsx`,
+`globals.css`, new guard test. Gate: tsc 0 · lint 0 · **1326/1326 (134 files)**
+· build exit 0. `CHANGELOG.md` 2026-09-13 (day, afternoon, evening); rules
+`DECISIONS.md` → *"The homepage headline shrinks in place"*, *"A hero too short
+to fit goes compact"*, *"The hero keeps a minimum height on the tiniest
+windows"*. (09-13 04:30Z sweep rows also checked clean — below.)
+
+🟢 **09-13 04:00Z — LIVE and ARMED: a sale on Etsy or eBay now marks the
+product sold on the site and ends it on the other marketplace.** SQL run,
+deployed, both marketplaces reconnected with the order scopes (from a
+local port-3002 dev server — production's Reconnect button pointed at
+localhost because Netlify's `ETSY_REDIRECT_URI` was the dev value; that
+Netlify value is fixed and goes live on the next deploy; eBay's RuName
+already pointed at production, nothing to change — `TASKS.md` top). Both sweeps logged
+"Auto-mark-sold armed" at 04:00:02Z. ✅ 04:30Z rows CHECKED 13:55Z: both
+channels "0 orders read … 0 failed", outcome ok, on every half-hour
+04:30 → 13:30Z, 0 warning/error rows — the order reads authenticate.
+◻ The first real sale is still the proof (0 orders cannot prove the
+parser). (Pre-deploy record follows.)
+
+🟡 (superseded) **09-12 (night) — a sale on Etsy or eBay now MARKS THE PRODUCT SOLD ON
 THE SITE, which ends it on the other marketplace — BUILT + gated + STAGED;
 needs the owner to run `supabase/marketplace-sales-2026-09.sql`, deploy,
 then Reconnect Etsy and Reconnect eBay once (new order-reading scopes).**

@@ -515,13 +515,14 @@ is batched"*; `lib/__tests__/marketplace-price-push-batching.test.ts` guards it.
   `TODO(etsy-verify)` still covers image-upload size/format caps and rate-limit
   response-header names because neither is present in Etsy's machine-readable
   specification.
-- The daily 11:15 UTC trigger is **GitHub Actions**
-  (`.github/workflows/scheduled-jobs.yml`, job `etsy-price-push`), which POSTs
-  the `ETSY_CRON_SECRET`-guarded route. `netlify/functions/etsy-price-push.mts`
-  still exists with the same schedule but **has never once executed** — a Netlify
-  platform fault, documented in CHANGELOG 2026-08-10; it is kept only so the
-  change is reversible. ⚠️ A Netlify "Scheduled" badge and a "Next execution"
-  time prove registration, never execution — that is exactly what masked this for
+- The daily 11:15 UTC trigger is **Supabase pg_cron**
+  (`supabase/scheduled-jobs-pg-cron-2026-09.sql`), which POSTs the
+  `ETSY_CRON_SECRET`-guarded route — the only scheduler since 2026-09-13. The
+  GitHub workflow keeps a manual "Run workflow" button; its `schedule:` and the
+  old `netlify/functions/etsy-price-push.mts` were removed after both started
+  firing alongside pg_cron (history: GitHub 2026-08-11 → pg_cron 2026-09-07).
+  ⚠️ A Netlify "Scheduled" badge and a "Next execution" time prove registration,
+  never execution — that is exactly what masked the dead Netlify scheduler for
   weeks. The run fails closed when relevant spot data is missing/fallback and
   records a `scheduled_price_push` summary.
   🟢 **Confirmed working 2026-08-11**: first-ever `scheduled_price_push` row read

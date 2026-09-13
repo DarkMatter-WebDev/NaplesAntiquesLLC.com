@@ -38,9 +38,16 @@ redirects.
 `supabase/scheduled-jobs-pg-cron-2026-09.sql`, each POSTing the matching
 secret-guarded Next route with the `x-cron-secret` read from Supabase Vault at
 fire time. Run history: Supabase dashboard → Integrations → Cron, plus the
-app's own run-summary log rows. The GitHub workflow and the Netlify `.mts`
-files described below are kept only for a short overlap and are scheduled for
-removal (`TASKS.md`). The two paragraphs below are the 2026-08-11 record.
+app's own run-summary log rows.
+
+**pg_cron is the ONLY scheduler since 2026-09-13.** Netlify's scheduler started
+executing the old `next-app/netlify/functions/*.mts` around 2026-09-11 and
+GitHub's `schedule:` kept firing late, so every job ran three times; the social
+drips claim nothing before publishing, so overlapping triggers could double-post.
+The `schedule:` block was removed from `.github/workflows/scheduled-jobs.yml`
+(its "Run workflow" button remains for manual runs) and
+`next-app/netlify/functions/` was deleted. Never add a second scheduler. The two
+paragraphs below are the 2026-08-11 record.
 
 **Scheduled work is triggered by GitHub Actions, not Netlify** (cut over
 2026-08-11). `.github/workflows/scheduled-jobs.yml` runs all five jobs — Etsy and
@@ -52,10 +59,10 @@ marketplace log.
 
 The routes are deliberately **trigger-agnostic**: any external cron with the
 shared secret can drive them, which is what made this swap a zero-code change.
-`next-app/netlify/functions/*.mts` still exist with the same schedules but have
-**never once executed** — a Netlify platform fault, documented in CHANGELOG
-2026-08-10. They are kept only so the change is reversible; if Netlify is ever
-fixed, delete one side or the other or every job fires twice.
+`next-app/netlify/functions/*.mts` had the same schedules but **never once
+executed** at the time — a Netlify platform fault, documented in CHANGELOG
+2026-08-10. (They began executing ~2026-09-11 and were deleted 2026-09-13; see
+above.)
 
 ⚠️ A Netlify "Scheduled" badge and a "Next execution" time prove registration,
 never execution. That pair sat over a completely dead scheduler for weeks.

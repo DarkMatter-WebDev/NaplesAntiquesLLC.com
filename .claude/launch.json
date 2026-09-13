@@ -10,6 +10,13 @@
       "cwd": "next-app"
     },
     {
+      "name": "Next.js Dev (port 3002 — marketplace OAuth callbacks)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--", "-p", "3002"],
+      "port": 3002,
+      "cwd": "next-app"
+    },
+    {
       "name": "Next.js Prod",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "start", "--", "-p", "3003"],

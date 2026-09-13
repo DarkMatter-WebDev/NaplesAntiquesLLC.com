@@ -61,6 +61,141 @@ const DARK_THEME: CSSProperties = {
   '--hero-btn-bg': 'rgba(212, 175, 55, 0.14)',
 } as CSSProperties;
 
+// Compact-mode rule bodies ("Compact hero" in the styles below), shared by its
+// width bands. They are interpolated into that style block, so its
+// no-backticks rule applies inside these strings too.
+
+/** Phones: eyebrow hidden, headline 1.5rem under the promo bar, tighter gaps. */
+const COMPACT_PHONE_ROOM = `
+            .home-hero-top > span { display: none; }
+            .home-hero-top {
+              top: 1.5rem;
+              --hero-fit-room: calc(100cqh - 1.5rem - 1rem);
+            }
+            .home-hero-bottom { gap: 0.5rem; }
+            .home-hero-newest { margin-top: 0; }`;
+
+/** Phones: Name, Email and Join on one slim row; Buy / Sell / Visit Us on one row. */
+const COMPACT_PHONE_CONTROLS = `
+            .home-subscriber-label { margin-bottom: 0.3rem; }
+            .home-subscriber-fields {
+              grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+              gap: 0.3rem;
+            }
+            .home-subscriber-input,
+            .home-subscriber-join { height: 1.9rem; }
+            .home-subscriber-input {
+              padding-inline: 0.55rem;
+              font-size: 0.72rem;
+              border-radius: 0.6rem;
+            }
+            .home-subscriber-join {
+              padding-inline: 0.75rem;
+              font-size: 0.62rem;
+            }
+            .home-subscriber-privacy {
+              margin-top: 0.3rem;
+              font-size: 0.62rem;
+              line-height: 1.35;
+            }
+            .home-hero-actions {
+              grid-template-columns: repeat(3, minmax(0, 1fr));
+              width: 100%;
+              gap: 0.4rem;
+            }
+            .home-hero-actions .hero-cta {
+              padding-block: 0.4rem;
+              padding-inline: 0.3rem;
+              font-size: 0.62rem;
+              letter-spacing: 0.1em;
+            }
+            .home-hero-actions .hero-cta:last-child {
+              grid-column: auto;
+              width: auto;
+              justify-self: stretch;
+            }
+            .home-hero-newest { font-size: 0.72rem; }`;
+
+/** Laptops: eyebrow hidden, tighter gaps, 1.5rem under the buttons. */
+const COMPACT_DESKTOP_ROOM = `
+            .home-hero-top > span { display: none; }
+            .home-hero-top {
+              --hero-fit-room: calc(2 * min(var(--hero-quarter), 100cqh - var(--hero-quarter) - 1.5rem));
+            }
+            .home-hero-bottom {
+              margin-bottom: 1.5rem;
+              gap: 0.75rem;
+            }
+            .home-hero-newest { margin-top: -0.25rem; }`;
+
+/** Laptops and the 640px one-row form: shorter fields, slimmer buttons. */
+const COMPACT_DESKTOP_CONTROLS = `
+            .home-subscriber-input,
+            .home-subscriber-join { height: 2.25rem; }
+            .home-subscriber-input { font-size: 0.8rem; }
+            .home-subscriber-privacy {
+              margin-top: 0.35rem;
+              font-size: 0.7rem;
+            }
+            .home-hero-actions .hero-cta {
+              padding-block: 0.4rem;
+              min-width: 8rem;
+            }`;
+
+const COMPACT_PHONE = COMPACT_PHONE_ROOM + COMPACT_PHONE_CONTROLS;
+
+/**
+ * One compact-mode band: a viewport-width range and the HERO height at or below
+ * which compact mode switches on. See "Compact hero" in the styles for how the
+ * limits were measured.
+ */
+type CompactBand = {
+  minWidth?: number;
+  maxWidth?: number;
+  maxHeroHeight: number;
+  rules: string;
+};
+
+/** Wider than 430px the English and Spanish headlines behave the same. */
+const COMPACT_BANDS_SHARED: CompactBand[] = [
+  { minWidth: 431, maxWidth: 614, maxHeroHeight: 498, rules: COMPACT_PHONE },
+  { minWidth: 615, maxWidth: 639, maxHeroHeight: 478, rules: COMPACT_PHONE },
+  // Exactly 640: the form's sm breakpoint puts Name / Email / Join on one row,
+  // so it keeps that row and takes the laptop-sized controls.
+  { minWidth: 640, maxWidth: 640, maxHeroHeight: 398, rules: COMPACT_PHONE_ROOM + COMPACT_DESKTOP_CONTROLS },
+  { minWidth: 641, maxHeroHeight: 460, rules: COMPACT_DESKTOP_ROOM + COMPACT_DESKTOP_CONTROLS },
+];
+
+/** Narrow phones, English headline. */
+const COMPACT_BANDS_EN: CompactBand[] = [
+  { maxWidth: 348, maxHeroHeight: 580, rules: COMPACT_PHONE },
+  { minWidth: 349, maxWidth: 349, maxHeroHeight: 540, rules: COMPACT_PHONE },
+  { minWidth: 350, maxWidth: 430, maxHeroHeight: 520, rules: COMPACT_PHONE },
+  ...COMPACT_BANDS_SHARED,
+];
+
+/** Narrow phones, Spanish headline (wraps differently, so its limits differ). */
+const COMPACT_BANDS_ES: CompactBand[] = [
+  { maxWidth: 335, maxHeroHeight: 600, rules: COMPACT_PHONE },
+  { minWidth: 336, maxWidth: 339, maxHeroHeight: 580, rules: COMPACT_PHONE },
+  { minWidth: 340, maxWidth: 350, maxHeroHeight: 560, rules: COMPACT_PHONE },
+  { minWidth: 351, maxWidth: 368, maxHeroHeight: 540, rules: COMPACT_PHONE },
+  { minWidth: 369, maxWidth: 430, maxHeroHeight: 520, rules: COMPACT_PHONE },
+  ...COMPACT_BANDS_SHARED,
+];
+
+function compactBandCss(band: CompactBand): string {
+  const widths = [
+    band.minWidth != null ? `(min-width: ${band.minWidth}px)` : '',
+    band.maxWidth != null ? `(max-width: ${band.maxWidth}px)` : '',
+  ].filter(Boolean).join(' and ');
+  return `
+        @media ${widths} {
+          @container hero-overlay (max-height: ${band.maxHeroHeight}px) {${band.rules}
+          }
+        }`;
+}
+
 export default function HomeHeroOverlay({ locale, dark }: Props) {
   const isEs = locale === 'es';
   const storeHref = isEs ? '/es/shop' : '/shop';
@@ -122,69 +257,79 @@ export default function HomeHeroOverlay({ locale, dark }: Props) {
       <div className="home-top-fade home-top-fade--light" style={{ opacity: dark ? 0 : 1 }} aria-hidden="true" />
       <div className="home-top-fade home-top-fade--dark" style={{ opacity: dark ? 1 : 0 }} aria-hidden="true" />
 
-      {/* Headline — centered in the top half, above the rotating pieces */}
-      <div className="home-hero-top">
-        {/* Eyebrow: a <span>, so it carries NO heading weight — which is why the
-            PROMISE lives here and the keywords sit in the <h1> below. This is
-            the pairing the owner settled on; it was briefly
-            "We Buy & Sell Estate Jewelry and Watches" while the headline was
-            brand copy, and reverted with the headline.
+      {/* Zone = the room above the sign-up block. The headline sizes itself
+          to it on a short window (.home-hero-top-zone in the styles below). */}
+      <div className="home-hero-top-zone">
+        {/* Headline — centered in the top half, above the rotating pieces */}
+        <div className="home-hero-top">
+          {/* Eyebrow: a <span>, so it carries NO heading weight — which is why the
+              PROMISE lives here and the keywords sit in the <h1> below. This is
+              the pairing the owner settled on; it was briefly
+              "We Buy & Sell Estate Jewelry and Watches" while the headline was
+              brand copy, and reverted with the headline.
 
-            ⚠️ It must put the knowing on US, not the customer.
-            "Know What Yours Is Worth" was rejected for implying the visitor
-            should already know what they have — most arrive holding something
-            inherited and unidentified.
+              ⚠️ It must put the knowing on US, not the customer.
+              "Know What Yours Is Worth" was rejected for implying the visitor
+              should already know what they have — most arrive holding something
+              inherited and unidentified.
 
-            ⚠️ Says nothing about the SERVICE MODEL, deliberately — and that
-            foresight paid off: the showroom opened 2026-08-17 and 61 strings
-            elsewhere had to be rewritten, while this one did not. Do not add
-            "visit us", "mobile" or "by appointment" here now either. */}
-        <span
-          className="text-[0.75rem] font-bold uppercase tracking-[0.3em] block"
-          style={{ color: 'var(--hero-eyebrow)', fontFamily: 'var(--font-label)' }}
-        >
-          {isEs ? 'Una Pieza o Todo un Patrimonio' : 'One Piece or an Entire Estate'}
-        </span>
-        {/* ⚠️ KEEP THIS SHORT — the length is load-bearing, not a style choice.
-            At clamp(2.4rem, 8vw, 5.75rem) in a min(92vw, 52rem) box, measured
-            line counts are: ~26-29 characters = 2 lines at every width (the
-            profile this page has always had), 38 characters = 3 lines at both
-            320px and 1280px+, 48 characters = 4 lines. Re-measure before
-            lengthening; the full page title will NOT fit here.
+              ⚠️ Says nothing about the SERVICE MODEL, deliberately — and that
+              foresight paid off: the showroom opened 2026-08-17 and 61 strings
+              elsewhere had to be rewritten, while this one did not. Do not add
+              "visit us", "mobile" or "by appointment" here now either. */}
+          <span
+            className="text-[0.75rem] font-bold uppercase tracking-[0.3em] block"
+            style={{ color: 'var(--hero-eyebrow)', fontFamily: 'var(--font-label)' }}
+          >
+            {isEs ? 'Una Pieza o Todo un Patrimonio' : 'One Piece or an Entire Estate'}
+          </span>
+          {/* ⚠️ KEEP THIS SHORT — the length is load-bearing, not a style choice.
+              At clamp(2.4rem, 8vw, 5.75rem) in a min(92vw, 52rem) box, measured
+              line counts are: ~26-29 characters = 2 lines at every width (the
+              profile this page has always had), 38 characters = 3 lines at both
+              320px and 1280px+, 48 characters = 4 lines. Re-measure before
+              lengthening; the full page title will NOT fit here.
 
-            KEYWORDS, deliberately — location + both primary categories + buyer
-            intent, in the one slot Google reads as the page's topic. The owner's
-            stated priority (2026-08-16) is that the strongest signal on the site
-            is that we BUY in Naples, and this is the only element that can carry
-            it with heading weight.
+              KEYWORDS, deliberately — location + both primary categories + buyer
+              intent, in the one slot Google reads as the page's topic. The owner's
+              stated priority (2026-08-16) is that the strongest signal on the site
+              is that we BUY in Naples, and this is the only element that can carry
+              it with heading weight.
 
-            A brand-voice draft ("Pieces Worth Discovering") held this slot
-            briefly and was reverted for exactly that reason. Its trade-off is
-            worth remembering if the question comes round again: warmer copy, but
-            the homepage then had no on-page topic signal at all.
+              A brand-voice draft ("Pieces Worth Discovering") held this slot
+              briefly and was reverted for exactly that reason. Its trade-off is
+              worth remembering if the question comes round again: warmer copy, but
+              the homepage then had no on-page topic signal at all.
 
-            ⚠️ At 46 characters this is well past the ~29-char two-line budget.
-            The headline block was widened to 72rem so it renders TWO lines on
-            desktop; it is still THREE at phone and tablet widths, where 92vw
-            binds before the cap. Accepted. Re-measure on any rewording and do
-            not assume a line count — it now differs by breakpoint.
+              ⚠️ At 46 characters this is well past the ~29-char two-line budget.
+              The headline block was widened to 72rem so it renders TWO lines on
+              desktop; it is still THREE at phone and tablet widths, where 92vw
+              binds before the cap. Accepted. Re-measure on any rewording and do
+              not assume a line count — it now differs by breakpoint.
 
-            ⚠️ "Premier", not "Premiere" — the latter means a debut performance.
-            `/silver-services` uses the same correct form; do not let a
-            well-meaning edit reintroduce the typo in the site's largest text.
+              ⚠️ Since 2026-09-13 the size also depends on window HEIGHT: on a
+              short window the CSS fit shrinks this so it clears the sign-up
+              form. That fit hardcodes this wording's measured widths (23.5 and
+              12.6 in the headline fit rule below) — a longer headline needs them
+              re-measured, or it can wrap onto a line the fit did not budget for.
 
-            ⚠️ One test survives every rewrite: hero copy must never imply the
-            visitor should ALREADY know what they have. "Know What Yours Is
-            Worth" was rejected for exactly that — most arrive holding something
-            inherited and unidentified. */}
-        <h1
-          className="font-normal tracking-normal"
-          style={{ fontFamily: 'var(--font-headline)', color: 'var(--hero-text)' }}
-        >
-          {isEs
-            ? 'Compradores de Oro, Plata y Joyería en Naples'
-            : 'Naples Premier Gold, Sterling & Jewelry Buyers'}
-        </h1>
+              ⚠️ "Premier", not "Premiere" — the latter means a debut performance.
+              `/silver-services` uses the same correct form; do not let a
+              well-meaning edit reintroduce the typo in the site's largest text.
+
+              ⚠️ One test survives every rewrite: hero copy must never imply the
+              visitor should ALREADY know what they have. "Know What Yours Is
+              Worth" was rejected for exactly that — most arrive holding something
+              inherited and unidentified. */}
+          <h1
+            className="font-normal tracking-normal"
+            style={{ fontFamily: 'var(--font-headline)', color: 'var(--hero-text)' }}
+          >
+            {isEs
+              ? 'Compradores de Oro, Plata y Joyería en Naples'
+              : 'Naples Premier Gold, Sterling & Jewelry Buyers'}
+          </h1>
+        </div>
       </div>
 
       {/* Sign-up + actions — centered in the open space below the pieces */}
@@ -245,10 +390,41 @@ export default function HomeHeroOverlay({ locale, dark }: Props) {
       <style>{`
         /* The overlay is a pinned, click-transparent layer over the slideshow
            panes; the form and CTA wrappers opt back into pointer events. */
+        /* Registered so 25cqh is computed ONCE, on the zone, against the
+           overlay (a container query unit never queries its own element) and
+           then inherited as a plain length. Unregistered, the token would
+           re-resolve further down against the zone itself. */
+        @property --hero-quarter {
+          syntax: '<length>';
+          inherits: true;
+          initial-value: 0px;
+        }
+
         .home-hero-overlay {
           position: absolute;
           inset: 0;
           pointer-events: none;
+          /* Two rows: the headline zone gets whatever the sign-up block
+             leaves. A size container so the zone can read its height. */
+          display: grid;
+          grid-template-rows: minmax(0, 1fr) auto;
+          container-type: size;
+          container-name: hero-overlay;
+        }
+
+        /* The space ABOVE the sign-up block, as a size container: the
+           headline measures its room against this (100cqh) instead of
+           assuming the top half is free. Size containment makes it a
+           stacking context, so it carries the text's z-index itself —
+           without it the headline would paint UNDER the halo layers. */
+        .home-hero-top-zone {
+          position: relative;
+          grid-row: 1;
+          min-height: 0;
+          z-index: 5;
+          pointer-events: none;
+          container-type: size;
+          --hero-quarter: 25cqh;
         }
 
         .home-hero-overlay .home-hero-top,
@@ -353,9 +529,14 @@ export default function HomeHeroOverlay({ locale, dark }: Props) {
            styled-jsx template literal, so a backtick would END the string and
            surface as a bogus JSX parse error. */
         .home-hero-bottom {
-          position: absolute;
+          /* In flow in the overlay's second row, held off the bottom by its
+             margin — the same place the old absolute bottom offset put it
+             (measured identical at 14 window sizes, 2026-09-13) — so the row
+             above it knows how much room is left. */
+          position: relative;
+          grid-row: 2;
           left: 50%;
-          bottom: clamp(5rem, calc(var(--app-vh) * 0.15), 10rem);
+          margin-bottom: clamp(5rem, calc(var(--app-vh) * 0.15), 10rem);
           width: min(92vw, 52rem);
           transform: translateX(-50%);
           z-index: 5;
@@ -416,6 +597,50 @@ export default function HomeHeroOverlay({ locale, dark }: Props) {
           text-shadow: 0 2px 24px rgba(var(--hero-fade), 0.9);
         }
 
+        /* Headline fit (owner, 2026-09-13, "Option A"): on a short window
+           the headline SHRINKS IN PLACE so it never reaches the sign-up
+           form. Its position does not change; only its size.
+
+           Room = a band centered where the headline is centered (a quarter
+           of the overlay down), as tall as it can be without coming within
+           1.5rem of the zone's bottom, less the eyebrow (18px + 1.25rem).
+           The size is the LARGEST of three fits, each capped by the width
+           its line count needs, so it never budgets for fewer lines than it
+           renders: one line (unwrapped, the headline measures 22.4em EN and
+           22.1em ES; 23.5 leaves margin), two lines (12.6, from the
+           1152px-for-two-lines measurement plus margin), three lines (no
+           width cap; 8vw already holds it to three). Then the old caps still
+           apply — never above 8vw or 5.75rem — so a window with room renders
+           exactly as it did.
+
+           Before this, 1024x609 overlapped the form by 92px and 1366x657 by
+           28px. Inside @supports so a browser without container units keeps
+           the plain clamp above. */
+        @supports (height: 1cqh) {
+          .home-hero-top {
+            /* Twice the registered quarter = half the OVERLAY, as before the
+               zone existed; the 50% above would now be half the zone. */
+            height: calc(var(--hero-quarter) * 2);
+            --hero-fit-room: calc(2 * min(var(--hero-quarter), 100cqh - var(--hero-quarter) - 1.5rem) - 2.4rem);
+            --hero-fit-measure: calc(min(92vw, 72rem) - 2rem);
+          }
+
+          .home-hero-top h1 {
+            font-size: clamp(
+              1.5rem,
+              min(
+                8vw,
+                max(
+                  min(var(--hero-fit-room) / 1.15, var(--hero-fit-measure) / 23.5),
+                  min(var(--hero-fit-room) / 2.3, var(--hero-fit-measure) / 12.6),
+                  var(--hero-fit-room) / 3.45
+                )
+              ),
+              5.75rem
+            );
+          }
+        }
+
         @media (max-width: 640px) {
           /* Headline near the top (nudged down a touch). */
           .home-hero-top {
@@ -433,13 +658,41 @@ export default function HomeHeroOverlay({ locale, dark }: Props) {
             font-size: clamp(1.9rem, 7vw, 2.5rem);
           }
 
+          /* Phone fit: here the headline is anchored at the top offset, not
+             centered, so its room runs from that offset to 1rem above the
+             zone's bottom, less the eyebrow (18px + 0.6rem). Two lines only
+             when the width guarantees it, otherwise three. Floor 1.5rem: an
+             iPhone SE in Safari (375x552) still overlaps at the floor —
+             shortening the headline is the fix there, not smaller type. */
+          @supports (height: 1cqh) {
+            .home-hero-top {
+              --hero-fit-room: calc(100cqh - clamp(3rem, calc(var(--app-vh) * 0.11), 6rem) - 1rem - 1.75rem);
+            }
+
+            .home-hero-top h1 {
+              font-size: clamp(
+                1.5rem,
+                min(
+                  7vw,
+                  max(
+                    min(var(--hero-fit-room) / 2.3, var(--hero-fit-measure) / 12.6),
+                    var(--hero-fit-room) / 3.45
+                  )
+                ),
+                2.5rem
+              );
+            }
+          }
+
           /* Sign-up + actions anchored to the bottom of the hero so the last
              CTA button (Visit Us) always stays inside it (with a small gap
              before the next section) regardless of viewport height /
              browser-chrome changes. */
           .home-hero-bottom {
-            top: auto;
-            bottom: clamp(1rem, calc(var(--app-vh) * 0.03), 2rem);
+            /* A margin, not a bottom offset: the block is in flow now, where
+               a bottom offset would shift it up on top of the desktop margin
+               (measured: the form jumped 99px at 390x664). */
+            margin-bottom: clamp(1rem, calc(var(--app-vh) * 0.03), 2rem);
             gap: 0.85rem;
           }
 
@@ -482,6 +735,34 @@ export default function HomeHeroOverlay({ locale, dark }: Props) {
             font-size: 0.78rem;
           }
         }
+
+        /* Compact hero (owner, 2026-09-13): ONLY on a hero too short for the
+           headline to clear the sign-up form. The eyebrow is hidden (and the
+           fit stops reserving its space), the sign-up block's gaps tighten,
+           on laptops the space under the buttons drops to 1.5rem ("Choice
+           A"); a phone headline starts 1.5rem under the promo bar ("option
+           1"); and the form fields and buttons shrink (owner: smaller
+           controls only where the hero does not fit today). A hero that
+           already fits is untouched. The rule bodies are the COMPACT_*
+           constants at the top of this file.
+
+           The limits are HERO heights, one table per headline language
+           (COMPACT_BANDS_EN / COMPACT_BANDS_ES at the top of this file — each
+           page renders only its own). Each was set from a sweep of the live
+           page at the tallest window where the previous layout was tight
+           (under 16px) or overlapping and below the first height where it
+           fit, so nothing that fit gains compact mode. The two headlines wrap
+           differently only on narrow phones, which is why the tables differ
+           there and match from 431px up. Narrow widths that were not measured
+           keep the neighbouring limit that cannot change a fitting screen.
+
+           ⚠️ A container query on the overlay, never a max-height media query:
+           the overlay height comes from the frozen --app-vh, while a media
+           query follows the live window height, which a mobile toolbar moves
+           mid-scroll — the hero would flip modes while the visitor scrolls.
+           Source order matters: these must stay after every rule they
+           override, including the phone fit above. */
+        ${(isEs ? COMPACT_BANDS_ES : COMPACT_BANDS_EN).map(compactBandCss).join('\n')}
 
         @media (prefers-reduced-motion: reduce) {
           .home-hero-overlay .home-hero-top,
