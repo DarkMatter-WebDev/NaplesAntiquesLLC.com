@@ -14,6 +14,33 @@
 > the connection's default profile. All seven profile IDs are recorded in
 > `features/shipping-tiers.md`; one controlled listing update remains open.
 
+> **2026-09-12 (night, staged — needs SQL + reconnect) — Etsy sale → site
+> sold:** the 30-minute `reconcile-status` sweep first reads paid receipts
+> (`getShopReceipts`, scope `transactions_r`), maps each line by
+> `listing_id` → `etsy_listings`, and applies it with
+> `apply_marketplace_sale()` (checkout's quantity/sold/sold_price rule); a
+> product that becomes sold has its Etsy row marked `delisted` here and the
+> eBay status hook ends the eBay listing. Armed from the first run after
+> the reconnect (`etsy_connection.sales_cursor`); switch
+> `auto_mark_sold` in Settings. `lib/marketplace-sales*.ts`,
+> `supabase/marketplace-sales-2026-09.sql`; `CHANGELOG.md` 2026-09-12 (night).
+> **Phase 3 (order webhooks) is still not built and not needed** — polling
+> every 30 minutes is the design.
+
+> **2026-09-12 (staged) — edit in the review window:** "Review before
+> submitting to Etsy" now edits product fields in place (quantity, length /
+> ring size / height, brand, year → When made, metal colour + purity →
+> Materials, type) through `PUT /api/admin/products/fields`, shows the extra
+> tags field, and picks the category from `EtsyCategoryDropdown` (Jewelry's
+> 82 leaves grouped by branch, search over all 2,503, parent path always
+> visible, craft-supply groups flagged). Etsy has no finished-jewelry
+> "Pendants" leaf — both "Pendants" entries are craft-supply components —
+> so `Pendant → Pendant Necklaces (1229)` stays the default. Length accepts
+> `mm`/`cm` and converts to inches before the Length property push; the
+> description prints `Purity: 14K` / `925` and the product page's
+> `Length/Size` wording. `CHANGELOG.md` 2026-09-12; rules in `DECISIONS.md`
+> → *"Review-window edits write to the product"*.
+
 > Status: **Phase 1 + Phase 2 built and confirmed live end to end.** Phase 3
 > (Etsy order webhooks) is out of scope and not built. This document is the
 > current technical contract and operator runbook; implementation history lives

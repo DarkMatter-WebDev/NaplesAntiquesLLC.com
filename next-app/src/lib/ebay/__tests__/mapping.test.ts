@@ -177,7 +177,7 @@ describe('condition (Q5)', () => {
 describe('mapDescription', () => {
   it('includes a spec block with purity, weight, length, and era', () => {
     const html = mapDescription(makeProduct());
-    expect(html).toContain('Purity: 14');
+    expect(html).toContain('Purity: 14K');
     expect(html).toContain('Weight: 10g');
     expect(html).toContain('Length: 20 in');
     expect(html).toContain('Era: 1985');
@@ -187,6 +187,18 @@ describe('mapDescription', () => {
     const html = mapDescription(makeProduct({ product_type: 'Ring', jewelry_type: 'Ring', length: '7.5' }));
     expect(html).toContain('Ring size: 7.5');
     expect(html).not.toContain('Length: 7.5');
+  });
+
+  it('prints silver purity as fineness and gold as karats, never the bare column number', () => {
+    const silver = mapDescription(makeProduct({ category: 'Silver', metal_type: 'Silver', metal_variant: 'silver', purity: 925 }));
+    expect(silver).toContain('Purity: 925');
+    expect(mapDescription(makeProduct({ purity: 10 }))).toContain('Purity: 10K');
+  });
+
+  it('converts a millimetre length to inches in the description and the Chain Length aspect', () => {
+    const product = makeProduct({ length: '470 mm' });
+    expect(mapDescription(product)).toContain('Length: 18.5 in');
+    expect(mapAspects(product)['Chain Length']).toEqual(['18.5 in']);
   });
 
   it('escapes HTML-significant characters from free text', () => {

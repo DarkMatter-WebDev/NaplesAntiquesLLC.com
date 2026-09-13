@@ -1,10 +1,12 @@
 import crypto from 'node:crypto';
 import type { Product, SpotData } from '@/types/product';
 import {
+  formatProductPurityLabel,
   normalizeProductJewelryType,
   normalizeProductMetalType,
   normalizeProductQuantity,
   normalizeProductStatus,
+  productLengthSizeDisplay,
   productMetalVariantLabel,
 } from '@/types/product';
 import { getMarketplaceSpotPriceError, getProductPriceValue } from '@/lib/pricing';
@@ -549,9 +551,15 @@ export function mapDescription(
     | 'sku'
     | 'inventory_number'
     | 'title'
+    | 'title_es'
     | 'metal_variant'
     | 'metal_type'
     | 'category'
+    | 'product_type'
+    | 'jewelry_type'
+    | 'chain_type'
+    | 'tags'
+    | 'tags_es'
   >,
 ): string {
   const bodyParts = [product.description?.trim(), product.public_notes?.trim(), ...(product.details ?? [])].filter(
@@ -562,10 +570,16 @@ export function mapDescription(
   const specLines: string[] = [];
   const metalLabel = productMetalVariantLabel(product.metal_variant, product.category === 'Silver' ? 'Silver' : 'Gold');
   if (metalLabel) specLines.push(`Metal: ${metalLabel}`);
-  if (product.purity) specLines.push(`Purity: ${product.purity}`);
+  // "14K" / "925", never the bare column number (owner report 2026-09-12: the
+  // description read "Purity: 14").
+  const purityLabel = formatProductPurityLabel(product.purity);
+  if (purityLabel) specLines.push(`Purity: ${purityLabel}`);
   const weight = product.gram_weight ?? product.weight_grams;
   if (weight) specLines.push(`Weight: ${weight}g`);
-  if (product.length) specLines.push(`Length/Size: ${product.length}`);
+  // Same words the product page prints ("18.5 in" / "Size: 7"), so a raw
+  // "470 mm" or bare "18.5" never reaches a buyer unlabelled.
+  const lengthDisplay = productLengthSizeDisplay(product);
+  if (lengthDisplay) specLines.push(`Length/Size: ${lengthDisplay}`);
   if (product.brand) specLines.push(`Maker/Brand: ${product.brand}`);
   if (product.item_year) specLines.push(`Era: ${product.item_year}`);
   const sku = mapSku(product);

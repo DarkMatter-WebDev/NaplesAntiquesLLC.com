@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import SelectedMarketplaceReviewFlow from './SelectedMarketplaceReviewFlow';
+import type { ProductFieldEditPatch } from '@/lib/product-field-edits';
 
 interface EligibilitySummary {
   total: number;
@@ -19,7 +20,15 @@ interface DrainResult {
 }
 
 /** Phase 2 bulk action (etsy-sync-plan/07-admin-ux.md §3): pre-flight summary -> confirm -> drain the queue with progress -> stop-after-current cancel. */
-export default function EtsyBulkSyncModal({ onClose, productIds }: { onClose: (completed?: boolean) => void; productIds?: string[] }) {
+export default function EtsyBulkSyncModal({
+  onClose,
+  productIds,
+  onProductEdited,
+}: {
+  onClose: (completed?: boolean) => void;
+  productIds?: string[];
+  onProductEdited?: (productId: string, patch: ProductFieldEditPatch) => void;
+}) {
   const selectedProductIds = productIds?.length ? productIds : null;
   const selectedRun = selectedProductIds !== null;
   const selectedCount = selectedProductIds?.length ?? 0;
@@ -62,6 +71,7 @@ export default function EtsyBulkSyncModal({ onClose, productIds }: { onClose: (c
         productIds={selectedProductIds ?? []}
         onBack={() => setSelectedFlow('choice')}
         onClose={onClose}
+        onProductEdited={onProductEdited}
       />
     );
   }

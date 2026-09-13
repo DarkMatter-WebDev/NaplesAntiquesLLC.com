@@ -10,12 +10,16 @@ import { getConnection, updateConnection, type EbayConnectionRow } from './store
 // handling, AES-GCM token encryption, refresh-on-demand); never imports from
 // it. See ebay-sync-plan/04-oauth-and-secrets.md.
 
-// Phase 1-2 scopes only. Phase 3 (order ingest, not built — Q15) would add
-// https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly.
+// `sell.fulfillment.readonly` (2026-09-12) lets the 30-minute sweep read paid
+// orders so a sale on eBay marks the product sold on the site
+// (lib/marketplace-sales.ts). A connection made before then lacks it; the
+// settings panel asks for a reconnect and the sweep stays inert until the
+// stored scopes include it.
 export const EBAY_OAUTH_SCOPES = [
   'https://api.ebay.com/oauth/api_scope',
   'https://api.ebay.com/oauth/api_scope/sell.inventory',
   'https://api.ebay.com/oauth/api_scope/sell.account',
+  'https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly',
 ].join(' ');
 
 export function requireRuName(): string {

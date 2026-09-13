@@ -56,7 +56,9 @@ describe('AI buyer-facing copy guardrails', () => {
   it('keeps canonical length output rules in saved custom prompts', () => {
     const prompt = buildProductSystemPrompt('Custom admin prompt.');
     expect(prompt).toContain('24 in');
-    expect(prompt).toContain('bare canonical numeric string');
+    expect(prompt).toContain('stored in INCHES');
+    // A metric measurement must keep its unit so the form can convert it.
+    expect(prompt).toContain('"470 mm"');
   });
 });
 
@@ -185,6 +187,19 @@ describe('AI measurement coercion', () => {
         },
       });
       expect(result.fields.length).toBe('24');
+    }
+  });
+
+  it('converts a metric AI length to inches instead of storing the number as inches', () => {
+    for (const [length, inches] of [['470 mm', '18.5'], ['47 cm', '18.5'], ['40mm', '1.57']] as const) {
+      const result = coerceProductAutofill({
+        fields: {
+          ...EMPTY_PRODUCT_AUTOFILL_FIELDS,
+          product_type: 'Necklace',
+          length,
+        },
+      });
+      expect(result.fields.length).toBe(inches);
     }
   });
 

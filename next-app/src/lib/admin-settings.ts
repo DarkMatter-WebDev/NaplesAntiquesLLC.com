@@ -3,6 +3,16 @@ export const QUICK_FILL_PROMPT_STORAGE_KEY = 'naples-admin-quick-fill-ai-prompt'
 export const QUICK_FILL_BRAND_RULES_MARKER = 'Brand detection rules:';
 export const QUICK_FILL_WATCH_RULES_MARKER = 'Watch item type rules:';
 export const QUICK_FILL_PRODUCT_HIERARCHY_RULES_MARKER = 'Product hierarchy rules:';
+export const QUICK_FILL_LENGTH_UNIT_RULES_MARKER = 'Length unit rules:';
+
+// The length column is inches everywhere (product page, Etsy, eBay), but the
+// owner measures in millimetres — a bare "470" once printed as 470 in. The
+// form converts a value that CARRIES its unit, so the assistant must keep it.
+export const QUICK_FILL_LENGTH_UNIT_RULES_ADDENDUM = `${QUICK_FILL_LENGTH_UNIT_RULES_MARKER}
+
+* Length and Height are stored in inches. Write inches as a bare number or with "in" (Length:18.5 in).
+* If the measurement was given in millimetres or centimetres, keep that unit in the value (Length:470 mm, Height:40 mm, Length:47 cm) — the form converts it to inches. Never drop the unit from a metric measurement and never convert it yourself.
+* Size (rings) is a ring size, never a length: Size:7 or Size:6.5.`;
 
 export const QUICK_FILL_BRAND_RULES_ADDENDUM = `${QUICK_FILL_BRAND_RULES_MARKER}
 
@@ -83,6 +93,8 @@ Use Length for necklaces and bracelets, such as Length:22 in or Length:7.5 in.
 Use Size for rings, such as Size:7 or Size:6.5. Do not write ring sizes as inches.
 Length and Size are direct field values. Use the measured value exactly and do not invent a permanent option list.
 
+${QUICK_FILL_LENGTH_UNIT_RULES_ADDENDUM}
+
 Important terminology rules:
 
 * The word "Italian" always refers to the maker, origin, or manufacture of the overall piece and should be used only in titles, descriptions, or notes describing the item as a whole.
@@ -107,5 +119,6 @@ export function ensureQuickFillPromptHasCurrentBrandRules(prompt: string): strin
   if (!trimmedPrompt.includes(QUICK_FILL_BRAND_RULES_MARKER)) addenda.push(QUICK_FILL_BRAND_RULES_ADDENDUM);
   if (!trimmedPrompt.includes(QUICK_FILL_WATCH_RULES_MARKER)) addenda.push(QUICK_FILL_WATCH_RULES_ADDENDUM);
   if (!trimmedPrompt.includes(QUICK_FILL_PRODUCT_HIERARCHY_RULES_MARKER)) addenda.push(QUICK_FILL_PRODUCT_HIERARCHY_RULES_ADDENDUM);
+  if (!trimmedPrompt.includes(QUICK_FILL_LENGTH_UNIT_RULES_MARKER)) addenda.push(QUICK_FILL_LENGTH_UNIT_RULES_ADDENDUM);
   return [trimmedPrompt, ...addenda].join('\n\n');
 }

@@ -10,6 +10,7 @@ import {
   type EtsyTaxonomyProperty,
 } from './client';
 import { type EtsyListingRow } from './store';
+import { parseLengthInches } from '@/types/product';
 
 // Wearable-length re-investigation (2026-07-08, session 7). Full incident:
 // DECISIONS.md session 5 — a guessed `value_ids: [scale_id]` for the
@@ -162,11 +163,10 @@ export function verifyLengthReadback(readback: EtsyListingPropertyValue, expecte
 
 /** A bare decimal, optionally with an inch unit — same acceptance pattern as ai-product-schema.ts's cleanLength. A ring size, a range, or free text never matches. */
 export function parseWearableLengthInches(length: string | null | undefined): number | null {
-  const trimmed = length?.trim() ?? '';
-  const match = trimmed.match(/^(\d+(?:\.\d+)?)\s*(?:in(?:ch(?:es?)?)?\.?|")?$/i);
-  if (!match) return null;
-  const value = Number(match[1]);
-  return value > 0 && Number.isFinite(value) ? value : null;
+  // One shared parser (types/product.ts) so a `470 mm` value stored before the
+  // unit conversion existed still pushes as 18.5 inches, never 470.
+  const value = parseLengthInches(length);
+  return value != null && value > 0 ? value : null;
 }
 
 export interface LengthExperimentResult {

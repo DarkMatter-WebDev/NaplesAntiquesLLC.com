@@ -27,6 +27,10 @@ export interface EtsyConnectionRow {
   price_push_enabled: boolean;
   price_push_threshold_pct: number;
   price_markup_pct: number;
+  /** Mark a product sold on the site when its Etsy listing sells (2026-09-12; needs the transactions_r scope). */
+  auto_mark_sold?: boolean;
+  /** Receipts created after this instant are read by the sales sweep; null = not armed yet. */
+  sales_cursor?: string | null;
   connected_at: string | null;
   updated_at: string;
 }

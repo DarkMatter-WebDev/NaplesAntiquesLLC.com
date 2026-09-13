@@ -1,32 +1,110 @@
 # Tasks
 
 > Actionable open work plus a short recent-completions summary. Full history is
-> in `CHANGELOG.md`. Last reconciled: **2026-09-11**.
+> in `CHANGELOG.md`. Last reconciled: **2026-09-12**.
 
 ## ◻ OPEN — needs a human
 
-### 🟡 2026-09-11 — Free-evaluation calls: page rebuilt call/visit-first + small fixes STAGED (awaiting owner push)
+### 🔴 DEPLOY the 2026-09-12 (night) addition: marketplace sale → site SOLD → other marketplace ended — needs ONE SQL run + TWO reconnects (no env vars)
+
+Built + gated (tsc 0 · lint 0 · **1319/1319 (133 files)** · build exit 0)
+and staged with the batch below. `CHANGELOG.md` 2026-09-12 (night); rule in
+`DECISIONS.md` → *"A marketplace sale marks the product sold"*. Owner steps,
+in this order:
+
+1. ◻ **Supabase → SQL editor → run `supabase/marketplace-sales-2026-09.sql`**
+   (idempotent). Adds `auto_mark_sold` + `sales_cursor` to `etsy_connection`,
+   `auto_mark_sold` to `ebay_connection`, table `marketplace_sale_events`,
+   function `apply_marketplace_sale()`. Until it is run the sweeps log
+   "waiting for the database migration" once and otherwise behave as before.
+2. ◻ **Push + deploy** (the batch below plus this).
+3. ◻ **Admin → Settings → Etsy Sync → "Reconnect Etsy"** (the gold callout
+   under the new "Mark sold on the site when it sells on Etsy" switch) —
+   Etsy's consent screen now lists order access. Listings are untouched.
+4. ◻ **Admin → Settings → eBay Sync → "Reconnect eBay"** — same callout.
+5. ◻ Within 30 min each panel's line reads "Watching Etsy/eBay sales since
+   <time> ET" and the activity log shows "Auto-mark-sold armed — … sales
+   from <time>". Sales before that instant are ignored (your call 09-12).
+6. ◻ **First real sale = the proof.** After the next Etsy or eBay sale wait
+   for the half-hour: the activity log shows "Sold on Etsy — marked sold on
+   the site at $X (Etsy order …)", the product reads Sold in Admin →
+   Products with that sold price, and the OTHER marketplace's listing is
+   ended / quantity 0. If anything reads "failed" or "not ours", send me the
+   log line.
+
+Switch off any time: the same checkbox (per marketplace). ⛔ Not exercised
+against live Etsy/eBay from here — the API shapes are the published ones and
+an unexpected response reads as "0 orders", never as a sale.
+
+**Staging (marketplace sales):** ✅ synced 2026-09-12 (night) — dry run listed exactly the 25 touched files (marketplace-sales.ts NEW, marketplace-sales-sweep.ts NEW, marketplace-sales.test.ts NEW, marketplace-sales-2026-09.sql NEW, etsy/ebay auth+client+store, both reconcile-status/status/settings routes, both settings panels + CHANGELOG, CURRENT_STATUS, DECISIONS, STRUCTURE, TASKS, features/etsy-sync, features/ebay-sync), 0 Extras, 1085 total (= 1082 on disk + the 3 `/XF`-excluded); real run copied 25 / 0 FAILED; follow-up dry run 0/0/0; leak check 0 `.env*`/`.log`, 0 `.git`; positive control 208 = 208 `.tsx`; SHA-256 MATCH on both sales libs, the SQL, etsy/auth.ts, EbaySettingsPanel, CHANGELOG. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+### 🔴 DEPLOY the 2026-09-12 batch: review-window inline edits + Etsy category dropdown + mm/cm length + "Purity: 14K" + sortable Subscribers table (no SQL, no env vars)
+
+Built, gated (tsc 0 · lint 0 · **1308/1308 (132 files)** · build exit 0) and
+staged — `CHANGELOG.md` 2026-09-12 (two entries). The admin is behind login
+and its sign-in page crashes the Browser pane, so both screens are
+**unverified in a browser**.
+
+**Also in the batch (09-12 later): Admin → Subscribers sorts by column.**
+◻ Owner look on the dev server (`/admin/subscribers`): opens newest-first
+on Subscribed (▼ on that header); click Name → A→Z (▲), click again → Z→A
+with blank names still last; click Subscribed twice → oldest first with
+undated "(account)" rows still last; Copy All Emails follows the visible
+order.
+
+**Owner walkthrough (dev `http://localhost:3007/admin` or production after
+the push) — Products → select 1–2 items → Actions → Sync to Etsy → Review:**
+1. ◻ Pencil on **Length** → type `470 mm` → the hint reads "= 18.5 in" →
+   Save → "Length saved · preflight refreshed." and the row shows 18.5 in.
+   (Pick a test item, or put the right value straight back.)
+2. ◻ Pencil on **Category** → the dropdown opens on Jewelry groups; type
+   `pend` → "Pendant Necklaces · Jewelry › Necklaces" first, the two
+   craft-supply "Pendants" flagged below → pick one → "Category saved".
+   "Reset to automatic" appears while an override is set.
+3. ◻ **Materials** pencil → metal + purity together; **When made** pencil →
+   year; **Tags** → add one in "Additional tags" → Save tags → it shows
+   gold-outlined, first.
+4. ◻ Then **Sync to eBay → Review**: the Aspects list shows one line per
+   aspect with pencils; **Brand** / **Main Stone** / **Chain Length** save
+   and refresh; Style says "fixed"; Price/Condition/Shipping carry notes.
+5. ◻ Close the window: the product row in the table shows the new value
+   without a reload; open the item's editor: same value, label "Length (in)".
+6. ◻ After the push, post one item and read the Etsy/eBay description:
+   `Purity: 14K` (or `925`), `Length/Size: 18.5 in`.
+
+**Staging:** ✅ synced 2026-09-12 — dry run listed exactly the 28 touched files (products/fields/route.ts NEW, EtsyCategoryDropdown.tsx NEW, product-field-edits.ts NEW, product-field-edits.test.ts NEW, SelectedMarketplaceReviewFlow.tsx, AdminShell.tsx, both bulk modals, both preview routes, product.ts + test, etsy/ebay mapping + tests, length-experiment + test, ai-product-provider/schema + test, admin-settings + CHANGELOG, CURRENT_STATUS, DECISIONS, STRUCTURE, TASKS, features/etsy-sync, features/ebay-sync), 0 Extras, 1079 total (= 1076 on disk + the documented 3 `/XF`-excluded); real run copied 28 / 0 FAILED (robocopy exit 1 = copied only); follow-up dry run 0/0/0; leak check 0 `.env*`/`.log`, 0 `.git`, no node_modules/.next/worktrees, launch.json present; positive control 208 = 208 `.tsx`; SHA-256 MATCH on the review flow, dropdown, field-edits lib, route, product.ts, CHANGELOG. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+**Staging (subscribers sort):** ✅ synced 2026-09-12 (later) — dry run listed exactly the 7 touched files (subscriber-sort.ts NEW, subscriber-sort.test.ts NEW, SubscribersManager.tsx + CHANGELOG, CURRENT_STATUS, STRUCTURE, TASKS), 0 Extras, 1081 total (= 1078 on disk + the 3 `/XF`-excluded); real run copied 7 / 0 FAILED; follow-up dry run 0/0/0; leak check 0 `.env*`/`.log`, 0 `.git`; positive control 208 = 208 `.tsx`; SHA-256 MATCH on the sort lib, manager, test, CHANGELOG. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+### ✅ 2026-09-11 — Free-evaluation calls: page rebuilt call/visit-first + small fixes DEPLOYED (production-verified)
 
 Findings in `SEO_LEAD_AUDIT.md` → "Free-evaluation follow-up". Built 09-11
 night (`CHANGELOG.md`): `/free-evaluation` is now the "Free Estate Jewelry
 Appraisal — Home or Showroom" page (call/visit first, home-visit section,
 form last), sitewide "Free Appraisal" labels, `/process.html` 308, Spanish
 LLAMAR buttons, QR claim removed. No SQL, no env vars.
-- ✅ Staging synced 09-11 night: 39 files (33 app + 6 docs), follow-up dry run
-  0, no `.env*` in staging, SHA256 spot-checks match.
-- ◻ **Owner: push + deploy** (staging synced). After the deploy the agent
-  runs `npm run indexnow` (titles changed); optional live check that
-  `/process.html` answers 308.
+- ✅ GSC 09-11 night: indexing requested for `/free-evaluation` and
+  `/es/free-evaluation` (both already indexed; new titles need a re-read).
+  No other GSC change needed. ⛔ never click REQUEST AGAIN.
+- ✅ **DEPLOYED 09-11 night** and production-verified: `/process.html` 308,
+  both new titles live, the new section on the page. IndexNow **200 OK for
+  220 URLs**. Staging equals source; nothing in flight.
 - ◻ Owner: did walk-ins rise after 08-18? Were the free-evaluation calls
   mostly about home visits? Early-morning callers?
 - ✅ GBP post published 09-11 night: free estate jewelry appraisals, showroom
   or home, Call now button, Chris-at-the-counter photo (`CHANGELOG.md`).
+  The owner also added that photo to the GBP photo gallery (gold testing
+  with scales, touchstone and acid kit) — part of the "buying photos" item.
   ◻ **Recheck ~09-13** that it still says Published — the 08-30 post was
   removed ~2 days after passing the instant check. Do not repost the same
   text (repetitive-content rule).
-- ◻ GBP (owner, not code): restore "free in-home appraisal" wording in GBP
-  services/description; decide whether the GBP booking link stays on
-  `/free-evaluation` (now call-first, so most of the concern is gone).
+- ✅ GBP description updated 09-11 night (agent, owner-asked): "We appraise",
+  "Appraisals are free", and free in-home appraisal in the six cities. The
+  phone-hours line was already there. Saved as **pending Google review**
+  (~60 min) — ◻ confirm it published ~09-12.
+- ◻ GBP (owner, not code): decide whether the booking link stays on
+  `/free-evaluation` (now call-first, so most of the concern is gone);
+  reconcile "since 2010" in the description vs the Sept 1, 2026 opening
+  date (Yelp says 2010 as well).
 - ◻ Look-back ~10-09: appraisal / home-visit calls vs the 09-11 baseline;
   GSC "free jewelry appraisal" queries landing on `/free-evaluation` vs
   `/jewelry-appraisal` (cannibalization watch).
@@ -877,7 +955,9 @@ and Admin Settings that names "the Netlify function log" as the place to look
 ever misbehaves: `select cron.unschedule(jobname) from cron.job where jobname
 like 'nej-%';` — the GitHub schedule is still there until this cleanup.
 ✅ **Delist-retry loop — FIXED (built + dev-verified, staged above).**
-◻ **Owner decision — inbound marketplace-sale detection (proposed 09-07, NOT
+✅ **BUILT 2026-09-12 (night) as stage 2 directly — see the top of this file
+for the SQL + reconnect steps.** The proposal below is the historical record.
+◻ (was) **Owner decision — inbound marketplace-sale detection (proposed 09-07, NOT
 built).** Today a sale on eBay/Etsy is marked sold on the site by hand, and
 the hook then closes the other marketplace. Proposal: **stage 1 detect-only** —
 from the 30-min sweep, poll eBay orders (`sell.fulfillment.readonly`; needs a

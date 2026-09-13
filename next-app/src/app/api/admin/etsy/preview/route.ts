@@ -8,6 +8,7 @@ import { parseWearableLengthInches } from '@/lib/etsy/length-experiment';
 import { parseRingSize, decimalToRingSizeFraction } from '@/lib/etsy/ring-size-experiment';
 import type { Product } from '@/types/product';
 import { normalizeProductJewelryType } from '@/types/product';
+import { reviewProductFields } from '@/lib/product-field-edits';
 
 export const runtime = 'nodejs';
 
@@ -78,5 +79,10 @@ export async function POST(req: Request) {
     // The raw owner-supplied custom tags (not the merged set in payload.tags) so
     // the admin drawer can prefill its editable "additional tags" field.
     extraTags: extraTags ?? [],
+    // Raw column values behind the mapped rows, so the review window's inline
+    // editors prefill with what is stored (not the formatted output), plus
+    // the markup the price note explains.
+    productFields: reviewProductFields(typedProduct),
+    priceMarkupPct: connection?.price_markup_pct ?? 8,
   });
 }

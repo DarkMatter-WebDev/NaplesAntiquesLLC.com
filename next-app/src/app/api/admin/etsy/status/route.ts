@@ -3,6 +3,7 @@ import { requireAdmin } from '@/lib/admin-auth';
 import { createServiceClient } from '@/lib/supabase/service';
 import { getConnection, getLastScheduledPricePush, getRecentSyncLog } from '@/lib/etsy/store';
 import { resolvePricePushHealth } from '@/lib/marketplace-price-push-health';
+import { hasSalesScope } from '@/lib/marketplace-sales';
 
 export const runtime = 'nodejs';
 
@@ -45,6 +46,13 @@ export async function GET() {
       pricePushEnabled: connection?.price_push_enabled ?? false,
       pricePushThresholdPct: connection?.price_push_threshold_pct ?? 1,
       priceMarkupPct: connection?.price_markup_pct ?? 8,
+      autoMarkSold: connection?.auto_mark_sold ?? true,
+    },
+    // Marketplace sales → site sold (2026-09-12). `scopeGranted` false means
+    // the connection predates the transactions_r scope: reconnect to enable.
+    salesSync: {
+      scopeGranted: hasSalesScope('etsy', connection?.scopes),
+      watchingSince: connection?.sales_cursor ?? null,
     },
     priceAutomation: {
       cronSecretConfigured,

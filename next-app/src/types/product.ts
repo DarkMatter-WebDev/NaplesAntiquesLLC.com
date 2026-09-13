@@ -584,13 +584,49 @@ export function productWidthDisplay(
   return width == null ? null : `${width.toLocaleString('en-US', { maximumFractionDigits: 2 })} mm`;
 }
 
+/**
+ * A wearable length as a number of INCHES, or null when the text is not a
+ * measurement. The stored `length` column, the product page, the `len:` filter
+ * tag, Etsy's Length property and eBay's Chain Length all speak inches — this
+ * is the one parser they share, so a value typed as `470 mm` or `47 cm` becomes
+ * `18.5` once, here, instead of being read as 470 inches downstream (which is
+ * what happened when only the inch suffixes were understood: the owner
+ * measures in millimetres, and a bare "470" printed as "470 in" everywhere).
+ * Rounded to 2 decimals; a bare number is inches, as it always was.
+ */
+export function parseLengthInches(value: string | number | null | undefined): number | null {
+  const raw = String(value ?? '').trim().replace(/\s+/g, ' ');
+  if (!raw) return null;
+  const match = raw.match(/^(\d+(?:\.\d+)?)\s*(in(?:ch(?:es?)?)?\.?|"|mm|millimet(?:er|re)s?|cm|centimet(?:er|re)s?)?$/i);
+  if (!match) return null;
+  const amount = Number(match[1]);
+  if (!Number.isFinite(amount) || amount < 0) return null;
+  const unit = (match[2] ?? '').toLowerCase();
+  const inches = unit.startsWith('mm') || unit.startsWith('millimet')
+    ? amount / 25.4
+    : unit.startsWith('cm') || unit.startsWith('centimet')
+      ? amount / 2.54
+      : amount;
+  return Math.round((inches + Number.EPSILON) * 100) / 100;
+}
+
 export function normalizeProductLengthSizeValue(value: string | number | null | undefined): string {
   const raw = String(value ?? '').trim().replace(/\s+/g, ' ');
   if (!raw) return '';
-  const numericMeasurement = raw.match(/^(\d+(?:\.\d+)?)\s*(?:in(?:ch(?:es?)?)?\.?|")?$/i);
-  if (numericMeasurement) return String(Number(numericMeasurement[1]));
+  const inches = parseLengthInches(raw);
+  if (inches != null) return String(inches);
   const ringSize = raw.match(/^size\s*:?\s*(\d+(?:\.\d+)?)$/i);
   return ringSize ? String(Number(ringSize[1])) : raw;
+}
+
+/**
+ * The purity as buyers read it: gold karats carry a K ("14K"), silver and
+ * other fineness values stay parts-per-thousand ("925"). The raw column is a
+ * bare number, which printed as "Purity: 14" in the marketplace spec blocks.
+ */
+export function formatProductPurityLabel(purity: number | null | undefined): string | null {
+  if (purity == null || !Number.isFinite(purity) || purity <= 0) return null;
+  return purity <= 24 ? `${Math.round(purity)}K` : String(Math.round(purity));
 }
 
 export function productLengthSizeDisplay(

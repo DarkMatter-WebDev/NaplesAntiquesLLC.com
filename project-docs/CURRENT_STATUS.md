@@ -2,18 +2,85 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-09-11**.
+> in `DECISIONS.md`. Last reconciled: **2026-09-12**.
 
-## Start Here (2026-09-11 night — SUPERSEDES the blocks below)
+## Start Here (2026-09-12 — SUPERSEDES the blocks below)
 
 **Read this, then `TASKS.md`.**
 
-🟡 **09-11 night — STAGED, awaiting the owner's push (no SQL, no env):**
-`/free-evaluation` rebuilt call/visit-first as "Free Estate Jewelry
-Appraisal — Home or Showroom" (URL unchanged), sitewide "Free Appraisal"
-button labels, `/process.html` 308, Spanish LLAMAR buttons, QR claim
-removed. Gate green (tsc 0 · lint 0 · 1278/1278 · build 0). Staging
-synced. After the deploy: IndexNow. Details: `TASKS.md` top, `CHANGELOG.md`.
+🔴 **09-12 (night) — a sale on Etsy or eBay now MARKS THE PRODUCT SOLD ON
+THE SITE, which ends it on the other marketplace — BUILT + gated + STAGED;
+needs the owner to run `supabase/marketplace-sales-2026-09.sql`, deploy,
+then Reconnect Etsy and Reconnect eBay once (new order-reading scopes).**
+The 30-minute reconcile sweeps read paid orders, map lines to products and
+apply the checkout rule through `apply_marketplace_sale()`; a product that
+becomes sold fires the other channel's status hook. Armed from the first
+run after the reconnects — earlier sales are ignored (owner: already
+handled). Unverified against live marketplaces until the first real sale;
+steps + what to look for at the top of `TASKS.md`. Gate: tsc 0 · lint 0 ·
+**1319/1319 (133 files)** · build exit 0. `CHANGELOG.md` 2026-09-12 (night);
+`DECISIONS.md` → *"A marketplace sale marks the product sold"*.
+
+🟡 **09-12 — the marketplace review window now EDITS FIELDS IN PLACE, the
+Etsy category is a grouped dropdown, length understands `mm`/`cm`, the
+description prints "Purity: 14K", and (later the same day) Admin →
+Subscribers sorts by any column header, default Subscribed newest-first
+(`lib/subscriber-sort.ts`) — BUILT + gated + STAGED, awaiting the owner's
+push (no SQL, no env vars).** Gate after the sort: tsc 0 · lint 0 ·
+**1308/1308 (132 files)** · build exit 0. "Review before submitting to
+Etsy/eBay" has a pencil on every product-backed row (length / ring size /
+height, brand, year, weight, main stone, chain type, purity, metal colour,
+type, quantity; eBay aspects one per line); a save goes to the PRODUCT via
+the new `PUT /api/admin/products/fields` and re-runs the preflight. Price,
+photos, condition, shipping and Style stay read-only with a note saying why.
+Root cause of the mm problem: the whole pipeline is inches and the listing
+assistant was told to strip units — fixed with one shared `parseLengthInches()`
+(`470 mm` → `18.5`) used by the editor, the AI autofill, the product page and
+both marketplace mappers. Etsy's taxonomy has NO finished-jewelry "Pendants"
+leaf (both are craft-supply components), so `Pendant Necklaces` stays the
+default; the dropdown shows the parent path so that cannot be missed. Gate:
+tsc 0 · lint 0 · **1301/1301 (131 files)** · build exit 0. ⚠️ The window
+sits behind admin login — **unverified in a browser until the owner opens
+it** (checklist at the top of `TASKS.md`). Detail: `CHANGELOG.md` 2026-09-12;
+rules: `DECISIONS.md` → *"Review-window edits write to the product"*,
+*"Length is stored in inches"*, *"Purity prints as 14K"*.
+
+## (superseded) Start Here (2026-09-11 night)
+
+✅ **09-11 night — DEPLOYED and production-verified (no SQL, no env):**
+`/free-evaluation` is now the call/visit-first "Free Estate Jewelry
+Appraisal — Home or Showroom" (URL unchanged), with sitewide "Free
+Appraisal" button labels, `/process.html` 308 (it 404'd before), Spanish
+LLAMAR buttons and the QR claim removed. Gate was green (tsc 0 · lint 0 ·
+1278/1278 · build 0); IndexNow **200 for 220 URLs**. **Staging equals
+source; nothing is in flight.**
+
+✅ **GBP update post is live** ("Free estate jewelry appraisals … Call
+now") with the owner's testing photo, which the owner also added to the
+GBP gallery. ◻ Recheck ~09-13 that the post still says Published — the
+08-30 post passed the instant check and was removed ~2 days later.
+
+✅ **GBP description now carries both call-driving lines** (phone hours was
+already pasted by the owner; the agent added "Appraisals are free" plus the
+free in-home appraisal cities 09-11) — pending Google review, ◻ confirm
+~09-12.
+
+✅ **Yelp Connect post live** ("Inherited jewelry? Free appraisal, no
+pressure", Call now, runs Sep 11 – Dec 9), beside the 08-21 selling post.
+Its photo was rebuilt so the whole frame survives Yelp's centre-square
+tile — recipe in `DECISIONS.md` → "GBP operational facts".
+
+✅ **GSC:** indexing requested for `/free-evaluation` + `/es/free-evaluation`
+(both already indexed; the titles changed). Nothing else needed there.
+
+**Dates, owner-clarified 09-11:** buying since 2010, the Shirley Street
+showroom opened Sept 1 2026 — both true. Keep the GBP opening date at
+Sept 2026 and Yelp's "established 2010"; ◻ once the pending GBP description
+publishes, add a sentence that says both so they stop looking contradictory.
+
+Left for calls: reviews that name the metal, buying photos beyond the new
+testing shot, the 30-day caller question. Details:
+`TASKS.md` top, `CHANGELOG.md`.
 
 ◻ **09-11 citation audit delivered** (report link in `TASKS.md` top): GBP
 opening date now Sept 1 (Maps shows hours again); Apple Maps hours wrong,

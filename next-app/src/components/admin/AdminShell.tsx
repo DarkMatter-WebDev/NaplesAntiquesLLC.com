@@ -63,6 +63,7 @@ import EbayBulkPublishModal from './EbayBulkPublishModal';
 import SelectedProductsActionsModal, { type SelectedMarketplaceAction } from './SelectedProductsActionsModal';
 import SelectedProductsStatusModal from './SelectedProductsStatusModal';
 import type { Marketplace } from '@/lib/selected-marketplace-status';
+import type { ProductFieldEditPatch } from '@/lib/product-field-edits';
 import ProductVideoEditor, { type ProductVideoEditorHandle } from './ProductVideoEditor';
 import {
   DEFAULT_QUICK_FILL_AI_FORMAT_PROMPT,
@@ -3624,6 +3625,14 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     else setShowEbayBulkModal(true);
   }
 
+  // A field saved from the marketplace review window (length, brand, year…)
+  // already hit the database; merge it into the table so the row does not
+  // show the old value until the next full load. The editor drawer reloads
+  // the full row on open (loadFullProduct), so it needs nothing here.
+  function mergeReviewEdit(productId: string, patch: ProductFieldEditPatch) {
+    setProducts((current) => current.map((product) => (product.id === productId ? { ...product, ...patch } : product)));
+  }
+
   function handleEtsyBulkClose(completed = false) {
     setShowEtsyBulkModal(false);
     void refreshEtsyChips();
@@ -5628,14 +5637,18 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                   const usesHeight = productUsesHeight(jewelryTypeInput);
                   const canUseLengthOrSize = productUsesLength(jewelryTypeInput) || productUsesSize(jewelryTypeInput) || usesHeight;
                   if (!canUseLengthOrSize) return null;
+                  // Inches unless a unit is typed — "470 mm" / "47 cm" convert on
+                  // the way in (normalizeProductLengthSizeValue), because the owner
+                  // measures in millimetres and a bare 470 used to read as 470 in.
                   const placeholder = usesHeight
-                    ? 'height in inches, e.g. 1.5, 0.75...'
+                    ? 'inches, or add mm: 1.5, 40 mm...'
                     : lengthSizeLabel === 'Size'
                       ? 'e.g. 6.5, 7, 8...'
-                      : 'e.g. 22, 22 in, 7.5...';
+                      : 'inches, or add mm: 22, 7.5, 470 mm...';
+                  const unitLabel = lengthSizeLabel === 'Size' ? lengthSizeLabel : `${lengthSizeLabel} (in)`;
                   return (
                     <div>
-                      <label className="form-label">{lengthSizeLabel}</label>
+                      <label className="form-label">{unitLabel}</label>
                       <ComboboxInput
                         value={lengthInput}
                         onChange={(value) => setLengthInput(normalizeProductLengthSizeValue(value))}
@@ -6665,6 +6678,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
         <EtsyBulkSyncModal
           productIds={selectedStatusPostTarget ? [selectedStatusPostTarget.productId] : selectedBulkRun ? selectedProductIds : undefined}
           onClose={handleEtsyBulkClose}
+          onProductEdited={mergeReviewEdit}
         />
       )}
 
@@ -6691,6 +6705,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
         <EbayBulkSyncModal
           productIds={selectedStatusPostTarget ? [selectedStatusPostTarget.productId] : selectedBulkRun ? selectedProductIds : undefined}
           onClose={handleEbayBulkClose}
+          onProductEdited={mergeReviewEdit}
         />
       )}
 

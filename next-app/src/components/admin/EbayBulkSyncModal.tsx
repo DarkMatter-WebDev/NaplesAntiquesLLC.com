@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import SelectedMarketplaceReviewFlow from './SelectedMarketplaceReviewFlow';
 import { EBAY_BULK_ENQUEUE_LIMIT } from '@/lib/ebay/guards';
+import type { ProductFieldEditPatch } from '@/lib/product-field-edits';
 
 interface EligibilitySummary {
   total: number;
@@ -33,7 +34,15 @@ function errorMessage(data: unknown, fallback: string): string {
 }
 
 /** Bulk action mirroring EtsyBulkSyncModal: pre-flight summary -> confirm -> drain the queue with progress -> stop-after-current cancel. */
-export default function EbayBulkSyncModal({ onClose, productIds }: { onClose: (completed?: boolean) => void; productIds?: string[] }) {
+export default function EbayBulkSyncModal({
+  onClose,
+  productIds,
+  onProductEdited,
+}: {
+  onClose: (completed?: boolean) => void;
+  productIds?: string[];
+  onProductEdited?: (productId: string, patch: ProductFieldEditPatch) => void;
+}) {
   const selectedProductIds = productIds?.length ? productIds : null;
   const selectedRun = selectedProductIds !== null;
   const selectedCount = selectedProductIds?.length ?? 0;
@@ -78,6 +87,7 @@ export default function EbayBulkSyncModal({ onClose, productIds }: { onClose: (c
         productIds={selectedProductIds ?? []}
         onBack={() => setSelectedFlow('choice')}
         onClose={onClose}
+        onProductEdited={onProductEdited}
       />
     );
   }

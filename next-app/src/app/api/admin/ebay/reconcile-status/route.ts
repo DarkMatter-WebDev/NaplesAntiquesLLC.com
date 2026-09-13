@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { reconcileEbayStatusDrift } from '@/lib/ebay/sync';
+import { sweepEbaySales } from '@/lib/marketplace-sales-sweep';
 
 /**
  * Scheduled status-drift reconcile — the safety net under the auto-delist hook.
@@ -20,6 +21,11 @@ import { reconcileEbayStatusDrift } from '@/lib/ebay/sync';
  * .env.local) and a mismatch fails silently as a 401 — so a new secret is a new
  * way for this to break. Etsy has its own route guarded by its own secret,
  * matching the standing "Etsy and eBay remain independent channels" decision.
+ *
+ * Since 2026-09-12 the same 30-minute tick first reads paid eBay orders and
+ * marks the sold products sold on the site (lib/marketplace-sales-sweep.ts),
+ * which ends them on Etsy through the existing status hook; the drift
+ * reconcile then runs as before.
  */
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -40,7 +46,11 @@ export async function POST(req: Request) {
   }
 
   try {
-    return NextResponse.json(await reconcileEbayStatusDrift());
+    // Sales first — a product sold on eBay is already 'sold' when the drift
+    // pass looks at its listing; the sweep never throws (it logs and returns).
+    const sales = await sweepEbaySales();
+    const reconcile = await reconcileEbayStatusDrift();
+    return NextResponse.json({ ...reconcile, sales });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'eBay status reconcile failed.';
     return NextResponse.json({ error: { code: 'reconcile_failed', message } }, { status: 500 });

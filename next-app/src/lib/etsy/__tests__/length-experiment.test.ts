@@ -249,6 +249,13 @@ describe('parseWearableLengthInches', () => {
     expect(parseWearableLengthInches('7.75"')).toBe(7.75);
   });
 
+  it('converts a millimetre or centimetre value to inches (the owner measures in mm)', () => {
+    expect(parseWearableLengthInches('470 mm')).toBe(18.5);
+    expect(parseWearableLengthInches('470mm')).toBe(18.5);
+    expect(parseWearableLengthInches('47 cm')).toBe(18.5);
+    expect(parseWearableLengthInches('40 millimeters')).toBe(1.57);
+  });
+
   it('rejects a ring-size-style string', () => {
     expect(parseWearableLengthInches('size 7')).toBeNull();
   });

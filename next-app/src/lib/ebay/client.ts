@@ -1,5 +1,6 @@
 import 'server-only';
 import { XMLParser } from 'fast-xml-parser';
+import type { EbayOrder } from '@/lib/marketplace-sales';
 
 // Fetch wrapper for eBay's REST APIs. Modeled on next-app/src/lib/etsy/client.ts's
 // shape (throttle + backoff + typed error + redacted logging) — never imports
@@ -268,6 +269,34 @@ export async function ebayFetch<T>(opts: EbayRequestOptions): Promise<EbayRespon
     console.error(`ebay client: ${opts.method} ${opts.path} failed (HTTP ${res.status}):`, JSON.stringify(error.detail));
     throw error;
   }
+}
+
+/**
+ * Orders created at or after `createdAfter` (Sell Fulfillment getOrders;
+ * requires `sell.fulfillment.readonly`). Follows eBay's `next` link up to
+ * `maxPages`. Shape is trimmed to what lib/marketplace-sales.ts reads.
+ */
+export async function getOrders(params: {
+  accessToken: string;
+  createdAfter: Date;
+  maxPages?: number;
+}): Promise<EbayOrder[]> {
+  type Page = { orders?: EbayOrder[]; next?: string | null };
+  const orders: EbayOrder[] = [];
+  const maxPages = params.maxPages ?? 5;
+  let path: string | null = '/sell/fulfillment/v1/order';
+  let query: EbayRequestOptions['query'] = {
+    filter: `creationdate:[${params.createdAfter.toISOString()}..]`,
+    limit: 200,
+  };
+  for (let page = 0; page < maxPages && path; page += 1) {
+    const res: EbayResponse<Page> = await ebayFetch<Page>({ method: 'GET', path, accessToken: params.accessToken, query });
+    orders.push(...(res.data?.orders ?? []));
+    // `next` is an absolute URL carrying its own query string.
+    path = res.data?.next ?? null;
+    query = undefined;
+  }
+  return orders;
 }
 
 export interface EbayTradingItemStatus {

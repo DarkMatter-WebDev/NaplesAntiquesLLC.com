@@ -4,7 +4,80 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-09-11**.
+> compaction. Last reconciled: **2026-09-12**.
+
+## A marketplace sale marks the product sold on the site through the checkout rule, and only from the moment it was enabled (2026-09-12)
+
+- **Decision.** The 30-minute reconcile sweeps read paid Etsy receipts and
+  eBay orders and apply each line with `apply_marketplace_sale()` — the same
+  quantity-down / sold-at-zero / `sold_price` rule as `capture_paypal_order`.
+  Becoming `sold` fires the other channel's status hook, exactly as a manual
+  Mark Sold does; that is what ends the eBay listing after an Etsy sale.
+  Nothing ever un-sells: cancelled and fully refunded orders are skipped, and
+  a product that is not `available` is left alone with a "no change" log line.
+- **Cursor rule.** The first armed run stores "now" and reads nothing —
+  the owner had already handled every earlier sale by hand. Every run
+  re-reads a 10-minute overlap; `marketplace_sale_events` (one row per
+  channel + order + line) makes the re-read inert. The cursor advances only
+  after a successful read, so a failed run is retried, never skipped.
+- **No detect-only stage.** The owner already gets the marketplace's own
+  sale emails; a second email would be noise. The log rows are the audit.
+- **Why not the listing-state signal the sweep already sees.** Etsy `edit`
+  and eBay `Completed` also cover manual deactivation and expiry; an order
+  is the only unambiguous "it sold", and it carries the price.
+- **How to apply.** Reading orders needs `transactions_r` /
+  `sell.fulfillment.readonly` — both are in the scope constants; a
+  connection that lacks them keeps the sweep inert and the panel asks for a
+  reconnect. Never call the selling channel's own delist after its sale (it
+  already zeroed the listing — mark our row terminal instead). The sales
+  pass is awaited inside the cron route; it is not the payment path, so
+  `after()` is neither needed nor trusted there.
+
+## Review-window edits write to the product, never to a marketplace-only override (2026-09-12)
+
+- **Decision.** A field corrected in "Review before submitting to Etsy/eBay"
+  (length, brand, year, weight, stone, chain type, purity, metal colour,
+  type, quantity) is saved to the `products` row through
+  `PUT /api/admin/products/fields`, then the preflight re-runs. The only
+  channel-specific values are the ones that already were: the Etsy category
+  (`etsy_listings.taxonomy_override_*`) and the extra Etsy tags.
+- **Why.** The wrong value is wrong on the product page and on the other
+  marketplace too, and the out-of-date scan re-hashes from the product — a
+  per-channel value would be overwritten on the next sweep. Owner confirmed
+  ("yes to all three") that fixing it once everywhere is what they want.
+- **How to apply.** New editable rows go through `EDITABLE_PRODUCT_FIELDS`
+  in `lib/product-field-edits.ts` with the listing editor's normalizers and
+  the `jt:`/`ct:`/`len:` tag rebuild; never add a second write path from the
+  window. Derived rows (price, photos, condition, shipping tier, Style, eBay
+  category) stay read-only and say where the value comes from — the window
+  must never imply a value can be changed there when it cannot.
+
+## Length is stored in inches; a value that carries `mm`/`cm` converts once, on the way in (2026-09-12)
+
+- **Decision.** `products.length` stays inches (the product page, `len:`
+  tag, Etsy Length property and eBay Chain Length all print inches). Input
+  may carry a metric unit — `470 mm`, `47 cm` — and `parseLengthInches()` in
+  `types/product.ts` converts it (2 decimals) everywhere the value enters:
+  the editor, the AI autofill, the review window, and the marketplace
+  mappers (so an old `470 mm` row pushes 18.5 in too). A bare number is
+  inches, as it always was.
+- **Why.** The owner measures in millimetres. The pipeline understood only
+  inch suffixes, and the Smart Listing Assistant was told to return "one
+  bare numeric string with no unit", so a 470 mm chain became "470 in" on
+  the site and on both marketplaces (2026-09-12). Etsy does offer mm/cm
+  scales, but pushing mm there alone would need the unit stored per row and
+  would disagree with the site and eBay — the owner accepted inches.
+- **How to apply.** Any new length input or prompt must either accept the
+  unit and hand it to the shared parser, or say "inches" in its label. Never
+  ask a model to strip a unit from a measurement. Ring sizes are not
+  lengths and are never converted.
+
+## Purity prints as "14K" / "925", never the bare column number (2026-09-12)
+
+`formatProductPurityLabel()` is the one formatter for buyer-facing purity
+text (Etsy and eBay description spec blocks). Karats ≤ 24 get a `K`; silver
+fineness stays parts-per-thousand. Owner: "normalize it to 14k, 10k, etc
+instead of just 14 or 10".
 
 ## `/free-evaluation` is the call/visit-first "Free Estate Jewelry Appraisal" page; buttons say "Free Appraisal" (2026-09-11)
 
@@ -841,6 +914,26 @@ stones to discuss them before travelling. Do not invent a refusal or minimum-val
 - **Public Q&A is retired on this listing** (only "Ask Maps" remains, checked
   on both Search and Maps 2026-08-30). Seed FAQs on the site instead.
 - GBP post images reject WebP — convert to JPG first.
+- **Post photos: match the canvas to the surface's crop, never hand the
+  platform a bare portrait shot.** GBP crops post photos to a WIDE box, Yelp
+  to a 9:16 fullscreen whose TILES crop a centre square. Recipe used
+  2026-09-11 for the same source photo: for GBP, the photo uncropped and
+  centred on a 2500×1600 canvas; for Yelp, the photo scaled to fit the
+  centre square of a 1302×2315 canvas. Both fill the remainder with the
+  photo blown up, Gaussian-blurred ~45 and dimmed to 0.55–0.72. Pillow
+  script pattern; always render the platform's crop locally and LOOK before
+  uploading.
+- **GBP photos have no caption field on desktop.** Checked 2026-09-11 in the
+  owner's account: opening an uploaded photo in Business Profile Manager
+  offers exactly one action, "Delete photo" — no caption, title or edit.
+  The owner typed a caption while uploading and it did NOT apply, so the
+  mobile caption box does not caption a business photo either. On the live
+  profile an owner photo carries only "Photo · <month year>" — there is no
+  caption line in the layout to render one. Google's current help page for
+  managing Business Profile photos documents no caption feature at all.
+  ⛔ Do not spend time hunting for this setting. Put the words in a POST
+  (which has a description and a Call now button) beside the same photo.
+  New photos also take 24–48 h to appear, so judge visibility a day later.
 - ⛔ **No phone number anywhere in GBP post text** (Google: "we do not allow
   your post content to include a phone number"; the 08-30 post was removed
   and posting turned off for days). Use the **Call now** button. Also keep

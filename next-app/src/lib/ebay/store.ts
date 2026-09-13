@@ -33,6 +33,9 @@ export interface EbayConnectionRow {
   price_push_enabled: boolean;
   price_push_threshold_pct: number;
   price_markup_pct: number;
+  /** Mark a product sold on the site when its eBay listing sells (2026-09-12; needs sell.fulfillment.readonly). */
+  auto_mark_sold?: boolean;
+  /** Orders created after this instant are read by the sales sweep; null = not armed yet. */
   orders_cursor: string | null;
   connected_at: string | null;
   updated_at: string;

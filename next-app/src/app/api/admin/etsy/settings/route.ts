@@ -20,6 +20,7 @@ export async function PUT(req: Request) {
   if ('autoActivate' in body) patch.auto_activate = Boolean(body.autoActivate);
   if ('autoDelistOnSold' in body) patch.auto_delist_on_sold = Boolean(body.autoDelistOnSold);
   if ('pricePushEnabled' in body) patch.price_push_enabled = Boolean(body.pricePushEnabled);
+  if ('autoMarkSold' in body) patch.auto_mark_sold = Boolean(body.autoMarkSold);
 
   if ('pricePushThresholdPct' in body) {
     const value = Number(body.pricePushThresholdPct);

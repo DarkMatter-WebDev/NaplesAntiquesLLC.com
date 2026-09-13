@@ -50,6 +50,7 @@ export async function PUT(req: Request) {
   }
   if ('bestOfferEnabled' in body) patch.best_offer_enabled = Boolean(body.bestOfferEnabled);
   if ('pricePushEnabled' in body) patch.price_push_enabled = Boolean(body.pricePushEnabled);
+  if ('autoMarkSold' in body) patch.auto_mark_sold = Boolean(body.autoMarkSold);
   if ('pricePushThresholdPct' in body) {
     const pct = num(body.pricePushThresholdPct);
     if (pct == null || pct < 0) {

@@ -8,7 +8,11 @@ import { getConnection, updateConnection, type EtsyConnectionRow } from './store
 //
 // listings_d is requested from the start (delist/relist + image replacement
 // can need delete calls) — one consent screen, not two.
-export const ETSY_OAUTH_SCOPES = 'listings_r listings_w listings_d shops_r shops_w';
+// `transactions_r` (2026-09-12) lets the 30-minute sweep read paid receipts so
+// a sale on Etsy marks the product sold on the site (lib/marketplace-sales.ts).
+// A connection made before then lacks it; the settings panel asks for a
+// reconnect and the sweep stays inert until the stored scopes include it.
+export const ETSY_OAUTH_SCOPES = 'listings_r listings_w listings_d shops_r shops_w transactions_r';
 
 const ACCESS_TOKEN_SKEW_MS = 2 * 60 * 1000; // refresh 2 minutes before expiry
 

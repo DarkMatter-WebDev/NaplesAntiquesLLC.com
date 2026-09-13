@@ -62,6 +62,30 @@ immediate sync or review-first submission. Closing or completing that route
 returns to a newly reconciled combined status summary without clearing the
 original table selection.
 
+**2026-09-12 (night, staged — needs SQL + reconnect) eBay sale → site sold:**
+the 30-minute `reconcile-status` sweep first reads paid orders (Sell
+Fulfillment `getOrders`, scope `sell.fulfillment.readonly`), maps each line
+by `sku` → `ebay_listings.ebay_sku` (else `legacyItemId` → `ebay_listing_id`),
+and applies it with `apply_marketplace_sale()` (checkout's rule); a product
+that becomes sold has its eBay row marked `hidden_oos` here and the Etsy
+status hook delists the Etsy listing. Cancelled / fully refunded orders are
+skipped; a partial refund still counts. Armed from the first run after the
+reconnect — `ebay_connection.orders_cursor`, the column that waited since
+the original build, is finally the cursor; switch `auto_mark_sold` in
+Settings. `lib/marketplace-sales*.ts`, `supabase/marketplace-sales-2026-09.sql`;
+`CHANGELOG.md` 2026-09-12 (night).
+
+**2026-09-12 (staged) edit in the review window:** the review step's Aspects
+line is a list, one aspect per line, and every aspect fed by a product column
+(Metal, Metal Purity, Type, Brand, Year Manufactured, Item Weight, Main Stone,
+Chain Type, Chain Length / Ring Size) has a pencil that saves the product
+through `PUT /api/admin/products/fields` and re-runs the preflight; aspects
+the mapper skipped for an empty field still get a "—" row. Style stays fixed
+("Classic"); Condition, Shipping and Category are read-only with a note
+saying where they come from. `mapAspects` and the description now convert a
+`mm`/`cm` length to inches, and the description prints `Purity: 14K` / `925`.
+`CHANGELOG.md` 2026-09-12.
+
 **2026-07-20 selected review-first sync:** Selected products can either use the
 existing immediate eBay batch queue or open a sequential review flow. Each step
 loads the real eBay preview checks, condition, shipping, aspects, and mapped

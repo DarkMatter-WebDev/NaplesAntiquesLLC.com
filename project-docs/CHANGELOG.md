@@ -1,6 +1,304 @@
 
 # Changelog
 
+## 2026-09-12 (night, STAGED — needs SQL + two reconnects) — A sale on Etsy or eBay marks the product sold on the site, which ends it on the other marketplace
+
+Owner: "if an item sells on Etsy, automatically mark it sold on our site,
+which in turn would end it on eBay, and the same for eBay"; skip the
+detect-only stage ("I already get an email"); "only act on sales from the
+moment we enable it, I've covered all previous sales". Stage 2 of the 09-07
+proposal, built directly.
+
+**How it runs.** The two existing 30-minute pg_cron sweeps
+(`nej-etsy-reconcile-status`, `nej-ebay-reconcile-status`) now start with a
+sales pass (`lib/marketplace-sales-sweep.ts`, called first from both
+`reconcile-status` routes; the drift reconcile follows unchanged):
+1. Read paid orders since the cursor minus a 10-minute overlap — Etsy
+   `getShopReceipts` (`was_paid`, oldest first, ≤500), eBay Sell Fulfillment
+   `getOrders` (`creationdate` filter, follows `next`, ≤1000).
+2. Map lines to products — Etsy by `listing_id` → `etsy_listings`, eBay by
+   `sku` → `ebay_listings.ebay_sku`, else `legacyItemId` → `ebay_listing_id`.
+   Cancelled / fully refunded / unpaid orders are skipped; a partial refund
+   still counts as sold. Lines for items we never synced are logged as
+   "not ours" and left alone. (`lib/marketplace-sales.ts`, pure, 12 tests.)
+3. Apply each line through the new SQL function `apply_marketplace_sale()`
+   — the checkout rule from `capture_paypal_order`: quantity down by what
+   sold; at 0 the product is `sold` and `sold_price` = the marketplace unit
+   price. It never touches a product that is not `available` (already sold
+   by hand → "no change" log line) and records every line once in
+   `marketplace_sale_events` (unique per channel + order + line), so the
+   overlap re-read is inert.
+4. A product that became sold: its own listing row on the selling channel is
+   marked terminal here (Etsy `delisted`, eBay `hidden_oos` — the
+   marketplace already zeroed it; asking again would only log a refusal),
+   then the OTHER channel's `handleProductStatusChange` runs — the same call
+   a manual Mark Sold fires — plus Deep Field sync and the shop-cache
+   revalidate. A quantity that merely dropped re-hashes both channels so the
+   new count pushes on the next update. All awaited (cron, not the payment
+   path). Budget 15 s; anything unapplied is picked up next run.
+5. Log rows in each channel's activity log: `marketplace_sale` per line
+   ("Sold on Etsy — marked sold on the site at $454.25 (Etsy order …)") and
+   a `marketplace_sales` summary per run ("Etsy sales: N orders read, S
+   marked sold, D quantity reduced, A already handled, U not ours, F
+   failed"). A skip reason (off / no scope / migration missing) is logged
+   only when it changes, so it cannot bury the log.
+
+**Arming ("only from the moment we enable it").** The first run with the
+switch on and the scope granted stores the cursor = now
+(`etsy_connection.sales_cursor` NEW, `ebay_connection.orders_cursor` —
+existed since the eBay build, never used) and reads nothing; every later run
+reads from the cursor and advances it only after a successful read.
+
+**Scopes.** Reading orders needs `transactions_r` (Etsy) and
+`sell.fulfillment.readonly` (eBay). Both are added to the OAuth scope
+constants; a connection made before this lacks them, so the sweep stays
+inert and the Settings panels show "Marking items sold needs permission to
+read Etsy/eBay orders — Reconnect once" with the existing connect link.
+`/api/admin/{etsy,ebay}/status` now return `policy.autoMarkSold` and
+`salesSync: { scopeGranted, watchingSince }`; the settings routes accept
+`autoMarkSold`. Each panel gains the switch "Mark sold on the site when it
+sells on Etsy/eBay (checked every 30 min)" and a "Watching … sales since
+<time> ET" line once armed.
+
+**SQL — owner runs `supabase/marketplace-sales-2026-09.sql`** (idempotent):
+`etsy_connection.auto_mark_sold` + `sales_cursor`,
+`ebay_connection.auto_mark_sold`, table `marketplace_sale_events` (RLS on,
+service-role only), function `apply_marketplace_sale(...)` (security
+definer, `service_role` only). Until it is run the sweep logs "waiting for
+the database migration" once and the drift reconcile still runs.
+
+Files: `supabase/marketplace-sales-2026-09.sql` (NEW),
+`lib/marketplace-sales.ts` (NEW), `lib/marketplace-sales-sweep.ts` (NEW),
+`lib/__tests__/marketplace-sales.test.ts` (NEW), `lib/etsy/{auth,client,store}.ts`,
+`lib/ebay/{auth,client,store}.ts`, `api/admin/{etsy,ebay}/{reconcile-status,status,settings}/route.ts`,
+`components/admin/{Etsy,Ebay}SettingsPanel.tsx`. No env vars; no new cron job.
+
+**Gate:** tsc 0 · lint 0 · `npx vitest run` **1319/1319 (133 files)** ·
+`npm run build` exit 0 (dev server stopped first — see the 09-12 memory on
+Turbopack). ⚠️ Not exercised against Etsy or eBay: the API shapes follow the
+published v3 / Sell Fulfillment contracts and are parsed defensively (an
+unexpected shape reads as "0 orders", never as a sale). The first real sale
+after the reconnects is the proof — read the `marketplace_sale` log row and
+the product's status, and check the other marketplace ended it.
+
+## 2026-09-12 (later, STAGED) — Admin → Subscribers: sortable column headers, default Subscribed newest-first
+
+Owner: "on the subscribers table, let's allow admin to sort it by a
+particular column by clicking the column header; default should sort by
+date subscribed, newest first." Rides with the review-window batch below.
+
+- `lib/subscriber-sort.ts` (NEW, pure): `SubscriberRow` now lives here
+  (re-exported from the component so the page import is unchanged),
+  `DEFAULT_SUBSCRIBER_SORT = { key: 'subscribed', direction: 'desc' }`,
+  `nextSubscriberSort()` (same header flips; a new header opens A→Z, the
+  date header opens newest first), `sortSubscriberRows()` and
+  `subscriberSourceLabel()` (moved from the component so Source sorts by
+  the label the table shows). The Subscribed sort uses the date the column
+  prints — the newsletter row, else the account creation. Blank names and
+  undated rows stay at the BOTTOM in both directions; email breaks ties so
+  the order is stable. Case-insensitive, numeric-aware collation.
+- `components/admin/SubscribersManager.tsx`: Name / Email / Source /
+  Subscribed headers are buttons with the same ▲ ▼ ↕ marks and `aria-sort`
+  as the products table (`AdminShell.tsx`); Actions is not sortable. "Copy
+  All Emails" follows the visible order. Sort state is client-side and
+  resets on reload (the list is one page, no persistence needed).
+- Tests: `lib/__tests__/subscriber-sort.test.ts` (7). Gate: tsc 0 · lint 0
+  · `npx vitest run` **1308/1308 (132 files)** · `npm run build` exit 0, no
+  Turbopack cache dir. Behind admin login — owner reviews on the dev server
+  (`/admin/subscribers`), which was restarted for that.
+
+## 2026-09-12 (STAGED) — Marketplace review window edits fields in place; Etsy category dropdown; length understands mm/cm; "Purity: 14K"
+
+Owner: "on the post to Etsy / eBay flow … let's allow them to be editable
+right there in the window" — they had posted an item whose length was wrong
+and could only fix it on Etsy afterwards; then "length fills in in inches …
+but we had the item measured in MM"; then "normalize purity to 14k, 10k
+instead of just 14". Mockup approved (artifact `3d41dd37…`), three points
+confirmed: edits write to the product, the field list, mm → inches.
+
+**Inline editing in `Review before submitting to Etsy/eBay`**
+(`components/admin/SelectedMarketplaceReviewFlow.tsx`, rewritten):
+- A pencil on every row backed by a product column opens a small editor in
+  place: Quantity, Length / Ring size / Height, Brand, Year (Etsy "When
+  made"), Weight, Main stone, Chain type, Purity, Metal colour, Type. Etsy's
+  Materials row edits metal + purity together. eBay's Aspects line is now a
+  list, one aspect per line with its own pencil; aspects the mapper skipped
+  because the field is empty (Year, Weight, Chain Type, Chain Length / Ring
+  Size) still get a row with "—" so they can be filled.
+- Save → `PUT /api/admin/products/fields` → "Length saved · preflight
+  refreshed." and the preflight re-runs. Enter saves, Escape cancels; every
+  button in the window is disabled while a save is in flight.
+- Derived rows stay read-only and say why: Price ("Site price $X + N% Etsy
+  markup · change the price in the listing editor" — `priceBeforeMarkup` and
+  the new `priceMarkupPct` from the preview routes), Photos, eBay Condition
+  (one fixed sentence), Shipping (tier by price), Style ("fixed"), eBay
+  Category ("pinned from Type and metal").
+- Etsy "Additional tags" moved into the window too (same
+  `/api/admin/etsy/tags` route as the drawer); your tags are gold-outlined
+  among the generated ones.
+- The length editor shows the conversion live ("470 mm = **18.5 in** ·
+  stored in inches; Etsy and eBay push inches").
+
+**New route `PUT /api/admin/products/fields`** (`{ productId, fields }`,
+admin-gated, service role) over the pure `lib/product-field-edits.ts`:
+allow-list of ten fields, the listing editor's own normalizers, purity
+checked against the metal family (karat ≤ 24 for gold, 100–1000 for silver),
+metal colour limited to the product's family, `weight_grams` mirrored into
+`gram_weight`, `product_type` mirrored into `jewelry_type` and a Type without
+chains clears `chain_type`, and the internal `jt:`/`ct:`/`len:` filter tags
+rebuilt exactly as the editor rebuilds them. After the write: the same
+`shop-catalog` tag purge + product-path revalidate + `scheduleProductStatusHooks`
+(`scanOutOfDate`) as any admin save. Both preview routes now return
+`productFields` (the stored values behind the rows) and `priceMarkupPct`.
+The admin table merges the saved patch (`mergeReviewEdit` in `AdminShell`)
+so the row does not show the old value; the drawer already reloads the full
+row on open.
+
+**Etsy category dropdown** (`components/admin/EtsyCategoryDropdown.tsx`,
+replaces the "Choose exact category" button + bare combobox in the review
+window): Jewelry's 82 categories first, grouped by Etsy's own branches
+(Necklaces 15, Rings 16, Earrings 15, Bracelets 11, Watches 7 …) when the
+search is empty; typing searches all 2,503 seller categories with leaf-name
+hits ranked first; the parent path is always shown; groups under
+`Craft Supplies & Tools` are labelled "jewelry-making supplies, not
+finished jewelry". Data is the existing `/api/admin/etsy/taxonomy` (Etsy's
+seller-taxonomy API, cached a day) — no scraping was needed. **Finding:**
+Etsy has NO finished-jewelry "Pendants" leaf; the two "Pendants" entries
+are both craft-supply components (`Beads, Gems & Cabochons > Charms &
+Pendants > Pendants`, `Blanks > Jewelry > Pendants`). The Etsy editor's
+search box hides the parent path, which is why "Pendants" looked right. The
+automatic `Pendant → Jewelry > Necklaces > Pendant Necklaces` (1229) stays.
+
+**Length understands millimetres and centimetres** — one shared parser,
+`parseLengthInches()` in `types/product.ts`: `470 mm` / `47 cm` / `40
+millimeters` → inches, 2 decimals; a bare number is inches as before.
+Used by `normalizeProductLengthSizeValue` (editor save, AI autofill, the
+new route), `productLengthSizeDisplay` (product page), Etsy's
+`parseWearableLengthInches` and eBay's `parseWearableLengthInchesValue`, so
+an old row holding `470 mm` also pushes 18.5 in now (it previously pushed
+NOTHING to Etsy and the raw text to eBay, and the product page printed
+"470 in"). Editor label is now "Length (in)" / "Height (in)" with the
+placeholder "inches, or add mm: 22, 7.5, 470 mm…". The Smart Listing
+Assistant's field contract (`ai-product-provider.ts`) used to demand "one
+bare canonical numeric string with no unit text" — the real reason a
+millimetre measurement was stored as inches; it now keeps a metric unit on
+the value and `cleanLength` in `ai-product-schema.ts` accepts mm/cm. The
+legacy Quick Fill prompt gains a "Length unit rules" addendum
+(`admin-settings.ts`, appended to saved custom prompts by marker like the
+brand rules).
+
+**Purity in the marketplace description spec block** now prints `14K` /
+`10K` for gold and `925` for silver (`formatProductPurityLabel()`), on Etsy
+and eBay; Etsy's `Length/Size:` line now prints the product page's words
+("18.5 in", "Size: 7") instead of the raw column.
+
+Files: `types/product.ts`, `lib/product-field-edits.ts` (NEW),
+`app/api/admin/products/fields/route.ts` (NEW),
+`components/admin/EtsyCategoryDropdown.tsx` (NEW),
+`components/admin/SelectedMarketplaceReviewFlow.tsx`,
+`EtsyBulkSyncModal.tsx`, `EbayBulkSyncModal.tsx`, `AdminShell.tsx`,
+`api/admin/etsy/preview/route.ts`, `api/admin/ebay/preview/route.ts`,
+`lib/etsy/mapping.ts`, `lib/etsy/length-experiment.ts`, `lib/ebay/mapping.ts`,
+`lib/ai-product-provider.ts`, `lib/ai-product-schema.ts`, `lib/admin-settings.ts`;
+tests `lib/__tests__/product-field-edits.test.ts` (NEW), `types/__tests__/product.test.ts`,
+`lib/ebay/__tests__/mapping.test.ts`, `lib/etsy/__tests__/length-experiment.test.ts`,
+`lib/__tests__/ai-product-schema.test.ts`. No SQL, no env vars.
+
+**Gate:** `npx tsc --noEmit` 0 · `npm run lint` 0 · `npx vitest run`
+**1301/1301 (131 files)** · `npm run build` exit 0, no `.next/cache/turbopack/`.
+The admin sits behind login and its sign-in page crashes the Browser pane,
+so the window itself is **unverified in a browser until the owner opens
+Products → select → Sync → Review** (checklist in `TASKS.md`).
+
+## 2026-09-11 (night) — GSC: recrawl requested for both free-appraisal pages; no other Search Console change needed
+
+Owner asked whether GSC needed anything after the deploy. Nothing to
+configure: the sitemap is submitted and its `CONTENT_LAST_MODIFIED` moved to
+2026-09-11, and `/process.html` needs no GSC action now that it 308s. Both
+appraisal pages inspected in the `.com` URL-prefix property — each reported
+"URL is on Google · Page is indexed · Breadcrumbs 1 valid item" — and
+**Indexing requested** for `/free-evaluation` and `/es/free-evaluation` so
+Google re-reads the new titles and copy (2 of the day's 10 requests).
+⛔ Did not touch REQUEST AGAIN afterwards (the focus trap that burned quota
+in August). Still pending from earlier: the two validations started 09-06/07
+(read ~09-20) and the Breadcrumbs report (mid-Sept).
+
+## 2026-09-11 (night) — Yelp Connect post live: "Inherited jewelry? Free appraisal, no pressure" (Call now)
+
+Owner asked for a Yelp post on the buying side (collections + inheritance)
+using the same testing photo, then published it. Yelp Connect composer:
+headline 50 chars, description 300, one photo/video, a Button dropdown
+(View business · View more photos · Get directions · Call now · Message
+business · Visit website · Custom URL) and a schedule (90 days default).
+Used **Call now** with (239) 404-8505 — Yelp appends the number to the post
+text itself, which is allowed there (unlike GBP). Runs Sep 11 – Dec 9. It
+sits beside the 08-21 "Selling gold, silver or jewelry?" post (to Nov 19).
+
+**How a Yelp post photo renders (checked on the live public page).** Yelp
+asks for a 9:16 "Fullscreen" crop. Opening the post shows the WHOLE 9:16
+image, letterboxed, nothing cut. The tiles crop from the centre: the public
+page tile is a **130 px square** (Yelp generates an 800×800 `ms.jpg`) and
+the biz-dashboard card is landscape. A tall photo whose subject sits near
+the top therefore loses the head in both tiles while the opened post looks
+right. Rule for future photos: **centre the subject vertically** if the tile
+matters (the rings photo on the other post tiles well because it is
+centred). **Owner asked to fix it anyway, so the photo was rebuilt and
+swapped into the live post** (Yelp Connect posts stay editable: ⋯ → Edit
+post → Remove photo → upload → Fullscreen → Save & publish). Final image:
+the whole photo scaled to 1060×1302 and centred inside a 1302×2315 (9:16)
+canvas, blurred and dimmed fill around it, so the photo sits ENTIRELY inside
+the middle square the tile crops. Verified on the live public page: the tile
+now shows face, scale, acid kit, touchstone, calipers and the jewelry tray,
+nothing cut. The wide dashboard card still trims a little hair — that view
+is owner-only.
+
+## 2026-09-11 (night) — GBP description now says the appraisal is FREE and names the home-visit cities (owner asked; pending Google review)
+
+Owner: "add the gbp description lines for me" → "check to make sure i didnt
+do it yet". Checked first: the phone-hours line was ALREADY there ("Calls
+answered daily, 9 AM–6 PM" — the 09-08 Option C paste, done by the owner).
+The home-visit half was weak: "arrange an appointment or home visit", with
+no "free" and no cities, and the description still said "We evaluate".
+Edited in Business Profile Manager → About → Description (635/750 chars):
+"We evaluate" → "We appraise"; the showroom sentence now reads "Appraisals
+are free. Visit our Shirley Street showroom during posted hours, or ask for
+a free in-home appraisal in Naples, Marco Island, Bonita Springs, Estero,
+Fort Myers and Cape Coral." Everything else kept, including no phone number
+in the description text. Saved → "Your edit is pending. It usually takes up
+to 60 minutes to be reviewed." ◻ Confirm it published (~09-12). Note the
+description still says "since 2010" while the opening date is Sept 1, 2026 —
+the same inconsistency the owner owes a decision on (Yelp says 2010 too).
+
+## 2026-09-11 (night) — free-appraisal batch DEPLOYED + production-verified; IndexNow 200 ×220; GBP post live with the owner's testing photo
+
+Owner: "pushed and deployed, run indexnow". Verified over HTTP right after:
+`/process.html` now answers **308 → /free-evaluation** (it 404'd before),
+`/free-evaluation` title is "Free Estate Jewelry Appraisal — Home or
+Showroom", `/es/free-evaluation` is "Tasación Gratuita de Joyas de Herencia
+— Casa o Salón", and the "Come to Us, or We Come to You" section is on the
+live page. `npm run indexnow` from `next-app`: **IndexNow 200 OK for 220
+URLs** on naplesestatejewelry.com (exit 0).
+
+Also live: the GBP update post "Free estate jewelry appraisals, at our
+Naples showroom or in your home" with the Call now button and the photo of
+Chris testing at the counter (owner-supplied, placed uncropped on a wide
+blurred canvas). The owner added that same photo to the GBP photo gallery,
+which closes part of the long-standing "buying photos" item — gold testing
+with scales, touchstone and acid kit is now on the profile.
+
+**GBP photo captions — answered, nothing to fix.** The owner typed a caption
+while uploading the photo and it did not apply. Checked read-only: opening
+an owner photo in Business Profile Manager offers only "Delete photo", the
+live Maps profile shows an owner photo as just "Photo · <month year>" with
+no caption line in the layout, and Google's current help page for managing
+Business Profile photos documents no caption feature. Conclusion: put the
+words in a post, not a caption. Rule in `DECISIONS.md` → "GBP operational
+facts". New photos also take 24–48 h to appear publicly.
+
+**Dropped by owner the same night** ("ignore those if they dont affect seo,
+only focus on anyhthing that will get us calls"): the `/sell` EN/ES button
+wording mismatch and the admin banner link-option label. Do not reopen.
+
 ## 2026-09-11 (night) — GBP "free estate jewelry appraisal" post PUBLISHED (owner-requested)
 
 Owner: "use that one and do the post", with a WhatsApp photo of Chris at the

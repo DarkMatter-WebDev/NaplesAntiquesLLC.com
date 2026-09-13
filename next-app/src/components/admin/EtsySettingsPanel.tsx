@@ -21,7 +21,8 @@ interface StatusResponse {
   shopName: string | null;
   connectedAt: string | null;
   defaults: { shippingProfileId: number | null; returnPolicyId: number | null; readinessStateId: number | null };
-  policy: { autoActivate: boolean; autoDelistOnSold: boolean; pricePushEnabled: boolean; pricePushThresholdPct: number; priceMarkupPct: number };
+  policy: { autoActivate: boolean; autoDelistOnSold: boolean; pricePushEnabled: boolean; pricePushThresholdPct: number; priceMarkupPct: number; autoMarkSold?: boolean };
+  salesSync?: { scopeGranted: boolean; watchingSince: string | null };
   priceAutomation: {
     cronSecretConfigured: boolean;
     schedule: string;
@@ -401,6 +402,35 @@ export default function EtsySettingsPanel() {
                 />
                 Auto-delist when sold/archived on the site
               </label>
+              <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--color-on-surface-variant)' }}>
+                <input
+                  type="checkbox"
+                  checked={status.policy.autoMarkSold ?? true}
+                  disabled={saving}
+                  onChange={(e) => void saveSettings({ autoMarkSold: e.target.checked })}
+                  style={{ accentColor: 'var(--color-primary)' }}
+                />
+                Mark sold on the site when it sells on Etsy (checked every 30 min)
+              </label>
+              {(status.policy.autoMarkSold ?? true) && status.salesSync && !status.salesSync.scopeGranted && (
+                <div
+                  className="md:col-span-2 px-3 py-2 text-xs font-medium flex items-center justify-between gap-3 flex-wrap"
+                  style={{ background: 'color-mix(in srgb, #b8860b 14%, transparent)', border: '1px solid color-mix(in srgb, #b8860b 30%, transparent)', color: '#8a6400' }}
+                >
+                  <span>Marking items sold needs permission to read Etsy orders. Reconnect once to grant it — your listings are not touched.</span>
+                  {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- see the Connect Etsy button above */}
+                  <a href="/api/admin/etsy/connect" className="gold-button text-xs">
+                    Reconnect Etsy
+                  </a>
+                </div>
+              )}
+              {(status.policy.autoMarkSold ?? true) && status.salesSync?.scopeGranted && (
+                <p className="md:col-span-2 -mt-2 text-[0.65rem]" style={{ color: 'var(--color-on-surface-variant)' }}>
+                  {status.salesSync.watchingSince
+                    ? `Watching Etsy sales since ${new Date(status.salesSync.watchingSince).toLocaleString('en-US', { timeZone: 'America/New_York' })} ET. A sale marks the product sold here and ends it on eBay.`
+                    : 'Order permission granted — the next 30-minute check starts watching Etsy sales.'}
+                </p>
+              )}
               <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--color-on-surface-variant)' }}>
                 <input
                   type="checkbox"

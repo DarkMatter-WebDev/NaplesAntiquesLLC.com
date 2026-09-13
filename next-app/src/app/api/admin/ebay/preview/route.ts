@@ -6,6 +6,7 @@ import type { Product } from '@/types/product';
 import { buildMappedPayload, buildPreflightChecks, isPreflightPassing, type EbayConnectionDefaults } from '@/lib/ebay/mapping';
 import { getConnection, getListing, type EbayConnectionRow } from '@/lib/ebay/store';
 import { getMarketplaceShippingProfileMap } from '@/lib/marketplace-shipping';
+import { reviewProductFields } from '@/lib/product-field-edits';
 
 // Dry-run: what WOULD be pushed, with pre-flight results. No eBay writes.
 
@@ -71,5 +72,9 @@ export async function POST(req: Request) {
     // — not called from dry-run to avoid an eBay round trip before an item
     // is even queued (see ebay-sync-plan/09-api-routes.md's preview shape).
     fees: null,
+    // Raw column values behind the mapped rows, so the review window's inline
+    // editors prefill with what is stored, plus the markup the price note explains.
+    productFields: reviewProductFields(product),
+    priceMarkupPct: connection?.price_markup_pct ?? 15,
   });
 }

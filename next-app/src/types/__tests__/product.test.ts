@@ -4,8 +4,10 @@ import {
   PUBLIC_SHOP_PRODUCT_STATUSES,
   isProductPurchasable,
   isProductVisibleInShop,
+  formatProductPurityLabel,
   normalizeProductLengthSizeValue,
   normalizeProductWidthMm,
+  parseLengthInches,
   normalizeProductStatus,
   productWidthDisplay,
   resolveAdvertisedTradeInPrice,
@@ -118,5 +120,42 @@ describe('product length and size normalization', () => {
     expect(normalizeProductLengthSizeValue('size: 7.50')).toBe('7.5');
     expect(normalizeProductLengthSizeValue('adjustable')).toBe('adjustable');
     expect(normalizeProductLengthSizeValue('')).toBe('');
+  });
+
+  // The owner measures in millimetres; a bare "470" was stored — and printed,
+  // pushed to Etsy and eBay — as 470 inches (2026-09-12). A value that carries
+  // its unit converts once, here, and everything downstream keeps reading inches.
+  it('converts millimetre and centimetre values to inches, rounded to 2 decimals', () => {
+    expect(normalizeProductLengthSizeValue('470 mm')).toBe('18.5');
+    expect(normalizeProductLengthSizeValue('470mm')).toBe('18.5');
+    expect(normalizeProductLengthSizeValue('470 millimeters')).toBe('18.5');
+    expect(normalizeProductLengthSizeValue('47 cm')).toBe('18.5');
+    expect(normalizeProductLengthSizeValue('4.7 centimetres')).toBe('1.85');
+    expect(normalizeProductLengthSizeValue('40 mm')).toBe('1.57');
+    expect(parseLengthInches('470 mm')).toBe(18.5);
+    expect(parseLengthInches('18.5')).toBe(18.5);
+    expect(parseLengthInches('6 to 6.25 in')).toBeNull();
+    expect(parseLengthInches('adjustable')).toBeNull();
+  });
+
+  it('still treats a bare number as inches', () => {
+    expect(normalizeProductLengthSizeValue('470')).toBe('470');
+    expect(parseLengthInches('7.75')).toBe(7.75);
+  });
+});
+
+describe('formatProductPurityLabel', () => {
+  it('writes gold karats with a K and silver fineness as parts per thousand', () => {
+    expect(formatProductPurityLabel(14)).toBe('14K');
+    expect(formatProductPurityLabel(10)).toBe('10K');
+    expect(formatProductPurityLabel(24)).toBe('24K');
+    expect(formatProductPurityLabel(925)).toBe('925');
+    expect(formatProductPurityLabel(800)).toBe('800');
+  });
+
+  it('returns null for a missing or nonsensical purity', () => {
+    expect(formatProductPurityLabel(null)).toBeNull();
+    expect(formatProductPurityLabel(undefined)).toBeNull();
+    expect(formatProductPurityLabel(0)).toBeNull();
   });
 });

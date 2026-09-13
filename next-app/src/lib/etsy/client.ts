@@ -1,4 +1,5 @@
 import 'server-only';
+import type { EtsyReceipt } from '@/lib/marketplace-sales';
 
 // Etsy Open API v3 fetch wrapper: x-api-key + bearer auth, a client-side
 // throttle well under Etsy's 5 QPS cap, and 429/5xx backoff. Modeled on
@@ -236,6 +237,40 @@ export async function etsyFetch<T = unknown>(opts: EtsyRequestOptions): Promise<
     }
     throw error;
   }
+}
+
+/**
+ * Paid shop receipts created at or after `minCreated` (getShopReceipts;
+ * requires the `transactions_r` scope). Pages through Etsy's 100-per-call
+ * cap oldest-first. Shape is trimmed to what lib/marketplace-sales.ts reads.
+ */
+export async function getShopReceipts(params: {
+  shopId: number;
+  accessToken: string;
+  minCreated: Date;
+  maxPages?: number;
+}): Promise<EtsyReceipt[]> {
+  const receipts: EtsyReceipt[] = [];
+  const limit = 100;
+  const maxPages = params.maxPages ?? 5;
+  for (let page = 0; page < maxPages; page += 1) {
+    const res = await etsyFetch<{ count: number; results: EtsyReceipt[] }>({
+      path: `/v3/application/shops/${params.shopId}/receipts`,
+      accessToken: params.accessToken,
+      query: {
+        min_created: Math.floor(params.minCreated.getTime() / 1000),
+        was_paid: true,
+        limit,
+        offset: page * limit,
+        sort_on: 'created',
+        sort_order: 'asc',
+      },
+    });
+    const batch = res.data?.results ?? [];
+    receipts.push(...batch);
+    if (batch.length < limit) break;
+  }
+  return receipts;
 }
 
 /** Convenience for uploadListingImage-style multipart POSTs. */

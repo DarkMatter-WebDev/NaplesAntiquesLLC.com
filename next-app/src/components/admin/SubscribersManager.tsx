@@ -3,18 +3,25 @@
 import type { FormEvent } from 'react';
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import {
+  DEFAULT_SUBSCRIBER_SORT,
+  nextSubscriberSort,
+  sortSubscriberRows,
+  subscriberSourceLabel,
+  type SubscriberRow,
+  type SubscriberSortKey,
+} from '@/lib/subscriber-sort';
 
-export type SubscriberRow = {
-  email: string;
-  name: string | null;
-  source: string | null;
-  subscriberSource: string | null;
-  subscriberEmail: string | null;
-  /** When the newsletter row was created; null for account/buyer-only rows. */
-  subscribedAt: string | null;
-  /** When the matching site account was created; null when there is none. */
-  accountCreatedAt: string | null;
-};
+export type { SubscriberRow } from '@/lib/subscriber-sort';
+
+// Column headers; a `sortKey` makes the header a sort button (lib/subscriber-sort.ts).
+const COLUMNS: { label: string; sortKey: SubscriberSortKey | null }[] = [
+  { label: 'Name', sortKey: 'name' },
+  { label: 'Email', sortKey: 'email' },
+  { label: 'Source', sortKey: 'source' },
+  { label: 'Subscribed', sortKey: 'subscribed' },
+  { label: 'Actions', sortKey: null },
+];
 
 // Pinned to Eastern so the server render and the owner's browser agree (a
 // hydration mismatch otherwise) and so the time reads as the showroom's clock,
@@ -32,25 +39,6 @@ function formatDate(value: string | null) {
   if (!value) return null;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : dateFormatter.format(date);
-}
-
-// `row.source` may be a single value ('subscriber'/'account'/'buyer') or a
-// sorted '+'-joined combination (see combineSource in lib/marketing.ts) when
-// the same email matched more than one audience — checked by substring
-// rather than exact match so any combination renders a correct label instead
-// of falling through to a wrong default.
-function sourceLabel(row: SubscriberRow) {
-  const source = row.source ?? '';
-  const isSubscriber = source.includes('subscriber');
-  const isAccount = source.includes('account');
-  const isBuyer = source.includes('buyer');
-
-  const parts: string[] = [];
-  if (isSubscriber) parts.push(row.subscriberSource === 'admin_manual' ? 'Admin manual' : 'Newsletter subscriber');
-  if (isAccount) parts.push('Account holder');
-  if (isBuyer) parts.push('Past buyer');
-
-  return parts.length > 0 ? parts.join(' + ') : 'Newsletter subscriber';
 }
 
 async function copyText(value: string) {
@@ -80,8 +68,11 @@ export default function SubscribersManager({ initialRows }: { initialRows: Subsc
   const [adding, setAdding] = useState(false);
   const [busyEmail, setBusyEmail] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ text: string; ok: boolean } | null>(null);
+  const [sort, setSort] = useState(DEFAULT_SUBSCRIBER_SORT);
 
-  const emailList = useMemo(() => rows.map((row) => row.email).join(', '), [rows]);
+  const sortedRows = useMemo(() => sortSubscriberRows(rows, sort), [rows, sort]);
+  // "Copy All Emails" follows the visible order so a pasted list reads like the table.
+  const emailList = useMemo(() => sortedRows.map((row) => row.email).join(', '), [sortedRows]);
 
   function beginEdit(row: SubscriberRow) {
     setEditingEmail(row.subscriberEmail);
@@ -302,19 +293,40 @@ export default function SubscribersManager({ initialRows }: { initialRows: Subsc
         <table className="w-full min-w-[980px] text-left text-sm">
           <thead style={{ background: 'var(--color-surface-container-low)' }}>
             <tr>
-              {['Name', 'Email', 'Source', 'Subscribed', 'Actions'].map((heading) => (
-                <th
-                  key={heading}
-                  className="px-4 py-3 text-[0.68rem] uppercase tracking-widest font-bold"
-                  style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
-                >
-                  {heading}
-                </th>
-              ))}
+              {COLUMNS.map(({ label, sortKey }) => {
+                const active = sortKey !== null && sort.key === sortKey;
+                return (
+                  <th
+                    key={label}
+                    aria-sort={active ? (sort.direction === 'asc' ? 'ascending' : 'descending') : undefined}
+                    className="px-4 py-3 text-[0.68rem] uppercase tracking-widest font-bold whitespace-nowrap"
+                    style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
+                  >
+                    {sortKey ? (
+                      <button
+                        type="button"
+                        onClick={() => setSort((current) => nextSubscriberSort(current, sortKey))}
+                        className="flex items-center gap-1 uppercase tracking-widest hover:opacity-75"
+                        style={{ fontFamily: 'var(--font-label)' }}
+                        title={`Sort by ${label.toLowerCase()}`}
+                      >
+                        <span>{label}</span>
+                        <span
+                          aria-hidden="true"
+                          className="text-[0.65rem]"
+                          style={{ color: active ? 'var(--color-primary)' : 'var(--color-on-surface-variant)' }}
+                        >
+                          {active ? (sort.direction === 'asc' ? '▲' : '▼') : '↕'}
+                        </span>
+                      </button>
+                    ) : label}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
-            {rows.map((subscriber) => {
+            {sortedRows.map((subscriber) => {
               const canManage = Boolean(subscriber.subscriberEmail);
               const isEditing = editingEmail === subscriber.subscriberEmail && canManage;
               const busy = busyEmail === subscriber.subscriberEmail;
@@ -336,7 +348,7 @@ export default function SubscribersManager({ initialRows }: { initialRows: Subsc
                     )}
                   </td>
                   <td className="px-4 py-3" style={{ color: 'var(--color-on-surface-variant)' }}>
-                    {sourceLabel(subscriber)}
+                    {subscriberSourceLabel(subscriber)}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap" style={{ color: 'var(--color-on-surface-variant)' }}>
                     {formatDate(subscriber.subscribedAt) ?? (

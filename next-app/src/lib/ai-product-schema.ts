@@ -326,9 +326,12 @@ function cleanMetalVariant(value: unknown, fallbackCategory: Product['category']
 function cleanLength(value: unknown): string | null {
   const raw = cleanString(value, MAX_SHORT_TEXT_LENGTH);
   if (!raw) return null;
-  // Accept only a single numeric value (optionally with an inch unit). Reject ranges
-  // like "6 to 6.25 inches" and any free text — the field stores one measurement.
-  const match = raw.toLowerCase().match(/^(\d+(?:\.\d+)?)\s*(?:in(?:ch(?:es?)?)?|")?$/);
+  // Accept only a single numeric value, optionally with an inch, mm or cm unit
+  // (metric converts to inches in normalizeProductLengthSizeValue — the owner
+  // measures in millimetres, and a bare metric number used to be stored as
+  // inches). Reject ranges like "6 to 6.25 inches" and any free text — the
+  // field stores one measurement.
+  const match = raw.toLowerCase().match(/^(\d+(?:\.\d+)?)\s*(?:in(?:ch(?:es?)?)?|"|mm|millimet(?:er|re)s?|cm|centimet(?:er|re)s?)?$/);
   if (!match) return null;
   return normalizeProductLengthSizeValue(match[0]);
 }

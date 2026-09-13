@@ -1,6 +1,12 @@
 import crypto from 'node:crypto';
 import type { Product, SpotData } from '@/types/product';
-import { inferProductJewelryType, normalizeProductLengthSizeValue, normalizeProductQuantity } from '@/types/product';
+import {
+  formatProductPurityLabel,
+  inferProductJewelryType,
+  normalizeProductLengthSizeValue,
+  normalizeProductQuantity,
+  parseLengthInches,
+} from '@/types/product';
 import { EBAY_EXCLUDED_PRODUCT_IDS, EBAY_EXCLUDED_REASON } from './guards';
 import { getMarketplaceSpotPriceError, getProductPriceValue } from '@/lib/pricing';
 import { getMarketplaceShippingTier } from '@/lib/checkout-shipping';
@@ -121,7 +127,10 @@ export function mapDescription(
 
   const specLines: string[] = [];
   const weight = product.gram_weight ?? product.weight_grams;
-  if (product.purity) specLines.push(`Purity: ${product.purity}`);
+  // "14K" / "925", never the bare column number (owner report 2026-09-12: the
+  // description read "Purity: 14").
+  const purityLabel = formatProductPurityLabel(product.purity);
+  if (purityLabel) specLines.push(`Purity: ${purityLabel}`);
   if (weight) specLines.push(`Weight: ${weight}g`);
 
   const jewelryType = inferProductJewelryType(product);
@@ -162,11 +171,10 @@ function ringSizeDisplay(size: number): string {
 }
 
 function parseWearableLengthInchesValue(length: string | null | undefined): number | null {
-  const trimmed = length?.trim() ?? '';
-  const match = trimmed.match(/^(\d+(?:\.\d+)?)\s*(?:in(?:ch(?:es?)?)?\.?|")?$/i);
-  if (!match) return null;
-  const value = Number(match[1]);
-  return value > 0 && Number.isFinite(value) ? value : null;
+  // Shared with the product page and the Etsy build (types/product.ts) so a
+  // millimetre value converts to inches here too, instead of reading as 470 in.
+  const value = parseLengthInches(length);
+  return value != null && value > 0 ? value : null;
 }
 
 // ---------------------------------------------------------------------------
