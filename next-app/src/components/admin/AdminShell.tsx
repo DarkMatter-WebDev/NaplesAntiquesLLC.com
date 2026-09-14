@@ -63,7 +63,7 @@ import EbayBulkPublishModal from './EbayBulkPublishModal';
 import SelectedProductsActionsModal, { type SelectedMarketplaceAction } from './SelectedProductsActionsModal';
 import SelectedProductsStatusModal from './SelectedProductsStatusModal';
 import type { Marketplace } from '@/lib/selected-marketplace-status';
-import type { ProductFieldEditPatch } from '@/lib/product-field-edits';
+import { applyFieldPatchToEditorState, type ProductFieldEditPatch } from '@/lib/product-field-edits';
 import ProductVideoEditor, { type ProductVideoEditorHandle } from './ProductVideoEditor';
 import {
   DEFAULT_QUICK_FILL_AI_FORMAT_PROMPT,
@@ -3628,9 +3628,33 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   // A field saved from the marketplace review window (length, brand, year…)
   // already hit the database; merge it into the table so the row does not
   // show the old value until the next full load. The editor drawer reloads
-  // the full row on open (loadFullProduct), so it needs nothing here.
+  // the full row on open (loadFullProduct), so a CLOSED drawer needs nothing.
   function mergeReviewEdit(productId: string, patch: ProductFieldEditPatch) {
     setProducts((current) => current.map((product) => (product.id === productId ? { ...product, ...patch } : product)));
+  }
+
+  // The same kind of save made from the Etsy/eBay panels INSIDE the open
+  // drawer. The drawer's Save writes every field (and type, chain type and
+  // length from their own inputs), so the saved value must land in the
+  // drawer's state too — or the next Save would quietly put the old value
+  // back. It also becomes the undo baseline and is applied to older undo
+  // steps, so Undo cannot restore the pre-save value either. Other unsaved
+  // edits in the form are left alone.
+  function applyDrawerFieldEdit(productId: string, patch: ProductFieldEditPatch) {
+    mergeReviewEdit(productId, patch);
+    if (editing?.id !== productId) return;
+    const blankInputs = { jewelryTypeInput: '', chainTypeInput: '', lengthInput: '' };
+    undoStackRef.current = undoStackRef.current.map((snapshot) => applyFieldPatchToEditorState(snapshot, patch));
+    if (originalRef.current) {
+      originalRef.current = applyFieldPatchToEditorState({ editing: originalRef.current, ...blankInputs }, patch).editing;
+    }
+    skipUndoCaptureRef.current = true;
+    setEditing((current) => (current && current.id === productId
+      ? applyFieldPatchToEditorState({ editing: current, ...blankInputs }, patch).editing
+      : current));
+    if ('product_type' in patch) setJewelryTypeInput(patch.product_type ?? '');
+    if ('chain_type' in patch) setChainTypeInput(patch.chain_type ?? '');
+    if ('length' in patch) setLengthInput(patch.length ?? '');
   }
 
   function handleEtsyBulkClose(completed = false) {
@@ -6024,7 +6048,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                 {isNew || !editing.id ? (
                   <p className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>Save this listing first, then sync it to Etsy.</p>
                 ) : (
-                  <EtsyProductPanel productId={editing.id} onSynced={refreshEtsyChips} />
+                  <EtsyProductPanel productId={editing.id} onSynced={refreshEtsyChips} onProductEdited={applyDrawerFieldEdit} />
                 )}
               </div>
 
@@ -6045,7 +6069,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                 {isNew || !editing.id ? (
                   <p className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>Save this listing first, then sync it to eBay.</p>
                 ) : (
-                  <EbayProductPanel productId={editing.id} onSynced={refreshEbayChips} />
+                  <EbayProductPanel productId={editing.id} onSynced={refreshEbayChips} onProductEdited={applyDrawerFieldEdit} />
                 )}
               </div>
 

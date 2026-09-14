@@ -1,6 +1,185 @@
 
 # Changelog
 
+## 2026-09-13 (late night, STAGED) — "Refresh Preview" on the Instagram and Facebook panels
+
+**Why.** Owner: the Instagram and Facebook sync panels had no refresh like
+Etsy/eBay "Refresh Preview". A photo added and saved in the listing editor
+didn't appear in the panel until they left the form and came back.
+
+**Cause.** `InstagramProductPanel` / `FacebookProductPanel` call their
+preview route once on open (`load()` in the mount effect). The only manual
+button was "Refresh Instagram/Facebook status", which checks a published
+post's remote status, is shown only once published, and doesn't re-read photos.
+
+**Built.** A **Refresh Preview** button in each panel's header, next to the
+status chip, visible at every workflow step (the bottom action rows change per
+step). It re-runs `load({ preserveCaptionDraft: true })`:
+- It shows "Refreshing…", then the "Preview refreshed." notice (errors use the
+  existing load notice).
+- Unsaved lineup, crop, card and caption edits are kept.
+- Newly saved photos appear under "not included" to add; with no saved lineup
+  they flow straight into it.
+- It's disabled while loading, busy, saving the lineup or generating an
+  opening.
+- The same panels render in the listing editor's accordions and on the Manage
+  Instagram / Manage Facebook pages.
+
+**Verification.**
+- Checks: tsc 0 · eslint 0 · `npm run lint` 0 · vitest 1341/1341 · `npm run build` 0.
+- Dev check on :3007 in the owner's Chrome, item #135: both Manage pages show
+  the button. A click shows "Refreshing…", then "Preview refreshed.", and the
+  button re-enables.
+
+## 2026-09-13 (late night, STAGED) — Etsy photo sync: new photos silently never uploaded (inv #33, #82) + deleted listings stuck in "error"
+
+**Why.** The owner replaced photos on inv #33 (09-11). "Push to Etsy" never
+showed the new photos, several retries did nothing, and after they deleted the
+Etsy listing, re-syncing failed too. Owner: "investigate this", then "build
+the fix and fold it into this deploy".
+
+**Root cause 1 — photo adoption.** `reconcileMissingImageRows` exists to
+recover an upload that reached Etsy but crashed before its checkpoint row was
+written. It adopted ANY live Etsy image at a planned upload's rank.
+- The new photos went to ranks 1, 2, 5, 6 and 7, which still held the OLD
+  photos, so the step recorded those old Etsy image ids as the new uploads
+  (rows with `bytes_sha256` null).
+- The same pass then deleted the old photos, i.e. the images it had just adopted.
+- Result: Etsy kept 2 of 7 photos while our rows said all 7 were uploaded, so
+  every later sync planned nothing.
+- Evidence (read-only API + 8×8 image fingerprints, 09-13): #33's 5 adopted ids
+  were not on Etsy. #82 had the same pattern from 07-10: 7 of 10 photos live,
+  ranks 8–10 adopted and missing. Those were the only 2 of 1,035 photo rows.
+  The Etsy connection was healthy throughout (sweeps ok at 00:00/00:30Z).
+
+**Root cause 2 — deleted listing.** The update/price-only path GETs the
+listing first. A 404 (deleted on etsy.com) threw, set `error` and kept the
+dead listing id, so every retry 404'd again. Only "Check Etsy Status" knew how
+to reset it.
+
+**Fix (`lib/etsy/images.ts`, `lib/etsy/sync.ts`).**
+- `planImageAdoptions`: adopt only an image NO checkpoint row tracks.
+- `partitionRowsByLiveImages` ("trust but verify"): every photo pass reads the
+  listing's live images and drops checkpoint rows whose image Etsy doesn't
+  have, so those photos upload again. This self-heals #82 and photos deleted
+  on etsy.com. An empty live answer drops nothing, so there's no mass duplicate
+  re-upload. A repair logs an `image_repair` warning row.
+- `planImageDiff` runs deletes before uploads, so uploads land at their rank
+  and stay under the photo cap.
+- A 404 in the sync path runs the shared `resetDeletedEtsyListing` (also now
+  used by both "Check Etsy Status" paths), returns `listing_deleted`, and asks
+  for "Sync to Etsy". It never re-creates the listing itself, because price
+  pushes use this path.
+
+**Verification.**
+- Checks: tsc 0 · eslint 0 · `npm run lint` 0 · **vitest 1341/1341 (136 files;
+  new `photo-sync-repair.test.ts`: the #33 and #82 scenarios, orphan adoption,
+  empty-live guard, reset patch)** · `npm run build` 0 · no Turbopack cache.
+- Read-only dry run of the fixed planners on live data:
+  - #82 → drop rows 8–10, upload r8/r9/r10, 0 adoptions.
+  - #33 → 5 uploads, 0 adoptions.
+  - Replay of the 09-11 change → 0 adoptions (was 5), 5 uploads, deletes first.
+- **Not run against Etsy** (it writes the live shop): owner steps after the
+  push are in TASKS.
+
+## 2026-09-13 (late night, STAGED) — Pencil edits on every Etsy/eBay preflight: listing-editor accordions + Manage Etsy/eBay pages
+
+**Why.** Owner: the pencil-edit preflight rows existed only in "Review
+before submitting to Etsy/eBay". They asked for pencils "on every form that
+submits to eBay and Etsy", especially the add/edit item form's Etsy and eBay
+accordions, and a scan for any other preflight surface.
+
+**Scan: every place a per-item Etsy/eBay preflight is shown.**
+- `SelectedMarketplaceReviewFlow` (the "review selected" window from
+  `EtsyBulkSyncModal`/`EbayBulkSyncModal`) already had pencils.
+- `EtsyProductPanel` / `EbayProductPanel` had none. They render in two places:
+  the listing editor drawer's Etsy/eBay accordions (`AdminShell`) and the
+  Manage Etsy / Manage eBay pages (`ProductMarketplaceManagerPage`).
+- The bulk sync/publish/repair modals show only counts and an "ineligible"
+  sample list, with no per-item rows, so there is nothing to edit.
+- A brand-new item shows "Save this listing first" until its first save.
+  The accordions, and now the pencils, appear right after it.
+
+**Built.**
+- New shared `components/admin/ProductFieldInlineEditor.tsx`:
+  - `useProductFieldEditor`: the pencil and inline editors, one open at a time.
+  - `PencilButton`, `EbayAspectRows`, `FIELD_LABEL`, `lengthLabel` and `lengthDisplay`.
+  - All moved unchanged from the review window, which now uses them. Its only
+    change is that the tag-save error has its own state.
+- **Etsy panel.**
+  - Pencils on Quantity (a new row), Materials (metal and purity), When made
+    and Length / Ring size.
+  - The category pencil opens the grouped `EtsyCategoryDropdown`, replacing
+    the flat "Choose exact category…" search.
+- **eBay panel.**
+  - A Quantity pencil.
+  - The aspects list with pencils: Metal, Metal Purity, Type, Brand, Year,
+    Weight, Main Stone, Chain Type and Chain Length / Ring Size, including
+    empty ones.
+  - A note that changing Type moves the category.
+- **Saving.** Every pencil saves through the same
+  `PUT /api/admin/products/fields`, then the preview re-runs. Pencils wait
+  while a sync, price push or other save runs, and Sync waits for a pencil save.
+- **Drawer safety** (`AdminShell.applyDrawerFieldEdit` +
+  `applyFieldPatchToEditorState` in `lib/product-field-edits.ts`).
+  - The drawer's Save writes every field, and takes type, chain type and length
+    from their own inputs.
+  - So a pencil save is copied into the open form, those three inputs,
+    `originalRef` and every undo step. The next Save or Undo cannot restore the
+    old value.
+  - Other unsaved form edits and the visible tags are untouched, and the table
+    row merges the change too.
+- Manage pages call `router.refresh()`, so the header quantity updates.
+
+**Verification.**
+- Checks: tsc 0, eslint on the changed files 0, `npm run lint` 0,
+  **vitest 1334/1334 (135 files, including 5 new `applyFieldPatchToEditorState`
+  tests)**, `npm run build` 0, no Turbopack build cache.
+- Dev check on :3007 in the owner's Chrome, item #135, read-only (nothing saved):
+  - Manage eBay shows 10 pencils (Quantity and 9 aspects).
+  - Manage Etsy shows 5 (Quantity, Materials, When made, Length, category).
+  - The Materials editor prefilled `yellow_gold` / `14`, and Cancel closed it.
+  - The category pencil opened the grouped Jewelry list and cancelled.
+  - The Chain Length editor opened prefilled with 18.5 and was left unsaved.
+  - The listing editor drawer's Etsy and eBay accordions show the same 5 and
+    10 pencils.
+  - The dev server logged no errors.
+- **Not exercised:** a real pencil Save, because it writes the live product
+  (owner check in TASKS). The refactored review window was checked by types and
+  build only.
+
+## 2026-09-13 (night) — DEPLOYED + live-verified: webhook one-write, owner photo, one scheduler, hero short screens
+
+**Deploy.** Netlify `main@71a77d8` "schedule, pics, formats", published
+17:28 ET (21:28Z). Owner: "pushed and deployed, verify it live".
+
+**Verified live (21:36Z):**
+- **Photo:**
+  - `/`, `/es`, `/about`, `/es/about`, `/free-evaluation` and
+    `/es/free-evaluation` all 200 with `chris-owner.webp` (12/12/4/4/4/4
+    references) and 0 old `chris.webp` references.
+  - `/assets/images/pages/chris.webp` and `/chris.png` → 301 to `chris-owner.webp`.
+  - The file is 200 `image/webp` 143,768 bytes; `/_next/image` w=640 is 200 webp 47,130 bytes.
+- **Hero:** `/` has `container-name: hero-overlay`, 7 compact `@container`
+  bands (the EN table) and `--hero-min-vh`. `/es` has 9 bands (the ES table).
+- **eBay webhook:**
+  - The last `account_deletion` sync-log row is 21:29:00.87Z (the old code's
+    last run).
+  - Every receipt since then is `processed` with `processed_at` (13 in 15 min,
+    0 not processed).
+  - GET without a code → 400; unsigned POST → 412.
+- **One scheduler:**
+  - Netlify Functions lists 1 function, "Next.js Server Handler" (created 5:30 PM).
+  - The GitHub `scheduled-jobs.yml` on `main` has only `workflow_dispatch`.
+  - The newest scheduled GitHub run is 21:18:06Z, before the push.
+  - The first post-deploy half-hour (21:30Z) logged exactly one reconcile and
+    one sales row per channel.
+  - Before the deploy, hour 21 still showed the triple drip: 21:00:02 pg_cron,
+    21:00:38 Netlify, 21:18:10 GitHub.
+- **Not checkable without side effects:**
+  - The Etsy Reconnect redirect (it would start an OAuth flow).
+  - A real iPhone in Safari (owner).
+
 ## 2026-09-13 (late night, STAGED) — eBay account-deletion webhook: one write per notice instead of three
 
 **Why.** Owner: "build it and fold it into this deploy". The log retention

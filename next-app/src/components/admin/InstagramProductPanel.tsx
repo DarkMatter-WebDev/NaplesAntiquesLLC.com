@@ -124,6 +124,7 @@ export default function InstagramProductPanel({ productId }: { productId: string
   const [captionOpeningDraft, setCaptionOpeningDraft] = useState('');
   const [captionOpeningCanRegenerate, setCaptionOpeningCanRegenerate] = useState(false);
   const [generatingCaptionOpening, setGeneratingCaptionOpening] = useState(false);
+  const [refreshingPreview, setRefreshingPreview] = useState(false);
   const autoStatusCheckedProduct = useRef<string | null>(null);
 
   const showNotice = (text: string, ok = true) => {
@@ -516,24 +517,50 @@ export default function InstagramProductPanel({ productId }: { productId: string
     setDraftLineup([...shownLineup, url]);
   };
 
+  // Re-read the product without leaving the panel (2026-09-13) — the same job
+  // as Etsy/eBay "Refresh Preview". The panel loads once on open, so photos,
+  // title or price saved in the listing editor afterwards never appeared until
+  // the owner closed and reopened it. Unsaved lineup, crop and caption edits
+  // are kept; newly saved photos show up under "not included" to add.
+  const refreshPreview = async () => {
+    setRefreshingPreview(true);
+    try {
+      const next = await load({ preserveCaptionDraft: true });
+      if (next) showNotice('Preview refreshed.', true);
+    } finally {
+      setRefreshingPreview(false);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-bold" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
           Instagram
         </h2>
-        {state && (
-          <span
-            className="border px-2 py-1 text-[0.65rem] font-bold uppercase tracking-wide"
-            style={{ borderColor: 'var(--color-outline-variant)', color: stateTone(state), fontFamily: 'var(--font-label)' }}
+        <div className="flex flex-wrap items-center gap-2">
+          {state && (
+            <span
+              className="border px-2 py-1 text-[0.65rem] font-bold uppercase tracking-wide"
+              style={{ borderColor: 'var(--color-outline-variant)', color: stateTone(state), fontFamily: 'var(--font-label)' }}
+            >
+              {/* 'pending' only means "queued" when a queue entry actually
+                  exists — after a discard it just means "not posted". */}
+              {state === 'pending' && !preview?.current?.queuedAt
+                ? 'Not posted'
+                : STATE_LABELS[state] ?? state}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => void refreshPreview()}
+            disabled={loading || refreshingPreview || busy !== null || savingLineup || generatingCaptionOpening}
+            className="outline-button text-xs disabled:opacity-50"
+            title="Re-read this listing's photos, title and price after saving changes in the listing editor"
           >
-            {/* 'pending' only means "queued" when a queue entry actually
-                exists — after a discard it just means "not posted". */}
-            {state === 'pending' && !preview?.current?.queuedAt
-              ? 'Not posted'
-              : STATE_LABELS[state] ?? state}
-          </span>
-        )}
+            {refreshingPreview ? 'Refreshing…' : 'Refresh Preview'}
+          </button>
+        </div>
       </div>
 
       {notice && (

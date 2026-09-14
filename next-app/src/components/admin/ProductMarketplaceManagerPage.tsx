@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   normalizeProductQuantity,
   productImagePaddingBackground,
@@ -57,6 +58,7 @@ export default function ProductMarketplaceManagerPage({
   locale: string;
   returnTo?: 'social-queues' | null;
 }) {
+  const router = useRouter();
   const adminBasePath = locale === 'es' ? '/es/admin' : '/admin';
   const images = getImages(product);
   const coverImage = images[0] ?? null;
@@ -67,6 +69,9 @@ export default function ProductMarketplaceManagerPage({
   const marketplaceQuery = returnToSocialQueues ? '?returnTo=social-queues' : '';
   const backHref = returnToSocialQueues ? `${adminBasePath}/social-queues` : adminBasePath;
   const backLabel = returnToSocialQueues ? 'Back to Social Queues' : 'Back to Products';
+  // A pencil edit in the Etsy/eBay panel already saved the product; re-read
+  // the server props so the header (quantity) shows the new value.
+  const refreshSummary = () => router.refresh();
 
   return (
     <main className="ultrawide-page mx-auto flex w-full max-w-6xl flex-col gap-5 px-3 py-4 md:px-6 md:py-6">
@@ -157,8 +162,8 @@ export default function ProductMarketplaceManagerPage({
         className="border p-4 md:p-5"
         style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-background)' }}
       >
-        {marketplace === 'etsy' && <EtsyProductPanel productId={product.id} />}
-        {marketplace === 'ebay' && <EbayProductPanel productId={product.id} />}
+        {marketplace === 'etsy' && <EtsyProductPanel productId={product.id} onProductEdited={refreshSummary} />}
+        {marketplace === 'ebay' && <EbayProductPanel productId={product.id} onProductEdited={refreshSummary} />}
         {marketplace === 'instagram' && <InstagramProductPanel productId={product.id} />}
         {marketplace === 'facebook' && <FacebookProductPanel productId={product.id} />}
       </section>

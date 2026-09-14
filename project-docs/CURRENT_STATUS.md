@@ -8,6 +8,38 @@
 
 **Read this, then `TASKS.md`.**
 
+🟡 **09-13 late night — "Refresh Preview" on the Instagram and Facebook
+panels, STAGED (no SQL).** Photos, title and price saved in the listing editor
+now show up without closing the panel; unsaved lineup and caption edits are
+kept. Verified on dev. `CHANGELOG.md` 2026-09-13 (late night, social refresh).
+
+🟡 **09-13 late night — Etsy photo sync fix, STAGED (no SQL, no env vars).**
+- **Bug 1: new photos were recorded as uploaded but never sent.** The recovery
+  step claimed the old Etsy photos (inv #33: 2 of 7 photos on Etsy; #82: 7 of 10).
+  Fixed: never claim a tracked image, check records against the live listing,
+  delete before uploading.
+- **Bug 2: a listing deleted on etsy.com stayed stuck in error.** Fixed: it now
+  resets to not-listed.
+- Gate: 1341/1341 · build 0 · live dry run confirmed.
+- ◻ After the push: #33 → "Sync to Etsy"; #82 → "Sync Updates".
+- `CHANGELOG.md` 2026-09-13 (late night, Etsy photos).
+
+🟡 **09-13 late night — pencil edits on every Etsy/eBay preflight, STAGED (no
+SQL, no env vars).**
+- Where: the listing editor's Etsy and eBay accordions and the Manage Etsy/eBay
+  pages, with the same editors as the review window (shared
+  `ProductFieldInlineEditor`).
+- Safety: a pencil save is copied into the open form, so the drawer's Save and
+  Undo cannot revert it.
+- Gate: lint 0 · 1334/1334 · build 0 · dev pencils verified read-only.
+- `CHANGELOG.md` 2026-09-13 (late night, pencils).
+
+🟢 **09-13 night — DEPLOYED `main@71a77d8` (17:28 ET) and live-verified:** the
+webhook fix, owner photo, one scheduler and hero short screens (details below,
+all live). One check owed: the 22:00Z drips log one row per channel. Retention
+job `nej-log-retention` scheduled by the owner; its first run is 09-14 07:20Z.
+`CHANGELOG.md` 2026-09-13 (night, deployed).
+
 🟡 **09-13 (late night) — eBay account-deletion webhook writes once per notice,
 STAGED with the same push** (no SQL). The receipt is inserted `processed`, with
 no `ebay_sync_log` row and no update (~3,500 fewer writes/day). Guarded by

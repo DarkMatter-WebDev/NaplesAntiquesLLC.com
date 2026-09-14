@@ -1,18 +1,19 @@
 'use client';
 
-import { useEffect, useState, type ReactNode } from 'react';
-import ComboboxInput from './ComboboxInput';
+import { useEffect, useState } from 'react';
 import EtsyCategoryDropdown, { type EtsyCategoryLeaf } from './EtsyCategoryDropdown';
-import { AppIcon } from '@/components/AppIcon';
-import type { EditableProductField, ProductFieldEditPatch, ReviewProductFields } from '@/lib/product-field-edits';
 import {
-  PRODUCT_JEWELRY_TYPES,
-  PRODUCT_LINK_TYPES,
-  PRODUCT_METAL_VARIANTS,
-  normalizeProductJewelryType,
-  parseLengthInches,
-  productSupportsLinkType,
-} from '@/types/product';
+  EbayAspectRows,
+  FIELD_LABEL,
+  PencilButton,
+  lengthDisplay,
+  lengthLabel,
+  useProductFieldEditor,
+  type EditorKey,
+} from './ProductFieldInlineEditor';
+import { AppIcon } from '@/components/AppIcon';
+import type { ProductFieldEditPatch, ReviewProductFields } from '@/lib/product-field-edits';
+import { normalizeProductJewelryType } from '@/types/product';
 
 type Marketplace = 'etsy' | 'ebay';
 
@@ -75,12 +76,6 @@ interface Props {
   onProductEdited?: (productId: string, patch: ProductFieldEditPatch) => void;
 }
 
-/**
- * Which inline editor a row opens. `metal` is the Etsy Materials row: metal
- * colour and purity together, since the mapped materials come from both.
- */
-type EditorKey = EditableProductField | 'metal';
-
 const iconStyle = {
   lineHeight: 1,
 };
@@ -116,52 +111,6 @@ function mergeWarnings(current: string[], incoming: string[] | undefined): strin
   return Array.from(new Set([...current, ...(incoming ?? [])]));
 }
 
-/** The listing editor's own label for the `length` column, by product type. */
-function lengthLabel(productType: string | null | undefined): string {
-  const normalized = normalizeProductJewelryType(productType);
-  if (normalized === 'Ring') return 'Ring size';
-  if (normalized === 'Necklace' || normalized === 'Bracelet') return 'Length';
-  return 'Height';
-}
-
-/** Display text for the stored length, in the words the product page uses. */
-function lengthDisplay(raw: string | null | undefined, productType: string | null | undefined): string {
-  const value = raw?.trim();
-  if (!value) return '—';
-  if (normalizeProductJewelryType(productType) === 'Ring') return `Size ${value.replace(/^size:\s*/i, '')}`;
-  const inches = parseLengthInches(value);
-  return inches != null ? `${inches} in` : value;
-}
-
-/** eBay aspect name → the product field that feeds it (fixed aspects have none). */
-const EBAY_ASPECT_FIELD: Record<string, EditorKey | null> = {
-  Metal: 'metal_variant',
-  'Metal Purity': 'purity',
-  Type: 'product_type',
-  Brand: 'brand',
-  'Year Manufactured': 'item_year',
-  'Item Weight': 'weight_grams',
-  'Main Stone': 'stone_details',
-  Style: null,
-  'Chain Type': 'chain_type',
-  'Chain Length': 'length',
-  'Ring Size': 'length',
-};
-
-const FIELD_LABEL: Record<EditorKey, string> = {
-  quantity: 'Quantity',
-  length: 'Length',
-  brand: 'Brand',
-  item_year: 'Year',
-  weight_grams: 'Weight',
-  stone_details: 'Main stone',
-  chain_type: 'Chain type',
-  purity: 'Purity',
-  metal_variant: 'Metal',
-  product_type: 'Type',
-  metal: 'Metal & purity',
-};
-
 export default function SelectedMarketplaceReviewFlow({ marketplace, productIds, onBack, onClose, onProductEdited }: Props) {
   const [index, setIndex] = useState(0);
   const [completed, setCompleted] = useState(0);
@@ -179,24 +128,35 @@ export default function SelectedMarketplaceReviewFlow({ marketplace, productIds,
   const [loadingTaxonomy, setLoadingTaxonomy] = useState(false);
   const [savingCategory, setSavingCategory] = useState(false);
   const [categoryError, setCategoryError] = useState<string | null>(null);
-  // One inline editor at a time. `draft` holds the text of every input the
-  // editor shows (the Materials editor has two).
-  const [editor, setEditor] = useState<{ key: EditorKey; draft: Record<string, string> } | null>(null);
-  const [savingField, setSavingField] = useState(false);
-  const [fieldError, setFieldError] = useState<string | null>(null);
   // "Length saved · preflight refreshed" — one notice slot shared by every
   // save in the window (fields, category, tags), replaced by the next one.
   const [notice, setNotice] = useState<string | null>(null);
   // Etsy "additional tags": null = show the saved value, a string = an edit in progress.
   const [extraTagsInput, setExtraTagsInput] = useState<string | null>(null);
   const [savingTags, setSavingTags] = useState(false);
+  const [tagsError, setTagsError] = useState<string | null>(null);
 
   const currentProductId = productIds[index] ?? null;
   const name = marketplace === 'etsy' ? 'Etsy' : 'eBay';
   const preview = previewState?.productId === currentProductId ? previewState.data : null;
   const loadError = loadErrorState?.productId === currentProductId ? loadErrorState.message : null;
   const finished = currentProductId === null;
-  const busy = submitting || savingCategory || savingField || savingTags;
+  const fields = preview?.productFields ?? null;
+  const productType = fields?.product_type ?? preview?.productType ?? null;
+  const fieldEditor = useProductFieldEditor({
+    marketplace,
+    productId: currentProductId,
+    fields,
+    productType,
+    disabled: submitting || savingCategory || savingTags,
+    onOpen: () => setCategoryPickerOpen(false),
+    onSaved: (patch, key) => {
+      if (currentProductId) onProductEdited?.(currentProductId, patch);
+      setNotice(`${FIELD_LABEL[key]} saved · preflight refreshed.`);
+      reloadPreview();
+    },
+  });
+  const busy = submitting || savingCategory || fieldEditor.saving || savingTags;
 
   useEffect(() => {
     if (!currentProductId) return;
@@ -239,10 +199,10 @@ export default function SelectedMarketplaceReviewFlow({ marketplace, productIds,
     setWarnings([]);
     setCategoryPickerOpen(false);
     setCategoryError(null);
-    setEditor(null);
-    setFieldError(null);
+    fieldEditor.close();
     setNotice(null);
     setExtraTagsInput(null);
+    setTagsError(null);
   }
 
   function advance(skippedItem: boolean) {
@@ -266,7 +226,7 @@ export default function SelectedMarketplaceReviewFlow({ marketplace, productIds,
 
   async function openCategoryPicker() {
     if (marketplace !== 'etsy' || !preview) return;
-    setEditor(null);
+    fieldEditor.close();
     setCategoryPickerOpen(true);
     setCategoryError(null);
     if (taxonomyLeaves || loadingTaxonomy) return;
@@ -309,56 +269,11 @@ export default function SelectedMarketplaceReviewFlow({ marketplace, productIds,
     }
   }
 
-  function openEditor(key: EditorKey) {
-    const fields = preview?.productFields;
-    if (!fields || busy) return;
-    setCategoryPickerOpen(false);
-    setFieldError(null);
-    const text = (value: string | number | null | undefined) => (value == null ? '' : String(value));
-    const draft: Record<string, string> =
-      key === 'metal'
-        ? { metal_variant: text(fields.metal_variant), purity: text(fields.purity) }
-        : { [key]: text(fields[key]) };
-    setEditor({ key, draft });
-  }
-
-  function setDraft(field: string, value: string) {
-    setEditor((current) => (current ? { ...current, draft: { ...current.draft, [field]: value } } : current));
-  }
-
-  /** Write the edited field(s) to the product, then re-run the preflight. */
-  async function saveEditor() {
-    if (!editor || !currentProductId || busy) return;
-    const fields: Record<string, string | null> = {};
-    for (const [field, value] of Object.entries(editor.draft)) {
-      fields[field] = value.trim() === '' ? null : value.trim();
-    }
-    setSavingField(true);
-    setFieldError(null);
-    try {
-      const response = await fetch('/api/admin/products/fields', {
-        method: 'PUT',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ productId: currentProductId, fields }),
-      });
-      const data = (await response.json().catch(() => null)) as { patch?: ProductFieldEditPatch } | null;
-      if (!response.ok) throw new Error(responseError(data, 'Could not save that change.'));
-      if (data?.patch) onProductEdited?.(currentProductId, data.patch);
-      setNotice(`${FIELD_LABEL[editor.key]} saved · preflight refreshed.`);
-      setEditor(null);
-      reloadPreview();
-    } catch (caught) {
-      setFieldError(caught instanceof Error ? caught.message : 'Could not save that change.');
-    } finally {
-      setSavingField(false);
-    }
-  }
-
   async function saveTags() {
     if (marketplace !== 'etsy' || !currentProductId || extraTagsInput === null || busy) return;
     const tags = extraTagsInput.split(',').map((tag) => tag.trim()).filter(Boolean);
     setSavingTags(true);
-    setFieldError(null);
+    setTagsError(null);
     try {
       const response = await fetch('/api/admin/etsy/tags', {
         method: 'PUT',
@@ -371,7 +286,7 @@ export default function SelectedMarketplaceReviewFlow({ marketplace, productIds,
       setNotice('Tags saved · preflight refreshed.');
       reloadPreview();
     } catch (caught) {
-      setFieldError(caught instanceof Error ? caught.message : 'Could not save the tags.');
+      setTagsError(caught instanceof Error ? caught.message : 'Could not save the tags.');
     } finally {
       setSavingTags(false);
     }
@@ -429,187 +344,6 @@ export default function SelectedMarketplaceReviewFlow({ marketplace, productIds,
 
   const mode = preview ? syncMode(marketplace, preview) : 'publish';
   const submitLabel = mode === 'update' ? `Submit ${name} updates` : `Submit to ${name}`;
-  const fields = preview?.productFields ?? null;
-  const productType = fields?.product_type ?? preview?.productType ?? null;
-  const editorKey = editor?.key ?? null;
-
-  // ---- inline editor pieces ------------------------------------------------
-
-  function pencil(key: EditorKey, label: string) {
-    if (!fields) return null;
-    return (
-      <button
-        type="button"
-        onClick={() => openEditor(key)}
-        disabled={busy || editorKey === key}
-        className="inline-flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border transition-colors hover:bg-white disabled:opacity-40"
-        style={{ borderColor: 'color-mix(in srgb, var(--color-primary) 45%, transparent)', color: 'var(--color-primary)', background: 'rgba(255,255,255,0.8)' }}
-        aria-label={`Edit ${label}`}
-        title={`Edit ${label}`}
-      >
-        <AppIcon name="edit" style={{ ...iconStyle, fontSize: '12px', width: 12, height: 12 }} aria-hidden="true" />
-      </button>
-    );
-  }
-
-  function editorActions() {
-    return (
-      <div className="flex flex-wrap justify-end gap-2">
-        <button type="button" onClick={() => { setEditor(null); setFieldError(null); }} disabled={savingField} className="outline-button text-xs">
-          Cancel
-        </button>
-        <button type="button" onClick={() => void saveEditor()} disabled={savingField} className="gold-button text-xs">
-          {savingField ? 'Saving…' : 'Save'}
-        </button>
-      </div>
-    );
-  }
-
-  function editorBox(children: ReactNode) {
-    return (
-      <div
-        className="mt-1 flex flex-col gap-2 border p-3"
-        style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-lowest)' }}
-        onKeyDown={(event) => {
-          if (event.key === 'Escape') { setEditor(null); setFieldError(null); }
-          if (event.key === 'Enter' && (event.target as HTMLElement).tagName === 'INPUT') { event.preventDefault(); void saveEditor(); }
-        }}
-      >
-        {children}
-        {fieldError && (
-          <p className="text-xs" role="alert" style={{ color: 'var(--color-error)' }}>{fieldError}</p>
-        )}
-        {editorActions()}
-      </div>
-    );
-  }
-
-  /** The editor for `key`, or null when a different row is being edited. */
-  function inlineEditor(key: EditorKey) {
-    if (!editor || editor.key !== key || !fields) return null;
-    const draft = editor.draft;
-    const isSilver = fields.category === 'Silver';
-    const purityInput = (
-      <input
-        type="number"
-        className="form-field w-32"
-        value={draft.purity ?? ''}
-        onChange={(event) => setDraft('purity', event.target.value)}
-        placeholder={isSilver ? '925' : '14'}
-        min={isSilver ? 100 : 1}
-        max={isSilver ? 1000 : 24}
-        aria-label={isSilver ? 'Purity, parts per thousand' : 'Purity, karats'}
-        autoFocus={key === 'purity'}
-      />
-    );
-    const metalSelect = (
-      <select
-        className="form-field"
-        value={draft.metal_variant ?? ''}
-        onChange={(event) => setDraft('metal_variant', event.target.value)}
-        aria-label="Metal"
-        autoFocus={key === 'metal_variant' || key === 'metal'}
-      >
-        <option value="">Choose…</option>
-        {PRODUCT_METAL_VARIANTS[isSilver ? 'Silver' : 'Gold'].map((option) => (
-          <option key={option.value} value={option.value}>{option.label}</option>
-        ))}
-      </select>
-    );
-
-    switch (key) {
-      case 'quantity':
-        return editorBox(
-          <input type="number" className="form-field w-28" min={0} max={999} step={1} value={draft.quantity ?? ''} onChange={(event) => setDraft('quantity', event.target.value)} aria-label="Quantity" autoFocus />,
-        );
-      case 'length': {
-        const isRing = normalizeProductJewelryType(productType) === 'Ring';
-        const inches = isRing ? null : parseLengthInches(draft.length ?? '');
-        return editorBox(
-          <div className="flex flex-wrap items-center gap-2">
-            <input
-              type="text"
-              className="form-field w-36"
-              value={draft.length ?? ''}
-              onChange={(event) => setDraft('length', event.target.value)}
-              placeholder={isRing ? 'e.g. 7, 6.5' : 'e.g. 18.5, 470 mm, 47 cm'}
-              aria-label={lengthLabel(productType)}
-              autoFocus
-            />
-            {!isRing && (
-              <span className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
-                {inches != null ? <>= <strong style={{ color: 'var(--color-on-surface)' }}>{inches} in</strong> · stored in inches; Etsy and eBay push inches</> : 'Inches unless you add mm or cm'}
-              </span>
-            )}
-          </div>,
-        );
-      }
-      case 'brand':
-        return editorBox(
-          <div className="flex flex-wrap items-center gap-2">
-            <input type="text" className="form-field w-56" value={draft.brand ?? ''} onChange={(event) => setDraft('brand', event.target.value)} placeholder="Maker or brand" aria-label="Brand" autoFocus />
-            {marketplace === 'ebay' && <span className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>Blank = &quot;Unbranded&quot; on eBay</span>}
-          </div>,
-        );
-      case 'item_year':
-        return editorBox(
-          <div className="flex flex-wrap items-center gap-2">
-            <input type="number" className="form-field w-28" min={1} max={2200} value={draft.item_year ?? ''} onChange={(event) => setDraft('item_year', event.target.value)} placeholder="1925" aria-label="Year made" autoFocus />
-            <span className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>The year the piece was made · blank to clear</span>
-          </div>,
-        );
-      case 'weight_grams':
-        return editorBox(
-          <div className="flex flex-wrap items-center gap-2">
-            <input type="number" className="form-field w-32" step="0.01" min={0} value={draft.weight_grams ?? ''} onChange={(event) => setDraft('weight_grams', event.target.value)} placeholder="13.85" aria-label="Weight in grams" autoFocus />
-            <span className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>grams</span>
-          </div>,
-        );
-      case 'stone_details':
-        return editorBox(
-          <div className="flex flex-wrap items-center gap-2">
-            <input type="text" className="form-field w-64" value={draft.stone_details ?? ''} onChange={(event) => setDraft('stone_details', event.target.value)} placeholder="e.g. Diamond, 0.25 ct" aria-label="Main stone" autoFocus />
-            <span className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>Blank = &quot;No Stone&quot;</span>
-          </div>,
-        );
-      case 'chain_type':
-        return editorBox(
-          <div className="w-64">
-            <ComboboxInput value={draft.chain_type ?? ''} onChange={(value) => setDraft('chain_type', value)} options={[...PRODUCT_LINK_TYPES]} placeholder="e.g. Cuban link, Bead…" />
-          </div>,
-        );
-      case 'purity':
-        return editorBox(
-          <div className="flex flex-wrap items-center gap-2">
-            {purityInput}
-            <span className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>{isSilver ? 'parts per thousand (925 = sterling)' : 'karats'}</span>
-          </div>,
-        );
-      case 'metal_variant':
-        return editorBox(metalSelect);
-      case 'metal':
-        return editorBox(
-          <div className="flex flex-wrap items-center gap-3">
-            <label className="flex items-center gap-2 text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>Metal {metalSelect}</label>
-            <label className="flex items-center gap-2 text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>Purity {purityInput}</label>
-          </div>,
-        );
-      case 'product_type':
-        return editorBox(
-          <div className="flex flex-wrap items-center gap-2">
-            <select className="form-field" value={draft.product_type ?? ''} onChange={(event) => setDraft('product_type', event.target.value)} aria-label="Type" autoFocus>
-              <option value="">Choose…</option>
-              {PRODUCT_JEWELRY_TYPES.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-            <span className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>Also moves the {name} category</span>
-          </div>,
-        );
-      default:
-        return null;
-    }
-  }
 
   function derivedNote(text: string) {
     return <span className="mt-0.5 block text-[0.7rem] italic opacity-75">{text}</span>;
@@ -631,52 +365,12 @@ export default function SelectedMarketplaceReviewFlow({ marketplace, productIds,
         <dd>
           <span className="inline-flex flex-wrap items-center gap-2">
             <span>{display}</span>
-            {pencil(key, label)}
+            {fieldEditor.pencil(key, label)}
           </span>
           {note && derivedNote(note)}
-          {inlineEditor(key)}
+          {fieldEditor.inlineEditor(key)}
         </dd>
       </div>
-    );
-  }
-
-  /** eBay aspects, one line each, with a pencil where a product field feeds the value. */
-  function aspectList() {
-    const aspects = preview?.payload.aspects ?? {};
-    const rows: { label: string; value: string; key: EditorKey | null; fixed?: boolean }[] = [];
-    for (const [label, values] of Object.entries(aspects)) {
-      const key = Object.prototype.hasOwnProperty.call(EBAY_ASPECT_FIELD, label) ? EBAY_ASPECT_FIELD[label] : null;
-      rows.push({ label, value: values.join(', '), key, fixed: label === 'Style' });
-    }
-    // Rows the mapper skipped because the field is empty — still worth a pencil.
-    const present = new Set(rows.map((row) => row.label));
-    const supportsChain = productSupportsLinkType(productType);
-    const isRing = normalizeProductJewelryType(productType) === 'Ring';
-    if (fields) {
-      if (!present.has('Year Manufactured')) rows.push({ label: 'Year Manufactured', value: '—', key: 'item_year' });
-      if (!present.has('Item Weight')) rows.push({ label: 'Item Weight', value: '—', key: 'weight_grams' });
-      if (supportsChain && !present.has('Chain Type')) rows.push({ label: 'Chain Type', value: '—', key: 'chain_type' });
-      const lengthAspect = isRing ? 'Ring Size' : 'Chain Length';
-      if (!present.has('Ring Size') && !present.has('Chain Length') && productType && productType !== 'Other') {
-        rows.push({ label: lengthAspect, value: '—', key: 'length' });
-      }
-    }
-    if (rows.length === 0) return <dd>-</dd>;
-    return (
-      <dd>
-        <ul className="m-0 grid list-none gap-x-5 gap-y-1.5 p-0 sm:grid-cols-2">
-          {rows.map((row) => (
-            <li key={row.label} className={editorKey && row.key === editorKey ? 'sm:col-span-2' : undefined}>
-              <span className="inline-flex flex-wrap items-center gap-2">
-                <span>{row.label}</span>
-                <span className="font-semibold" style={{ color: row.fixed ? 'var(--color-on-surface-variant)' : 'var(--color-on-surface)' }}>{row.value}</span>
-                {row.key ? pencil(row.key, row.label) : row.fixed ? <span className="text-[0.65rem] italic opacity-75">fixed</span> : null}
-              </span>
-              {row.key ? inlineEditor(row.key) : null}
-            </li>
-          ))}
-        </ul>
-      </dd>
     );
   }
 
@@ -819,17 +513,7 @@ export default function SelectedMarketplaceReviewFlow({ marketplace, productIds,
                         </span>
                       )}
                       {marketplace === 'etsy' && !categoryPickerOpen && (
-                        <button
-                          type="button"
-                          onClick={() => void openCategoryPicker()}
-                          disabled={busy}
-                          className="inline-flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border transition-colors hover:bg-white disabled:opacity-40"
-                          style={{ borderColor: 'color-mix(in srgb, var(--color-primary) 45%, transparent)', color: 'var(--color-primary)', background: 'rgba(255,255,255,0.8)' }}
-                          aria-label="Change Etsy category"
-                          title="Change Etsy category"
-                        >
-                          <AppIcon name="edit" style={{ ...iconStyle, width: 12, height: 12 }} aria-hidden="true" />
-                        </button>
+                        <PencilButton label="Change Etsy category" onClick={() => void openCategoryPicker()} disabled={busy} />
                       )}
                       {marketplace === 'etsy' && !categoryPickerOpen && preview.payload.taxonomyIsOverride && (
                         <button type="button" onClick={() => void saveCategory(null, null)} disabled={busy} className="outline-button text-xs">
@@ -912,8 +596,8 @@ export default function SelectedMarketplaceReviewFlow({ marketplace, productIds,
                           </button>
                         </div>
                         {derivedNote('Gold-outlined tags are yours; the rest are generated from the listing')}
-                        {fieldError && !editor && (
-                          <p className="mt-1 text-xs" role="alert" style={{ color: 'var(--color-error)' }}>{fieldError}</p>
+                        {tagsError && (
+                          <p className="mt-1 text-xs" role="alert" style={{ color: 'var(--color-error)' }}>{tagsError}</p>
                         )}
                       </dd>
                     </div>
@@ -930,7 +614,9 @@ export default function SelectedMarketplaceReviewFlow({ marketplace, productIds,
                     </div>
                     <div className="sm:col-span-2">
                       <dt className="form-label">Aspects</dt>
-                      {aspectList()}
+                      <dd>
+                        <EbayAspectRows aspects={preview.payload.aspects ?? {}} fields={fields} productType={productType} editor={fieldEditor} />
+                      </dd>
                     </div>
                   </>
                 )}

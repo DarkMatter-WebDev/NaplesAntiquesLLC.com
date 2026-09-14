@@ -5,6 +5,91 @@
 
 ## ◻ OPEN — needs a human
 
+### 🔴 STAGED 2026-09-13 — "Refresh Preview" on the Instagram and Facebook panels (no SQL, no env vars)
+
+- **What.** `InstagramProductPanel` / `FacebookProductPanel` loaded their
+  preview only on open, so a photo saved in the listing editor never appeared
+  until the form was closed and reopened. Each now has a **Refresh Preview**
+  button in its header (every workflow step; listing-editor accordions and
+  Manage pages). It re-reads the preview and keeps unsaved lineup, crop and
+  caption edits.
+- **Gate.** tsc 0 · `npm run lint` 0 · 1341/1341 · build 0. Dev Chrome (item
+  #135): both buttons → "Refreshing…" → "Preview refreshed.".
+  `CHANGELOG.md` 2026-09-13 (late night, social refresh).
+- ◻ **Owner, after the push (1 minute).** Add a photo to a listing → Save →
+  open its Instagram (or Facebook) section → Refresh Preview → the new photo
+  shows under "not included" (or in the lineup if none was saved).
+
+**Staging (social refresh):** ✅ synced 2026-09-13 — dry run exactly the 5
+expected (InstagramProductPanel, FacebookProductPanel, CHANGELOG,
+CURRENT_STATUS, TASKS), 0 extras; copied 5; follow-up 0; SHA-256 MATCH ×5;
+staged panels carry `refreshPreview` (IG 2, FB 2); leak check 0 `.env*` /
+`.log`; 209 = 209 `.tsx`. Docs-only re-sync after this line.
+
+### 🔴 STAGED 2026-09-13 — Etsy photo sync fix: replaced photos never uploaded (inv #33, #82) + deleted listings stuck in error (no SQL, no env vars)
+
+- **Photos.** The crash-recovery step adopted the OLD Etsy images as the new
+  uploads and the same pass deleted them. Etsy held 2 of 7 photos for #33 and
+  7 of 10 for #82 while our rows said "uploaded". Fixed in
+  `lib/etsy/images.ts` + `sync.ts`:
+  - Photo records are checked against the live Etsy listing before every photo pass.
+  - Recovery only claims images no record points at.
+  - Deletes run first.
+- **Deleted listings.** A listing deleted on etsy.com now resets to not-listed
+  during a sync instead of 404-ing forever.
+- **Gate.** tsc 0 · `npm run lint` 0 · **1341/1341** · build 0. Read-only live
+  dry run: #82 → upload photos 8–10; #33 → 5 uploads, 0 adoptions.
+  `CHANGELOG.md` 2026-09-13 (late night, Etsy photos); rule in `DECISIONS.md`
+  → *"Etsy photo checkpoints are verified against the live listing"*.
+- ◻ **Owner, after the push (these write your live Etsy shop).**
+  1. **#33** (listing deleted on Etsy): open it → Etsy accordion → "Sync
+     Updates" (or "Check Etsy Status"). It resets to not listed; then "Sync to
+     Etsy" creates a new listing with all 7 photos (a draft unless
+     auto-activate is on).
+  2. **#82** (live, missing photos 8–10): open it → Etsy accordion → "Sync
+     Updates". Expect a notice, and an `image_repair` log row, then photos
+     8–10 on Etsy.
+  3. Ask and I'll verify both listings' photos read-only against the site.
+
+**Staging (Etsy photos):** ✅ synced 2026-09-13 — dry run exactly the 8 expected
+(etsy/images.ts, etsy/sync.ts, photo-sync-repair.test.ts new, CHANGELOG,
+CURRENT_STATUS, DECISIONS, TASKS, features/etsy-sync), 0 extras; copied 8;
+follow-up 0; SHA-256 MATCH ×8; staged sync.ts has `resetDeletedEtsyListing` ×4
+and images.ts `planImageAdoptions` ×3; temp dry-run script absent; leak check
+0 `.env*` / `.log`; 209 = 209 `.tsx`. Docs-only re-sync after this line.
+
+### 🔴 STAGED 2026-09-13 — pencil edits on every Etsy/eBay preflight: listing-editor accordions + Manage Etsy/eBay pages (no SQL, no env vars)
+
+- **What.** The Etsy and eBay accordions in the add/edit listing form, and the
+  Manage Etsy / Manage eBay pages, now have the review window's pencil editors
+  (shared `components/admin/ProductFieldInlineEditor.tsx`, same
+  `PUT /api/admin/products/fields`).
+  - Etsy: Quantity, Materials, When made, Length / Ring size, category.
+  - eBay: Quantity and every aspect.
+- **Safety.** In the open drawer, a pencil save is copied into the form, its
+  type/chain/length inputs and undo history (`applyFieldPatchToEditorState`),
+  so the drawer's Save or Undo can't revert it.
+- **Gate.** tsc 0 · `npm run lint` 0 · **1334/1334** · build 0. Dev Chrome
+  read-only check (item #135): drawer and Manage pages show 5 Etsy / 10 eBay
+  pencils, editors prefill, Cancel works. `CHANGELOG.md` 2026-09-13 (late
+  night, pencils).
+- ◻ **Owner, 2 minutes (dev :3007 now, or production after the push — both
+  write the live product).**
+  1. Open a listing → eBay accordion → pencil a field (e.g. Item Weight) → Save.
+  2. Expect "… saved · preview refreshed", with the same value in the form's
+     field.
+  3. Save the listing and reopen it: the value stuck.
+  4. Open "Review before submitting" once to confirm the refactored window
+     still works.
+
+**Staging (pencils):** ✅ synced 2026-09-13 — dry run exactly the 15 expected
+(ProductFieldInlineEditor.tsx new, SelectedMarketplaceReviewFlow, Etsy/Ebay
+ProductPanel, ProductMarketplaceManagerPage, AdminShell, product-field-edits.ts
++ test, CHANGELOG, CURRENT_STATUS, DECISIONS, STRUCTURE, TASKS,
+features/etsy-sync, features/ebay-sync), 0 extras; copied 15; follow-up 0;
+SHA-256 MATCH ×15; staged AdminShell has `applyDrawerFieldEdit` ×3; leak check
+0 `.env*` / `.log`; 209 = 209 `.tsx`. Docs-only re-sync after this line.
+
 ### 🟡 RUN BY OWNER 2026-09-13 evening (blocks 1–12: indexes, procedure, one-batch test, job `nej-log-retention` scheduled) — ◻ first nightly run 2026-09-14 07:20 UTC; check it after that ("check the retention run")
 
 `supabase/log-retention-2026-09.sql` — batched retention procedure + one new
@@ -29,7 +114,7 @@ lines. Docs-only re-sync after this line.
 copied 3; follow-up dry run 0; SHA-256 MATCH on all 3; leak check 0 `.env*`.
 Docs-only re-sync after this line.
 
-### 🔴 STAGED 2026-09-13 — eBay account-deletion webhook writes once per notice (rides with the same push; no SQL, no env vars)
+### ✅ DEPLOYED 2026-09-13 17:28 ET (main@71a77d8, live-verified — CHANGELOG 2026-09-13 night) — eBay account-deletion webhook writes once per notice (rides with the same push; no SQL, no env vars)
 
 `ebay-account-deletion/route.ts` now inserts the receipt already `processed`.
 It no longer writes an `ebay_sync_log` row or a follow-up update, cutting
@@ -45,11 +130,11 @@ features/ebay-sync.md, log-retention SQL), 0 extras; copied 7; follow-up 0;
 SHA-256 MATCH ×7; staged route has 0 `insertSyncLog`; leak check 0 `.env*` /
 `.log`; 208 = 208 `.tsx`. Docs-only re-sync after this line.
 
-- ◻ After the push (read-only, next day): new eBay receipts keep arriving in
-  `webhook_events` (~1,760/day, status `processed`), and `ebay_sync_log` gets
-  no new `account_deletion` rows. Ask and I'll read both tables.
+- ✅ Verified 2026-09-13 22:26Z (service-role read): 66 eBay receipts since
+  the 21:29:01Z cutover, 0 not `processed`, 0 new `account_deletion`
+  sync-log rows.
 
-### 🔴 STAGED 2026-09-13 — owner photo replaced on About, homepage and Free Appraisal (rides with the same push; no SQL, no env vars)
+### ✅ DEPLOYED 2026-09-13 17:28 ET (main@71a77d8, live-verified — CHANGELOG 2026-09-13 night) — owner photo replaced on About, homepage and Free Appraisal (rides with the same push; no SQL, no env vars)
 
 New `public/assets/images/pages/chris-owner.webp` (showroom-table WhatsApp
 photo, WebP q80, 140 KB) replaces the deleted `chris.webp` at
@@ -70,7 +155,7 @@ total; follow-up dry run 0; SHA-256 MATCH on all 8; old `chris.webp` gone from
 staging; leak check 0 `.env*` / `.log`; 208 = 208 `.tsx`; staged pages carry
 `chris-owner.webp` ×3. Docs-only re-sync after this line.
 
-### 🔴 STAGED 2026-09-13 — one scheduler: GitHub `schedule:` removed + Netlify scheduled functions deleted (rides with the same push; no SQL, no env vars)
+### ✅ DEPLOYED 2026-09-13 17:28 ET (main@71a77d8, live-verified — CHANGELOG 2026-09-13 night) — one scheduler: GitHub `schedule:` removed + Netlify scheduled functions deleted (rides with the same push; no SQL, no env vars)
 
 Why: GitHub run #606's `facebook-drip` 502 (a late scheduled GitHub call;
 nothing lost) led to finding every job firing THREE times — pg_cron, the old
@@ -82,15 +167,18 @@ cleanup" items further down. Detail + evidence: `CHANGELOG.md` 2026-09-13
 (late); rule: `DECISIONS.md` scheduling entry ("pg_cron is the ONLY
 scheduler"). Gate: YAML valid · tsc 0 · lint 0 · **1326/1326** · build exit 0.
 
-- ◻ After the push (read-only, any time the next day): Netlify → Functions
-  lists only "Next.js Server Handler" (no scheduled functions); GitHub Actions
-  shows no new scheduled "Scheduled jobs" runs; the sync logs show ONE drip row
-  per channel per hour (~:00:0x) and ONE price-push row per channel per day
-  (11:15 / 11:45 UTC). Ask and I will read the logs.
+- ✅ Verified 2026-09-13 after the deploy:
+  - Netlify → Functions lists only "Next.js Server Handler".
+  - The last scheduled GitHub run was 21:18:06Z (before the push); the live
+    workflow has only `workflow_dispatch`.
+  - 22:26Z read: ONE Facebook and ONE Instagram drip row at 22:00:06Z, and one
+    reconcile + one sales row per channel at 21:30 and 22:00.
+- ◻ Still to read (09-14 after 11:45 UTC): ONE `scheduled_price_push` row per
+  channel (11:15 Etsy / 11:45 eBay).
 
 **Staging (one scheduler):** ✅ synced 2026-09-13 (late) — dry run listed exactly the 14 changed files (scheduled-jobs.yml, three admin routes, pg_cron SQL, ARCHITECTURE, CHANGELOG, CURRENT_STATUS, DECISIONS, STRUCTURE, TASKS, features/ebay-sync, etsy-sync, facebook-posting) and exactly the 5 deleted `next-app/netlify/functions/*.mts` as extras (1 extra dir); real run copied 14 and removed the 5 + the folder (robocopy exit 3 = copied + extras); follow-up dry run 0/0; SHA-256 MATCH on all 14; staged `functions/` gone, `edge-functions/` 2 files intact, staged workflow has no `schedule:`; leak check 0 `.env*` / `.log` / `.git`; positive control 208 = 208 `.tsx`. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
 
-### 🔴 STAGED 2026-09-13 — homepage hero on short screens, three owner-approved steps in one push: headline shrinks in place ("Option A") · compact mode where it cannot fit ("Choice A") · smaller controls, higher phone headline and a minimum hero height on the tiniest windows (no SQL, no env vars)
+### ✅ DEPLOYED 2026-09-13 17:28 ET (main@71a77d8, live-verified — CHANGELOG 2026-09-13 night) — homepage hero on short screens, three owner-approved steps in one push: headline shrinks in place ("Option A") · compact mode where it cannot fit ("Choice A") · smaller controls, higher phone headline and a minimum hero height on the tiniest windows (no SQL, no env vars)
 
 Files: `components/home/HomeHeroOverlay.tsx`, `components/home/HomeHeroStack.tsx`,
 `components/home/HomeSubscriberForm.tsx`, `app/globals.css`, new

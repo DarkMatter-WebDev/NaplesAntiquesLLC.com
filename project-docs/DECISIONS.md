@@ -221,6 +221,39 @@ tight (under 16px) or overlapping:
   window. Derived rows (price, photos, condition, shipping tier, Style, eBay
   category) stay read-only and say where the value comes from — the window
   must never imply a value can be changed there when it cannot.
+- **Extended 2026-09-13 to every per-item preflight surface.** The Etsy/eBay
+  accordions in the listing editor and the Manage Etsy/eBay pages use the same
+  editors (`components/admin/ProductFieldInlineEditor.tsx`) and the same write
+  path; never fork a second editor per surface. **Inside the open listing
+  editor** a pencil save must also be copied into the form state, its separate
+  type/chain/length inputs and the undo history
+  (`applyFieldPatchToEditorState`, `AdminShell.applyDrawerFieldEdit`). The
+  drawer's Save writes every field, so without that copy the next Save — or an
+  Undo — would silently restore the old value.
+
+## Etsy photo checkpoints are verified against the live listing; recovery never adopts a tracked image (2026-09-13)
+
+- **Decision.** Before every Etsy photo pass, `sync.ts` reads the listing's
+  live images and drops any `etsy_listing_images` row whose image Etsy no
+  longer has (`partitionRowsByLiveImages`), so that photo uploads again.
+  Crash-window recovery adopts a live image only if NO row tracks it
+  (`planImageAdoptions`). Deletes run before uploads. A listing that 404s
+  during a sync is reset to not-listed (`resetDeletedEtsyListing`) and is
+  never re-created automatically.
+- **Why.** Checkpoint rows were trusted blindly and adoption took any image at
+  the planned rank. When the owner replaced photos (inv #33, 2026-09-11; #82,
+  2026-07-10), the new photos were recorded against the old Etsy images, and
+  the same pass deleted those images. Etsy silently lost photos, and every
+  retry saw nothing to do. A deleted listing left the item stuck in `error`.
+  Price pushes share the sync path, so an automatic re-create would bring back
+  listings the owner deleted on purpose.
+- **How to apply.** Never plan uploads from checkpoint rows without the live
+  read; never adopt an image a row points at. An empty live answer drops
+  nothing (no mass duplicate re-upload). A row with `bytes_sha256 IS NULL` was
+  adopted, not uploaded by us. When photos look wrong on Etsy, compare those
+  rows with `GET /v3/application/listings/{id}/images` before touching
+  anything. Repairing a listing = "Sync Updates" (or "Sync to Etsy" after a
+  reset), never hand-editing rows.
 
 ## Length is stored in inches; a value that carries `mm`/`cm` converts once, on the way in (2026-09-12)
 

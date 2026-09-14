@@ -1,7 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { EbayAspectRows, FIELD_LABEL, useProductFieldEditor, type EditorKey } from './ProductFieldInlineEditor';
 import { AppIcon } from '@/components/AppIcon';
+import type { ProductFieldEditPatch, ReviewProductFields } from '@/lib/product-field-edits';
 
 interface PreflightCheck {
   check: string;
@@ -46,6 +48,8 @@ interface PreviewResponse {
   payload: MappedEbayPayload;
   listing: EbayListingSummary | null;
   fees: unknown;
+  /** The stored product values behind the editable rows — prefills the pencil editors. */
+  productFields?: ReviewProductFields;
 }
 
 interface SyncStepResult {
@@ -88,11 +92,15 @@ const STATE_LABELS: Record<string, string> = {
 export default function EbayProductPanel({
   productId,
   onSynced,
+  onProductEdited,
 }: {
   productId: string;
   /** Called after an action that can change this listing's sync state, so the
    *  parent admin table can refresh its status chips (see AdminShell). */
   onSynced?: () => void;
+  /** A pencil edit saved product fields (quantity, brand, weight…) — the host
+   *  merges the patch so its own copy (the open editor form, a header) is not stale. */
+  onProductEdited?: (productId: string, patch: ProductFieldEditPatch) => void;
 }) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -135,6 +143,27 @@ export default function EbayProductPanel({
     const run = async () => { await loadPreview(); };
     void run();
   }, [loadPreview]);
+
+  // Pencil edits on the product-backed rows — the same editors as the
+  // "Review before submitting" window, saved to the product row, then the
+  // preview re-runs (DECISIONS.md → "Review-window edits write to the product").
+  const fieldEditor = useProductFieldEditor({
+    marketplace: 'ebay',
+    productId,
+    fields: preview?.productFields ?? null,
+    productType: preview?.productFields?.product_type ?? null,
+    disabled: syncing || publishing || pushingPrice || busyAction !== null,
+    onSaved: async (patch, key) => {
+      onProductEdited?.(productId, patch);
+      const result = await loadPreview();
+      showNotice(
+        result.ok
+          ? `${FIELD_LABEL[key]} saved · preview refreshed.`
+          : `${FIELD_LABEL[key]} saved, but the preview did not refresh: ${result.message ?? 'try Refresh Preview.'}`,
+        result.ok,
+      );
+    },
+  });
 
   const handleRefreshClick = async () => {
     const result = await loadPreview();
@@ -309,6 +338,20 @@ export default function EbayProductPanel({
   // A prepared offer that isn't live — can be fully discarded ("un-staged").
   const canUnstage =
     hasOffer && (listing?.syncState === 'review' || listing?.syncState === 'ended' || listing?.syncState === 'offer_created');
+  const fields = preview.productFields ?? null;
+
+  // A product-backed value with its pencil; the cell spans both columns while
+  // its editor is open so the inputs have room.
+  const valueCell = (key: EditorKey, label: string, value: ReactNode) => (
+    <div className={fieldEditor.editorKey === key ? 'md:col-span-2' : undefined}>
+      <span className="form-label">{label}</span>
+      <div className="flex flex-wrap items-center gap-2">
+        <span>{value}</span>
+        {fieldEditor.pencil(key, label)}
+      </div>
+      {fieldEditor.inlineEditor(key)}
+    </div>
+  );
 
   return (
     <div className="flex flex-col gap-4">
@@ -381,10 +424,7 @@ export default function EbayProductPanel({
               : ''}
           </p>
         </div>
-        <div>
-          <span className="form-label">Quantity</span>
-          <p>{preview.payload.quantity}</p>
-        </div>
+        {valueCell('quantity', 'Quantity', preview.payload.quantity)}
         <div>
           <span className="form-label">Condition</span>
           <p>{preview.payload.conditionDescription}</p>
@@ -400,20 +440,13 @@ export default function EbayProductPanel({
               <span className="ml-2 text-[0.65rem] font-bold uppercase tracking-wide" style={{ color: '#a9760a' }}>(approximate — review before publishing)</span>
             )}
           </p>
+          {fields && !preview.payload.categoryIsOverride && (
+            <p className="text-[0.7rem] italic opacity-75">Pinned from Type and metal · change Type in the aspects below to move it</p>
+          )}
         </div>
         <div className="md:col-span-2">
           <span className="form-label">Aspects</span>
-          {Object.keys(preview.payload.aspects).length === 0 ? (
-            <p>—</p>
-          ) : (
-            <ul className="flex flex-col gap-0.5">
-              {Object.entries(preview.payload.aspects).map(([key, values]) => (
-                <li key={key}>
-                  <strong>{key}:</strong> {values.join(', ')}
-                </li>
-              ))}
-            </ul>
-          )}
+          <EbayAspectRows aspects={preview.payload.aspects} fields={fields} productType={fields?.product_type ?? null} editor={fieldEditor} />
         </div>
         <div>
           <span className="form-label">Photos</span>
@@ -438,7 +471,7 @@ export default function EbayProductPanel({
       )}
 
       <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={() => void handleRefreshClick()} disabled={loading || syncing} className="outline-button text-sm">
+        <button type="button" onClick={() => void handleRefreshClick()} disabled={loading || syncing || fieldEditor.saving} className="outline-button text-sm">
           Refresh Preview
         </button>
         {hasOffer && (
@@ -449,7 +482,7 @@ export default function EbayProductPanel({
         <button
           type="button"
           onClick={() => void runSyncLoop(alreadySynced ? 'update' : 'publish')}
-          disabled={!preview.eligible || syncing}
+          disabled={!preview.eligible || syncing || fieldEditor.saving}
           className="gold-button text-sm disabled:opacity-50"
         >
           {syncing ? 'Syncing…' : alreadySynced ? 'Sync Updates' : 'Sync to eBay'}
@@ -458,7 +491,7 @@ export default function EbayProductPanel({
           <button
             type="button"
             onClick={() => void publishLive()}
-            disabled={publishing || syncing || !preview.eligible}
+            disabled={publishing || syncing || !preview.eligible || fieldEditor.saving}
             className="gold-button text-sm disabled:opacity-50"
             title="eBay has no private draft — this makes the listing live immediately."
           >

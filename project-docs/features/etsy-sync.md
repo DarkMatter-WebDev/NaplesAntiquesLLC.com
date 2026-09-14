@@ -205,7 +205,15 @@ next-app/src/lib/etsy/
               WebP->JPEG transcode (quality 90, flattened to white for
               alpha, format sniffed from bytes not extension, resized
               down-only to 2400px) -> multipart upload; pure image-diff
-              planning (planImageDiff) and crash-window reconciliation.
+              planning (planImageDiff — deletes before uploads) and
+              crash-window reconciliation. Since 2026-09-13 every photo pass
+              first reads the listing's live images and drops checkpoint rows
+              Etsy no longer has (partitionRowsByLiveImages, so those photos
+              re-upload), and recovery adopts only images no row tracks
+              (planImageAdoptions) — the inv #33/#82 "photos never uploaded"
+              bug; see DECISIONS.md → "Etsy photo checkpoints are verified".
+              A sync that finds the listing deleted on Etsy resets it to
+              not-listed (resetDeletedEtsyListing in sync.ts).
               computeUploadWarnings() checks against Etsy's own photo
               guidance (both-dimensions 2000px, first-photo 635px, 1MB file
               size) — non-blocking, see CHANGELOG.md 2026-07-08 (session 6)
@@ -448,7 +456,13 @@ failure path wrote a no-op `{}` patch and dropped `err.detail`, the field
   Sync Updates with inline step progress, Deactivate/Reactivate on Etsy, a
   link to the live listing, and a per-item **Push price** button (lean
   price-only re-push for that one listing). Gated behind "save this listing
-  first" for unsaved new products.
+  first" for unsaved new products. **Since 2026-09-13** the product-backed
+  rows carry the review window's pencil editors (shared
+  `ProductFieldInlineEditor.tsx`): Quantity, Materials (metal + purity), When
+  made (item year), Length / Ring size, and the category pencil (grouped
+  `EtsyCategoryDropdown`). Saves write the product row, the preview re-runs,
+  and inside the open listing editor the value is merged into the form so its
+  Save cannot revert it. The same panel renders on the Manage Etsy page.
 - **Toolbar → "Sync All to Etsy"** (`EtsyBulkSyncModal.tsx`, Phase 2): a free
   pre-flight summary ("N eligible · N ineligible · N up to date · N errors",
   with an expandable ineligibility sample list) before confirming, then

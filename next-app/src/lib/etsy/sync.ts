@@ -15,7 +15,7 @@ import {
 import type { Product, SpotData } from '@/types/product';
 import { normalizeProductJewelryType, normalizeProductQuantity, normalizeProductStatus } from '@/types/product';
 import { ensureFreshAccessToken } from './auth';
-import { etsyFetch, updateListingProperty, EtsyApiError } from './client';
+import { etsyFetch, updateListingProperty, EtsyApiError, type EtsyResponse } from './client';
 import { attemptLengthSync, parseWearableLengthInches } from './length-experiment';
 import { attemptRingSizeSync, parseRingSize } from './ring-size-experiment';
 import {
@@ -30,6 +30,8 @@ import {
 import {
   IMAGE_STEP_BUDGET,
   deleteEtsyListingImage,
+  fetchEtsyListingImages,
+  partitionRowsByLiveImages,
   planImageDiff,
   reconcileMissingImageRows,
   uploadListingImage,
@@ -425,10 +427,36 @@ export async function runSyncStep(productId: string, mode: SyncMode = 'publish')
   try {
     if (listing?.etsy_listing_id && (effectiveMode === 'update' || effectiveMode === 'price-only')) {
       const listingId = listing.etsy_listing_id;
-      const remote = await etsyFetch<{ state: string; shipping_profile_id?: number | null }>({
-        path: `/v3/application/listings/${listingId}`,
-        accessToken,
-      });
+      let remote: EtsyResponse<{ state: string; shipping_profile_id?: number | null }>;
+      try {
+        remote = await etsyFetch<{ state: string; shipping_profile_id?: number | null }>({
+          path: `/v3/application/listings/${listingId}`,
+          accessToken,
+        });
+      } catch (err) {
+        // Deleted on etsy.com (2026-09-13, inv #33): every retry used to 404
+        // here and leave the item stuck in 'error' holding a dead listing id.
+        // Reset it to not-listed exactly like "Check Etsy Status" does and say
+        // so. Never re-create the listing from here — this path also serves
+        // price pushes, which must not bring back a listing the owner deleted.
+        if (err instanceof EtsyApiError && err.status === 404) {
+          await resetDeletedEtsyListing(
+            service,
+            productId,
+            listingId,
+            'Listing no longer exists on Etsy (deleted there) — reset to not-listed during a sync.',
+          );
+          return {
+            done: true,
+            syncState: 'pending',
+            error: {
+              code: 'listing_deleted',
+              message: 'This listing no longer exists on Etsy (it was deleted there), so it was reset to not listed. Use "Sync to Etsy" to create it again.',
+            },
+          };
+        }
+        throw err;
+      }
       const remoteState = remote.data.state;
       const preserveQueuedState = listing.sync_state === 'pending' && isWritableEtsyListingState(remoteState);
       const patch = reconcileQueuedUpdateState(listing.sync_state, remoteState);
@@ -486,12 +514,37 @@ export async function runSyncStep(productId: string, mode: SyncMode = 'publish')
     // idempotent (planImageDiff no-ops when nothing changed), so re-running
     // it on a retry is always safe, just sometimes redundant.
     if (['draft_created', 'error'].includes(listing.sync_state) || effectiveMode === 'update') {
-      const existingImages = await getListingImages(service, listingId);
+      const storedImages = await getListingImages(service, listingId);
+      // Trust but verify (2026-09-13): a checkpoint row whose image is no
+      // longer on the Etsy listing is dropped so that photo uploads again.
+      // Self-heals the adoption bug (inv #33, #82 — rows said "uploaded" for
+      // photos Etsy never had) and photos deleted directly on etsy.com.
+      const liveImages = await fetchEtsyListingImages({ listingId, accessToken });
+      const { present: existingImages, missing } = partitionRowsByLiveImages(storedImages, liveImages);
+      if (missing.length > 0) {
+        for (const row of missing) await deleteListingImageRow(service, row.id);
+        await insertSyncLog(service, {
+          product_id: productId,
+          listing_id: listingId,
+          action: 'image_repair',
+          outcome: 'warning',
+          message: `${missing.length} photo${missing.length === 1 ? '' : 's'} recorded as uploaded ${missing.length === 1 ? 'was' : 'were'} not on the Etsy listing — uploading again.`,
+          detail: { ranks: missing.map((row) => row.rank), etsyListingImageIds: missing.map((row) => row.etsy_listing_image_id) },
+        });
+      }
       let ops = planImageDiff(
         payload.images.map((image) => image.sourceUrl),
         existingImages,
       );
-      ops = await reconcileMissingImageRows({ service, productId, listingId, accessToken, ops });
+      ops = await reconcileMissingImageRows({
+        service,
+        productId,
+        listingId,
+        accessToken,
+        ops,
+        liveImages,
+        trackedImageIds: new Set(existingImages.map((row) => row.etsy_listing_image_id)),
+      });
 
       const batch = ops.slice(0, IMAGE_STEP_BUDGET);
       let succeeded = 0;
@@ -681,6 +734,41 @@ export async function runSyncStep(productId: string, mode: SyncMode = 'publish')
   }
 }
 
+/** The patch that returns a listing deleted on etsy.com to "not listed". Exported for tests. */
+export const DELETED_LISTING_RESET_PATCH: Partial<EtsyListingRow> = {
+  etsy_listing_id: null,
+  sync_state: 'pending',
+  listing_state: null,
+  taxonomy_id: null,
+  content_hash: null,
+  last_pushed_price: null,
+  last_error: null,
+  error_count: 0,
+};
+
+/**
+ * A listing that 404s on Etsy was deleted there: drop its photo checkpoints and
+ * reset the row to not-listed so "Sync to Etsy" creates it fresh. Shared by
+ * "Check Etsy Status", the bulk status check and the sync step itself.
+ */
+async function resetDeletedEtsyListing(
+  service: SupabaseClient,
+  productId: string,
+  etsyListingId: number,
+  message: string,
+): Promise<EtsyListingRow> {
+  await deleteListingImagesByListingId(service, etsyListingId);
+  const updated = await upsertListing(service, productId, { ...DELETED_LISTING_RESET_PATCH });
+  await insertSyncLog(service, {
+    product_id: productId,
+    listing_id: etsyListingId,
+    action: 'check_status',
+    outcome: 'ok',
+    message,
+  });
+  return updated;
+}
+
 export interface CheckListingStatusResult {
   /** False when the listing no longer exists on Etsy (never synced, or just found deleted — see message). */
   found: boolean;
@@ -813,24 +901,12 @@ export async function checkListingStatus(productId: string): Promise<CheckListin
     };
   } catch (err) {
     if (err instanceof EtsyApiError && err.status === 404) {
-      await deleteListingImagesByListingId(service, listing.etsy_listing_id);
-      const updated = await upsertListing(service, productId, {
-        etsy_listing_id: null,
-        sync_state: 'pending',
-        listing_state: null,
-        taxonomy_id: null,
-        content_hash: null,
-        last_pushed_price: null,
-        last_error: null,
-        error_count: 0,
-      });
-      await insertSyncLog(service, {
-        product_id: productId,
-        listing_id: listing.etsy_listing_id,
-        action: 'check_status',
-        outcome: 'ok',
-        message: 'Listing no longer exists on Etsy (likely deleted there) — reset to not-listed.',
-      });
+      const updated = await resetDeletedEtsyListing(
+        service,
+        productId,
+        listing.etsy_listing_id,
+        'Listing no longer exists on Etsy (likely deleted there) — reset to not-listed.',
+      );
       return { found: false, syncState: updated.sync_state, message: 'This listing no longer exists on Etsy — reset to not-listed. You can sync it fresh.' };
     }
     throw err;
@@ -911,18 +987,7 @@ export async function checkAllListingStatuses(productIds?: string[]): Promise<Ch
     } catch (err) {
       if (err instanceof EtsyApiError && err.status === 404) {
         // Gone on Etsy (deleted there) — reset to not-listed, same as the per-item check.
-        await deleteListingImagesByListingId(service, listing.etsy_listing_id);
-        await upsertListing(service, listing.product_id, {
-          etsy_listing_id: null,
-          sync_state: 'pending',
-          listing_state: null,
-          taxonomy_id: null,
-          content_hash: null,
-          last_pushed_price: null,
-          last_error: null,
-          error_count: 0,
-        });
-        await insertSyncLog(service, { product_id: listing.product_id, listing_id: listing.etsy_listing_id, action: 'check_status', outcome: 'ok', message: 'No longer on Etsy — reset to not-listed.' });
+        await resetDeletedEtsyListing(service, listing.product_id, listing.etsy_listing_id, 'No longer on Etsy — reset to not-listed.');
         checked += 1;
         reset += 1;
         itemStatus.set(listing.product_id, { productId: listing.product_id, syncState: 'pending', linked: false, checkError: false });

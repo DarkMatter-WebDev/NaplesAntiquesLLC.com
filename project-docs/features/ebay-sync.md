@@ -339,7 +339,14 @@ place).
   Preview, Sync to eBay / Sync Updates (stall-guarded polling loop),
   **Publish on eBay** (only enabled once `syncState === 'review'`, copy
   makes clear it's live immediately), Push price only, Check eBay Status,
-  Hide / End / Restore.
+  Hide / End / Restore. **Since 2026-09-13** Quantity and every
+  product-backed aspect (Metal, Metal Purity, Type, Brand, Year Manufactured,
+  Item Weight, Main Stone, Chain Type, Chain Length / Ring Size — empty ones
+  included) have the review window's pencil editors (shared
+  `ProductFieldInlineEditor.tsx` → `PUT /api/admin/products/fields`); the
+  preview re-runs after a save, and inside the open listing editor the value is
+  merged into the form so its Save cannot revert it. Style and the category
+  stay read-only (Type moves the category). Same panel on the Manage eBay page.
 - **`EbayBulkSyncModal.tsx`** (Phase 2, toolbar button "Sync all to eBay"):
   eligibility summary (`"{eligible} eligible · {ineligible} ineligible ·
   {upToDate} up to date · {errors} errors"`, with Coin/Bullion items

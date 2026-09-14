@@ -1,9 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { cumulativeImageProgress } from '@/lib/etsy/progress';
-import ComboboxInput from './ComboboxInput';
+import EtsyCategoryDropdown, { type EtsyCategoryLeaf } from './EtsyCategoryDropdown';
+import { FIELD_LABEL, PencilButton, useProductFieldEditor, type EditorKey } from './ProductFieldInlineEditor';
 import { AppIcon } from '@/components/AppIcon';
+import type { ProductFieldEditPatch, ReviewProductFields } from '@/lib/product-field-edits';
 
 interface PreflightCheck {
   check: string;
@@ -28,11 +30,6 @@ interface MappedPayload {
   images: { sourceUrl: string; rank: number }[];
 }
 
-interface TaxonomyLeaf {
-  id: number;
-  path: string;
-}
-
 interface PreviewResponse {
   eligible: boolean;
   preflight: PreflightCheck[];
@@ -43,6 +40,8 @@ interface PreviewResponse {
   structuredProperties?: { length: string | null; ringSize: string | null };
   /** Raw owner-supplied custom tags (not the merged set in payload.tags) — prefills the editable "Additional tags" field. */
   extraTags?: string[];
+  /** The stored product values behind the editable rows — prefills the pencil editors. */
+  productFields?: ReviewProductFields;
 }
 
 interface EtsyListingSummary {
@@ -88,11 +87,15 @@ const ETSY_MANAGE_DRAFT_URL = 'https://www.etsy.com/your/shops/me/tools/listings
 export default function EtsyProductPanel({
   productId,
   onSynced,
+  onProductEdited,
 }: {
   productId: string;
   /** Called after an action that can change this listing's sync state, so the
    *  parent admin table can refresh its status chips (see AdminShell). */
   onSynced?: () => void;
+  /** A pencil edit saved product fields (quantity, length, metal…) — the host
+   *  merges the patch so its own copy (the open editor form, a header) is not stale. */
+  onProductEdited?: (productId: string, patch: ProductFieldEditPatch) => void;
 }) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -110,8 +113,7 @@ export default function EtsyProductPanel({
   const [savingTags, setSavingTags] = useState(false);
   const [notice, setNotice] = useState<{ text: string; ok: boolean } | null>(null);
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
-  const [categoryInput, setCategoryInput] = useState('');
-  const [taxonomyLeaves, setTaxonomyLeaves] = useState<TaxonomyLeaf[] | null>(null);
+  const [taxonomyLeaves, setTaxonomyLeaves] = useState<EtsyCategoryLeaf[] | null>(null);
   const [loadingTaxonomy, setLoadingTaxonomy] = useState(false);
   const [taxonomyLoadError, setTaxonomyLoadError] = useState<string | null>(null);
   const [savingCategory, setSavingCategory] = useState(false);
@@ -160,6 +162,28 @@ export default function EtsyProductPanel({
     const run = async () => { await loadPreview(); };
     void run();
   }, [loadPreview]);
+
+  // Pencil edits on the product-backed rows — the same editors as the
+  // "Review before submitting" window, saved to the product row, then the
+  // preview re-runs (DECISIONS.md → "Review-window edits write to the product").
+  const fieldEditor = useProductFieldEditor({
+    marketplace: 'etsy',
+    productId,
+    fields: preview?.productFields ?? null,
+    productType: preview?.productFields?.product_type ?? preview?.productType ?? null,
+    disabled: syncing || busyAction !== null || pushingPrice || savingTags || savingCategory,
+    onOpen: () => setCategoryPickerOpen(false),
+    onSaved: async (patch, key) => {
+      onProductEdited?.(productId, patch);
+      const result = await loadPreview();
+      showNotice(
+        result.ok
+          ? `${FIELD_LABEL[key]} saved · preview refreshed.`
+          : `${FIELD_LABEL[key]} saved, but the preview did not refresh: ${result.message ?? 'try Refresh Preview.'}`,
+        result.ok,
+      );
+    },
+  });
 
   const handleRefreshClick = async () => {
     const result = await loadPreview();
@@ -322,16 +346,16 @@ export default function EtsyProductPanel({
   };
 
   const openCategoryPicker = async () => {
+    fieldEditor.close();
     setCategoryPickerOpen(true);
-    setCategoryInput(preview?.payload.taxonomyPath ?? '');
     if (taxonomyLeaves || loadingTaxonomy) return;
     setLoadingTaxonomy(true);
     setTaxonomyLoadError(null);
     try {
       const res = await fetch('/api/admin/etsy/taxonomy');
       const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.error || 'Could not load Etsy categories.');
-      setTaxonomyLeaves(data.leaves as TaxonomyLeaf[]);
+      if (!res.ok || !Array.isArray(data?.leaves)) throw new Error(data?.error || 'Could not load Etsy categories.');
+      setTaxonomyLeaves(data.leaves as EtsyCategoryLeaf[]);
     } catch (err) {
       setTaxonomyLoadError(err instanceof Error ? err.message : 'Could not load Etsy categories.');
     } finally {
@@ -359,15 +383,6 @@ export default function EtsyProductPanel({
     }
   };
 
-  const confirmCategorySelection = () => {
-    const match = taxonomyLeaves?.find((leaf) => leaf.path === categoryInput);
-    if (!match) {
-      showNotice('Pick an exact category from the list.', false);
-      return;
-    }
-    void saveCategory(match.id, match.path);
-  };
-
   if (loading) return <p className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>Loading Etsy status…</p>;
   // Only the initial load (no preview yet) replaces the panel with a bare
   // error line; a later failed Refresh Preview click keeps the existing
@@ -384,12 +399,28 @@ export default function EtsyProductPanel({
   // unrelated enumerated property).
   const isLengthBearing = preview.productType != null && preview.productType !== 'Ring' && preview.productType !== 'Other';
   const isRing = preview.productType === 'Ring';
+  const fields = preview.productFields ?? null;
+  const actionsBusy = syncing || busyAction !== null || pushingPrice || savingTags || savingCategory || fieldEditor.saving;
 
   // Editable custom-tags field: show the in-progress edit if any, else the saved
   // value from the preview. "Dirty" gates the Save button.
   const savedExtraTags = (preview.extraTags ?? []).join(', ');
   const extraTagsValue = extraTagsInput ?? savedExtraTags;
   const extraTagsDirty = extraTagsInput !== null && extraTagsInput.trim() !== savedExtraTags.trim();
+
+  // A product-backed value with its pencil; the cell spans both columns while
+  // its editor is open so the inputs have room.
+  const valueCell = (key: EditorKey, label: string, value: ReactNode, note?: string) => (
+    <div className={fieldEditor.editorKey === key ? 'md:col-span-2' : undefined}>
+      <span className="form-label">{label}</span>
+      <div className="flex flex-wrap items-center gap-2">
+        <span>{value}</span>
+        {fieldEditor.pencil(key, label)}
+      </div>
+      {note && <p className="text-[0.7rem] italic opacity-75">{note}</p>}
+      {fieldEditor.inlineEditor(key)}
+    </div>
+  );
 
   return (
     <div className="flex flex-col gap-4">
@@ -460,14 +491,12 @@ export default function EtsyProductPanel({
             {preview.payload.priceBeforeMarkup != null && preview.payload.price != null ? ` (site: $${preview.payload.priceBeforeMarkup.toFixed(2)})` : ''}
           </p>
         </div>
+        {valueCell('quantity', 'Quantity', preview.payload.quantity)}
         <div>
           <span className="form-label">Tags</span>
           <p>{preview.payload.tags.join(', ') || '—'}</p>
         </div>
-        <div>
-          <span className="form-label">Materials</span>
-          <p>{preview.payload.materials.join(', ') || '—'}</p>
-        </div>
+        {valueCell('metal', 'Materials', preview.payload.materials.join(', ') || '—', 'From metal and purity')}
         <div className="md:col-span-2">
           <span className="form-label">Additional tags</span>
           <p className="text-[0.7rem] mb-1" style={{ color: 'var(--color-on-surface-variant)' }}>
@@ -493,77 +522,62 @@ export default function EtsyProductPanel({
             </button>
           </div>
         </div>
-        <div>
-          <span className="form-label">When made</span>
-          <p>
-            {preview.payload.whenMade}
-            {preview.payload.whenMadeUsedFallback ? ' (fallback)' : ''}
-          </p>
-        </div>
-        {isLengthBearing && (
-          <div>
-            <span className="form-label">Length</span>
-            {preview.structuredProperties?.length ? (
-              <p>{preview.structuredProperties.length} <span style={{ color: 'var(--color-on-surface-variant)' }}>· pushes on sync</span></p>
-            ) : (
-              <p style={{ color: 'var(--color-on-surface-variant)' }}>No length set — nothing to push</p>
-            )}
-          </div>
+        {valueCell(
+          'item_year',
+          'When made',
+          `${preview.payload.whenMade}${preview.payload.whenMadeUsedFallback ? ' (fallback)' : ''}`,
+          fields?.item_year ? `From the item year (${fields.item_year})` : 'No item year set — Etsy gets the vintage fallback',
         )}
-        {isRing && (
-          <div>
-            <span className="form-label">Ring size</span>
-            {preview.structuredProperties?.ringSize ? (
-              <p>{preview.structuredProperties.ringSize} (US/CA) <span style={{ color: 'var(--color-on-surface-variant)' }}>· pushes on sync</span></p>
-            ) : (
-              <p style={{ color: 'var(--color-on-surface-variant)' }}>No size in the length field — nothing to push</p>
-            )}
-          </div>
+        {isLengthBearing && valueCell(
+          'length',
+          'Length',
+          preview.structuredProperties?.length
+            ? <>{preview.structuredProperties.length} <span style={{ color: 'var(--color-on-surface-variant)' }}>· pushes on sync</span></>
+            : 'No length set — nothing to push',
+        )}
+        {isRing && valueCell(
+          'length',
+          'Ring size',
+          preview.structuredProperties?.ringSize
+            ? <>{preview.structuredProperties.ringSize} (US/CA) <span style={{ color: 'var(--color-on-surface-variant)' }}>· pushes on sync</span></>
+            : 'No size in the length field — nothing to push',
         )}
         <div className="md:col-span-2">
           <span className="form-label">Category</span>
-          <p>
-            {preview.payload.taxonomyPath ?? '—'}
+          <div className="flex flex-wrap items-center gap-2">
+            <span>{preview.payload.taxonomyPath ?? '—'}</span>
             {preview.payload.taxonomyIsOverride && (
-              <span className="ml-2 text-[0.65rem] font-bold uppercase tracking-wide" style={{ color: 'var(--color-primary)' }}>Manually selected</span>
+              <span className="text-[0.65rem] font-bold uppercase tracking-wide" style={{ color: 'var(--color-primary)' }}>Manually selected</span>
             )}
             {preview.payload.taxonomyIsApproximate && (
-              <span className="ml-2 text-[0.65rem] font-bold uppercase tracking-wide" style={{ color: '#a9760a' }}>Closest match — review</span>
+              <span className="text-[0.65rem] font-bold uppercase tracking-wide" style={{ color: '#a9760a' }}>Closest match — review</span>
             )}
-          </p>
-          {!categoryPickerOpen ? (
-            <div className="mt-1 flex flex-wrap gap-2">
-              <button type="button" onClick={() => void openCategoryPicker()} className="outline-button text-xs">
-                Choose exact category…
+            {!categoryPickerOpen && (
+              <PencilButton label="Change Etsy category" onClick={() => void openCategoryPicker()} disabled={actionsBusy} />
+            )}
+            {!categoryPickerOpen && preview.payload.taxonomyIsOverride && (
+              <button type="button" onClick={() => void saveCategory(null, null)} disabled={actionsBusy} className="outline-button text-xs">
+                {savingCategory ? 'Saving…' : 'Reset to automatic'}
               </button>
-              {preview.payload.taxonomyIsOverride && (
-                <button type="button" onClick={() => void saveCategory(null, null)} disabled={savingCategory} className="outline-button text-xs">
-                  Reset to automatic
-                </button>
-              )}
+            )}
+          </div>
+          {categoryPickerOpen && loadingTaxonomy && (
+            <p role="status" className="mt-2 text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>Loading Etsy categories…</p>
+          )}
+          {categoryPickerOpen && taxonomyLoadError && (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <p className="text-xs" role="alert" style={{ color: 'var(--color-error)' }}>{taxonomyLoadError}</p>
+              <button type="button" onClick={() => setCategoryPickerOpen(false)} className="outline-button text-xs">Close</button>
             </div>
-          ) : (
-            <div className="mt-2 flex flex-col gap-2 border p-3" style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-lowest)' }}>
-              {loadingTaxonomy && <p className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>Loading Etsy&apos;s full category list…</p>}
-              {taxonomyLoadError && <p className="text-xs" style={{ color: 'var(--color-error)' }}>{taxonomyLoadError}</p>}
-              {taxonomyLeaves && (
-                <ComboboxInput
-                  value={categoryInput}
-                  onChange={setCategoryInput}
-                  options={taxonomyLeaves.map((leaf) => leaf.path)}
-                  placeholder="Type to search Etsy categories…"
-                  disabled={savingCategory}
-                />
-              )}
-              <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => setCategoryPickerOpen(false)} disabled={savingCategory} className="outline-button text-xs">
-                  Cancel
-                </button>
-                <button type="button" onClick={confirmCategorySelection} disabled={savingCategory || !taxonomyLeaves} className="gold-button text-xs">
-                  {savingCategory ? 'Saving…' : 'Use this category'}
-                </button>
-              </div>
-            </div>
+          )}
+          {categoryPickerOpen && taxonomyLeaves && (
+            <EtsyCategoryDropdown
+              leaves={taxonomyLeaves}
+              selectedPath={preview.payload.taxonomyPath ?? null}
+              onSelect={(leaf) => void saveCategory(leaf.id, leaf.path)}
+              onCancel={() => setCategoryPickerOpen(false)}
+              disabled={savingCategory}
+            />
           )}
         </div>
         <div>
@@ -579,7 +593,7 @@ export default function EtsyProductPanel({
       )}
 
       <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={() => void handleRefreshClick()} disabled={loading || syncing} className="outline-button text-sm">
+        <button type="button" onClick={() => void handleRefreshClick()} disabled={loading || syncing || fieldEditor.saving} className="outline-button text-sm">
           Refresh Preview
         </button>
         {alreadyListed && (
@@ -588,11 +602,11 @@ export default function EtsyProductPanel({
           </button>
         )}
         {!alreadyListed ? (
-          <button type="button" onClick={() => void runSyncLoop('publish')} disabled={!preview.eligible || syncing} className="gold-button text-sm disabled:opacity-50">
+          <button type="button" onClick={() => void runSyncLoop('publish')} disabled={!preview.eligible || syncing || fieldEditor.saving} className="gold-button text-sm disabled:opacity-50">
             {syncing ? 'Syncing…' : 'Sync to Etsy'}
           </button>
         ) : (
-          <button type="button" onClick={() => void runSyncLoop('update')} disabled={syncing} className="gold-button text-sm">
+          <button type="button" onClick={() => void runSyncLoop('update')} disabled={syncing || fieldEditor.saving} className="gold-button text-sm">
             {syncing ? 'Syncing…' : 'Sync Updates'}
           </button>
         )}

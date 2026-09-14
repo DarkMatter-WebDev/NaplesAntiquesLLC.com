@@ -219,6 +219,8 @@ export type ImageSyncOp =
   | { type: 'delete'; row: EtsyListingImageRow }
   | { type: 'rerank'; row: EtsyListingImageRow; sourceUrl: string; sourceKey: string; newRank: number };
 
+export type ImageUploadOp = Extract<ImageSyncOp, { type: 'upload' }>;
+
 export function planImageDiff(productImageUrls: string[], existingRows: EtsyListingImageRow[]): ImageSyncOp[] {
   const desired = productImageUrls.slice(0, ETSY_MAX_IMAGES).map((url, index) => ({
     sourceUrl: url,
@@ -228,7 +230,13 @@ export function planImageDiff(productImageUrls: string[], existingRows: EtsyList
   const byKey = new Map(existingRows.map((row) => [row.source_key, row]));
   const desiredKeys = new Set(desired.map((entry) => entry.sourceKey));
 
-  const ops: ImageSyncOp[] = [];
+  // Deletes run FIRST (2026-09-13): removing the photos that left the product
+  // before uploading their replacements keeps the listing under Etsy's
+  // per-listing cap and lets each upload land at its intended rank instead of
+  // being shifted by images that are about to go.
+  const ops: ImageSyncOp[] = existingRows
+    .filter((row) => !desiredKeys.has(row.source_key))
+    .map((row): ImageSyncOp => ({ type: 'delete', row }));
   for (const entry of desired) {
     const existing = byKey.get(entry.sourceKey);
     if (!existing) {
@@ -237,17 +245,74 @@ export function planImageDiff(productImageUrls: string[], existingRows: EtsyList
       ops.push({ type: 'rerank', row: existing, sourceUrl: entry.sourceUrl, sourceKey: entry.sourceKey, newRank: entry.rank });
     }
   }
-  for (const row of existingRows) {
-    if (!desiredKeys.has(row.source_key)) ops.push({ type: 'delete', row });
-  }
   return ops;
 }
 
 /**
+ * Trust but verify (2026-09-13): split our checkpoint rows into those whose
+ * Etsy image is still on the listing and those Etsy no longer has. A missing
+ * row means that photo is NOT on Etsy — the adoption bug below left rows
+ * pointing at deleted images (inv #33 on 2026-09-11, #82 on 2026-07-10), and
+ * a photo removed directly on etsy.com does the same — so the caller drops the
+ * row and the photo uploads again. When Etsy reports no images at all, nothing
+ * is treated as missing: a wrong empty answer must never trigger a full
+ * duplicate re-upload of every photo.
+ */
+export function partitionRowsByLiveImages(
+  rows: EtsyListingImageRow[],
+  liveImages: EtsyListingImageApi[],
+): { present: EtsyListingImageRow[]; missing: EtsyListingImageRow[] } {
+  if (liveImages.length === 0) return { present: rows, missing: [] };
+  const liveIds = new Set(liveImages.map((image) => image.listing_image_id));
+  return {
+    present: rows.filter((row) => liveIds.has(row.etsy_listing_image_id)),
+    missing: rows.filter((row) => !liveIds.has(row.etsy_listing_image_id)),
+  };
+}
+
+/**
+ * Crash-window adoption, made safe (2026-09-13). An upload that reached Etsy
+ * but died before its checkpoint row was written leaves an image NO row tracks
+ * at the planned rank — adopt that instead of uploading a duplicate. An image
+ * a row DOES track belongs to a different photo (usually one this same pass is
+ * about to delete or re-rank). Adopting those was the bug: the new photos were
+ * recorded as already uploaded, then the old images they pointed at were
+ * deleted, so the listing silently lost photos and every later sync saw
+ * nothing to do (inv #33: 2 of 7 photos on Etsy; #82: 7 of 10).
+ */
+export function planImageAdoptions(
+  ops: ImageSyncOp[],
+  liveImages: EtsyListingImageApi[],
+  trackedImageIds: ReadonlySet<number>,
+): { adoptions: Array<{ op: ImageUploadOp; image: EtsyListingImageApi }>; remaining: ImageSyncOp[] } {
+  const untrackedByRank = new Map<number, EtsyListingImageApi>();
+  for (const image of liveImages) {
+    if (!trackedImageIds.has(image.listing_image_id) && !untrackedByRank.has(image.rank)) {
+      untrackedByRank.set(image.rank, image);
+    }
+  }
+  const adoptions: Array<{ op: ImageUploadOp; image: EtsyListingImageApi }> = [];
+  const remaining: ImageSyncOp[] = [];
+  for (const op of ops) {
+    if (op.type === 'upload') {
+      const image = untrackedByRank.get(op.rank);
+      if (image) {
+        adoptions.push({ op, image });
+        untrackedByRank.delete(op.rank);
+        continue;
+      }
+    }
+    remaining.push(op);
+  }
+  return { adoptions, remaining };
+}
+
+/**
  * Crash-window reconciliation (etsy-sync-plan/05-image-pipeline.md,
- * 11-error-handling.md): before uploading, check whether Etsy already has an
- * image at a planned rank (uploaded in a prior invocation that died before its
- * DB row was written) and adopt it instead of uploading a duplicate.
+ * 11-error-handling.md): before uploading, adopt an image Etsy already has at
+ * a planned rank that no checkpoint row tracks (uploaded in a prior invocation
+ * that died before its row was written) instead of uploading a duplicate. See
+ * `planImageAdoptions` for why tracked images are never adopted.
  */
 export async function reconcileMissingImageRows(params: {
   service: SupabaseClient;
@@ -255,32 +320,28 @@ export async function reconcileMissingImageRows(params: {
   listingId: number;
   accessToken: string;
   ops: ImageSyncOp[];
+  /** Etsy's current images when the caller already fetched them; fetched here otherwise. */
+  liveImages?: EtsyListingImageApi[];
+  /** Etsy image ids our checkpoint rows point at — never adoptable. */
+  trackedImageIds: ReadonlySet<number>;
 }): Promise<ImageSyncOp[]> {
   const hasUpload = params.ops.some((op) => op.type === 'upload');
   if (!hasUpload) return params.ops;
 
-  const live = await fetchEtsyListingImages({ listingId: params.listingId, accessToken: params.accessToken });
+  const live = params.liveImages ?? (await fetchEtsyListingImages({ listingId: params.listingId, accessToken: params.accessToken }));
   if (live.length === 0) return params.ops;
-  const liveByRank = new Map(live.map((image) => [image.rank, image]));
 
-  const remaining: ImageSyncOp[] = [];
-  for (const op of params.ops) {
-    if (op.type === 'upload') {
-      const adopt = liveByRank.get(op.rank);
-      if (adopt) {
-        await insertListingImage(params.service, {
-          product_id: params.productId,
-          etsy_listing_id: params.listingId,
-          source_url: op.sourceUrl,
-          source_key: op.sourceKey,
-          bytes_sha256: null,
-          etsy_listing_image_id: adopt.listing_image_id,
-          rank: op.rank,
-        });
-        continue;
-      }
-    }
-    remaining.push(op);
+  const { adoptions, remaining } = planImageAdoptions(params.ops, live, params.trackedImageIds);
+  for (const { op, image } of adoptions) {
+    await insertListingImage(params.service, {
+      product_id: params.productId,
+      etsy_listing_id: params.listingId,
+      source_url: op.sourceUrl,
+      source_key: op.sourceKey,
+      bytes_sha256: null,
+      etsy_listing_image_id: image.listing_image_id,
+      rank: op.rank,
+    });
   }
   return remaining;
 }

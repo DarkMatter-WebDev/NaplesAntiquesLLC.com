@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   EDITABLE_PRODUCT_FIELDS,
+  applyFieldPatchToEditorState,
   normalizeProductFieldEdits,
   rebuildInternalTags,
   reviewProductFields,
@@ -154,5 +155,76 @@ describe('reviewProductFields', () => {
       metal_variant: 'silver',
       product_type: 'Necklace',
     });
+  });
+});
+
+// A pencil edit in the Etsy/eBay panel inside the OPEN listing editor already
+// wrote the product; applyFieldPatchToEditorState copies it into the drawer's
+// state so the drawer's Save (which writes every field, and type/chain/length
+// from their own inputs) cannot put the old value back.
+describe('applyFieldPatchToEditorState', () => {
+  function drawer(overrides: Record<string, unknown> = {}) {
+    return {
+      editing: {
+        id: 'nej-12',
+        title: 'Unsaved new title',
+        quantity: 1,
+        brand: null as string | null,
+        length: '20',
+        chain_type: 'Cuban link' as string | null,
+        product_type: 'Necklace',
+        jewelry_type: 'Necklace',
+        purity: 14 as number | null,
+        metal_variant: 'yellow_gold',
+        weight_grams: 10 as number | null,
+        gram_weight: 10 as number | null,
+        tags: ['jt:Necklace', 'ct:Cuban link', 'len:20', 'my unsaved tag'],
+        ...overrides,
+      },
+      jewelryTypeInput: 'Necklace',
+      chainTypeInput: 'Cuban link',
+      lengthInput: '20',
+    };
+  }
+
+  it('updates only the saved column and keeps every other unsaved edit', () => {
+    const next = applyFieldPatchToEditorState(drawer(), { quantity: 3 });
+    expect(next.editing.quantity).toBe(3);
+    expect(next.editing.title).toBe('Unsaved new title');
+    expect(next.editing.tags).toEqual(['jt:Necklace', 'ct:Cuban link', 'len:20', 'my unsaved tag']);
+    expect(next.lengthInput).toBe('20');
+    expect(next.chainTypeInput).toBe('Cuban link');
+    expect(next.jewelryTypeInput).toBe('Necklace');
+  });
+
+  it('moves a saved length into the length input the drawer Save actually writes', () => {
+    const next = applyFieldPatchToEditorState(drawer(), { length: '18.5', tags: ['jt:Necklace', 'ct:Cuban link', 'len:18.5'] });
+    expect(next.editing.length).toBe('18.5');
+    expect(next.lengthInput).toBe('18.5');
+    // tags are rebuilt by Save from the inputs; the visible tags keep unsaved edits
+    expect(next.editing.tags).toContain('my unsaved tag');
+  });
+
+  it('carries a type change into all three inputs, including a cleared chain type', () => {
+    const next = applyFieldPatchToEditorState(drawer(), { product_type: 'Pendant', jewelry_type: 'Pendant', chain_type: null, tags: [] });
+    expect(next.jewelryTypeInput).toBe('Pendant');
+    expect(next.chainTypeInput).toBe('');
+    expect(next.editing.product_type).toBe('Pendant');
+    expect(next.editing.jewelry_type).toBe('Pendant');
+    expect(next.editing.chain_type).toBeNull();
+    expect(next.lengthInput).toBe('20');
+  });
+
+  it('writes weight to both columns and clears a value to null', () => {
+    const next = applyFieldPatchToEditorState(drawer(), { weight_grams: 13.85, gram_weight: 13.85, brand: null });
+    expect(next.editing.weight_grams).toBe(13.85);
+    expect(next.editing.gram_weight).toBe(13.85);
+    expect(next.editing.brand).toBeNull();
+  });
+
+  it('leaves the editing object untouched when the patch has no mirrored column', () => {
+    const state = drawer();
+    const next = applyFieldPatchToEditorState(state, { tags: ['jt:Necklace'] });
+    expect(next.editing).toBe(state.editing);
   });
 });
