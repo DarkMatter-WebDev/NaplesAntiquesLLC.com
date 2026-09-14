@@ -3044,6 +3044,30 @@ instead. The one harmless nit, only if a deploy is already happening: the
 canonical is `https://naplesestatejewelry.com/` (trailing slash); Google's own
 example uses the slash. Zero evidence it matters.
 
+✅ **2026-09-14 (owner: "build option 1").** The SERP still showed the bare domain.
+- **Changes (STAGED):** `WebSite.url` gets the trailing slash, `@id`
+  `…/#website`, and `publisher → {@id: …/#business}` (the JewelryStore). The
+  builder and IDs live in `lib/site-ld.ts`; the layout imports
+  `BUSINESS_ENTITY_ID`.
+- **Owner decisions the same day:**
+  - ⛔ No slogan-style name ("Naples Estate Jewelry - #1 Jewelry Buyers").
+    Google's guideline is "a concise, commonly-recognized name", and it
+    cross-checks the GBP name (which must never be keyworded).
+  - `alternateName: ["NaplesEstateJewelry.com"]` was first held as a last
+    resort. **Later the same day the owner agreed to add it now, in the same
+    change.** Google only uses it when it isn't confident in `name`, and that
+    is today's state. It's the logo/splash wordmark, and mixed case, so Google
+    doesn't read it as a plain domain preference.
+  - ⚠️ This is a WEBSITE site-name fallback. The JewelryStore entity keeps its
+    no-alternateName rule (business aliases still muddy the one-name signal).
+  - Trade-off accepted: Google may show "NaplesEstateJewelry.com" for a while
+    before it trusts "Naples Estate Jewelry". Removing the alternate later is
+    one deploy plus a re-crawl.
+- **Recognition work:** the name used consistently in reviews, posts and
+  citations is the lever Google actually weighs.
+- **After the deploy:** request indexing for the homepage in GSC so Google
+  re-reads the entity sooner.
+
 ⚠️ SUPERSEDED 2026-09-03: the snippet's run-together
 `(239) 404-8505info@naplesestatejewelry.com` was NOT structured data — it was
 the footer's two inline anchors shipping with no whitespace between them

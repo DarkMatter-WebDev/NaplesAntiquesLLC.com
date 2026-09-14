@@ -13,6 +13,7 @@ import RouteProgressBar from '@/components/layout/RouteProgressBar';
 import ViewportHeightToken from '@/components/layout/ViewportHeightToken';
 import ScriptTagWarningGuard from '@/components/shop/ScriptTagWarningGuard';
 import { jsonLdHtml } from '@/lib/json-ld';
+import { BUSINESS_ENTITY_ID } from '@/lib/site-ld';
 import {
   GEO,
   mapsUrl,
@@ -37,7 +38,8 @@ interface Props {
 const buildJsonLd = (schedule: StoreHoursSchedule) => ({
   '@context': 'https://schema.org',
   '@type': 'JewelryStore',
-  '@id': 'https://naplesestatejewelry.com/#business',
+  // Shared with the homepage WebSite entity's `publisher` (lib/site-ld.ts).
+  '@id': BUSINESS_ENTITY_ID,
   name: 'Naples Estate Jewelry',
   // No `alternateName` on purpose (owner, 2026-09-02: "drop the aliases").
   // "Naples Jewelry Buyers" / "Naples Gold & Silver Buyer" were old trading

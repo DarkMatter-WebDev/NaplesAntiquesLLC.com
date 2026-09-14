@@ -11,7 +11,14 @@ A read-only sweep on 2026-09-14 checked every open-looking item in this file
 against `CHANGELOG.md` / `CURRENT_STATUS.md`. **The 09-14 batch is DEPLOYED
 (`main@ee231dc`, 9:19 AM ET) and live-verified:** price-push warning, Etsy/eBay
 request timeouts, Deep Field batch pin, Netlify Node 22, "30-minute checks"
-card, homepage `loading.tsx` removal. Nothing is staged. **Older sections below still carry STAGED / DEPLOY /
+card, homepage `loading.tsx` removal. `main@beaf772` (Instagram 14-day
+window) is also DEPLOYED. **STAGED 09-14 (no SQL):** Google site-name
+`WebSite` entity tightened (`lib/site-ld.ts`: trailing-slash url, `@id`,
+`publisher` → JewelryStore, `alternateName: ["NaplesEstateJewelry.com"]`).
+- ◻ After that push: GSC → URL Inspection → Request indexing for `/`.
+- ◻ Recheck the brand SERP site-name line every ~2 weeks. It should become
+  "Naples Estate Jewelry" or "NaplesEstateJewelry.com", not the lowercase domain.
+- ⛔ Never a slogan name. **Older sections below still carry STAGED / DEPLOY /
 ◻ markers that are done or superseded; treat anything not listed here as
 history.**
 

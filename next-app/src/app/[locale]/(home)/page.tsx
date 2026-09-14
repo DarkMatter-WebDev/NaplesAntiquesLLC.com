@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { pageMetadata } from '@/lib/seo';
 import { jsonLdHtml } from '@/lib/json-ld';
+import { buildWebSiteJsonLd } from '@/lib/site-ld';
 import { cityLine, mapsUrl, phoneHours, streetLine } from '@/lib/business-location';
 import { VISIT_ANCHOR_ID } from '@/lib/home-anchors';
 import Image from 'next/image';
@@ -82,33 +83,12 @@ export default async function HomePage({ params }: Props) {
   // Admin-editable announcement strip; null when switched off or empty.
   const banner = resolveHomeBanner(await getHomeBanner(), isEs);
 
-  // Google prints a site name on its own line above the search result. Without a
-  // WebSite entity it falls back to the bare domain — which is why results read
-  // "naplesestatejewelry.com" rather than the brand. This is the documented
-  // mechanism for that line, and it is separate from the <title>.
-  //
-  // HOMEPAGE ONLY, per Google's spec: the WebSite entity belongs on the site
-  // root, not on every page. The sitewide JewelryStore entity in
-  // [locale]/layout.tsx is a different thing and stays where it is.
-  //
-  // ⚠️ Google re-crawls and re-evaluates this on its own schedule, so expect
-  // days-to-weeks before the displayed site name changes. It is not broken if
-  // the result looks identical the day after deploying.
-  // ⚠️ The brand is "Naples Estate Jewelry" — no "Co" (owner, 2026-08-15). An
-  // `alternateName: 'Naples Estate Jewelry Co'` was briefly set here and was
-  // removed: nobody uses that form, and Google cross-checks this against the
-  // JewelryStore schema, the header wordmark, and the Google Business Profile
-  // when choosing a site name. Disagreement among them is a reason it falls back
-  // to showing the bare domain, which is the problem this entity exists to fix.
-  // Do not reintroduce an alternateName unless the business genuinely trades
-  // under a second name. ("Naples Antiques LLC" is the legal entity, not a
-  // trading name, and must not go here.)
-  const webSiteLd = {
-    '@context': 'https://schema.org',
-    '@type': 'WebSite',
-    name: 'Naples Estate Jewelry',
-    url: 'https://naplesestatejewelry.com',
-  };
+  // Google's site-name line (above each result) comes from this WebSite entity.
+  // HOMEPAGE ONLY, per Google's spec — never move it into [locale]/layout.tsx.
+  // Shape, the one-name rule and the alternateName last-resort note live in
+  // lib/site-ld.ts. ⚠️ Google re-evaluates on its own schedule (days to weeks);
+  // an unchanged result the day after a deploy is not a fault.
+  const webSiteLd = buildWebSiteJsonLd();
 
   return (
     <>

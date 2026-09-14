@@ -8,11 +8,17 @@
 
 **Read this, then `TASKS.md`.**
 
-📋 **09-14 (evening) — STAGED (no SQL): Instagram token refresh window 7 → 14
-days** (`lib/instagram/auth.ts:26`), so the weekly job gets two tries before
-expiry. Push before Mon 09-21 12:15Z for that to apply to the current token
-(expires 09-30). Gate: tsc 0 · lint 0 · 1365/1365 · build 0. `CHANGELOG.md`
-2026-09-14 (evening).
+📋 **09-14 (late) — STAGED (no SQL): Google site-name `WebSite` entity tightened**
+(`lib/site-ld.ts`: trailing-slash `url`, `@id`, `publisher` → JewelryStore,
+`alternateName: ["NaplesEstateJewelry.com"]` as the fallback site name).
+The WebSite JSON-LD already existed since 08-15; Google shows the bare domain
+because it isn't confident in a descriptive name yet. After the push, request
+indexing for `/` in GSC. Gate: tsc 0 · lint 0 · 1368/1368 · build 0.
+`CHANGELOG.md` 2026-09-14 (evening, late).
+
+🟢 **09-14 (evening) — DEPLOYED `main@beaf772` (2:07 PM ET): Instagram token
+refresh window 7 → 14 days** (`lib/instagram/auth.ts:26`). Proof comes with the
+Mon 09-21 12:15Z `token_refresh` row (token expires 09-30).
 
 🟢 **09-14 — DEPLOYED `main@ee231dc` (9:19 AM ET) and live-verified** (Node
 22 in the build log; phone first paint 860 ms median vs 1.06–1.12 s before; both

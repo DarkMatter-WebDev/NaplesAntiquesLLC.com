@@ -1,6 +1,54 @@
 
 # Changelog
 
+## 2026-09-14 (evening, late) — `main@beaf772` live; Google site-name entity tightened (STAGED)
+
+**Deploy check.** Netlify deploy `6aa837ea521019000956e91c` (`main@beaf772`)
+published at 2:07 PM ET; the homepage returns 200. The Instagram 14-day window
+is server-side and can't be observed from outside. The first real proof is the
+`instagram_sync_log` `token_refresh` row after Mon 09-21 12:15Z (expected
+"refreshed", 9 days before expiry).
+
+**Site name investigation (owner: "falling back to the bare domain … because
+it has no website JSON-LD").**
+- **The premise was wrong.** The live `/` and `/es` HTML already carry `WebSite`
+  JSON-LD (`name` "Naples Estate Jewelry", `url` https://naplesestatejewelry.com),
+  shipped 2026-08-15. `og:site_name` is present and the title is brand-first.
+- The Google SERP for "naples estate jewelry" (09-14) still shows
+  `naplesestatejewelry.com` as the site name.
+- **Google's site-name doc** (developers.google.com/search/docs/appearance/site-names):
+  - `url` should be the canonical home page "https://example.com/".
+  - The name should be "a concise, commonly-recognized name".
+  - "Avoid using a generic name", e.g. "Best Dentists In Iowa".
+  - When not confident, Google falls back to the domain.
+  - `alternateName` fallbacks are its recovery lever.
+- **Diagnosis:** a descriptive-sounding name on a young `.com` (Change of
+  Address Aug 2), not missing markup.
+- **Options explained to the owner:**
+  - A slogan name ("#1 Jewelry Buyers") rejected: against the guideline, and
+    inconsistent with the GBP name.
+  - `alternateName` "NaplesEstateJewelry.com" kept as last resort only.
+
+**Built (option 1, owner-approved, STAGED).**
+- New `src/lib/site-ld.ts`: `SITE_HOME_URL` (trailing slash),
+  `BUSINESS_ENTITY_ID`, `WEBSITE_ENTITY_ID`, `buildWebSiteJsonLd()`. The
+  `WebSite` entity now has `@id` `…/#website`, the slash `url`, and `publisher`
+  → `…/#business`.
+- `(home)/page.tsx` uses the builder (homepage only).
+- `[locale]/layout.tsx` JewelryStore `@id` imports `BUSINESS_ENTITY_ID`, so the
+  link can't drift.
+- **Follow-up the same evening (owner agreed): `alternateName:
+  ["NaplesEstateJewelry.com"]` added now instead of waiting for October.**
+  - It's the logo/splash wordmark, mixed case, used only when Google isn't
+    confident in "Naples Estate Jewelry".
+  - The worst case replaces the lowercase bare domain with the wordmark.
+  - The JewelryStore entity still has no alternateName.
+- Tests: `lib/__tests__/site-ld.test.ts` (3) cover the slash url, the brand
+  name plus the wordmark as the only fallback (no slogan), and the `@id` link.
+- **Gate:** tsc 0 · lint 0 · vitest 1368/1368 (139 files) · build 0 (no
+  `.next/cache/turbopack`). Built `en.html`/`es.html` checked (see TASKS for
+  the post-deploy steps).
+
 ## 2026-09-14 (night, later) — Yelp: sterling flatware photo added as slideshow #3 (owner-requested)
 
 - **Source.** A customer photo from Judith Lam's Google review: a Waterford
