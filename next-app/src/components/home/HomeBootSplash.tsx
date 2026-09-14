@@ -3,15 +3,18 @@
 import { useEffect, useState } from 'react';
 
 // Branded splash that is server-rendered into the homepage HTML, so it paints on
-// the very first frame — including cold mobile/tablet loads where the static page
-// arrives before any JS runs and the route-level loading.tsx (a soft-navigation
-// Suspense fallback) never shows. It fades out the moment the app hydrates; a CSS
-// failsafe animation (see globals.css) also hides it if hydration is slow or never
-// happens, so it can never get stuck over the page.
+// the very first frame of a cold load, before any JS runs. It fades out the moment
+// the app hydrates; a CSS failsafe animation (see globals.css) also hides it if
+// hydration is slow or never happens, so it can never get stuck over the page.
 //
-// Uses the same visuals as SiteLoadingScreen (the `site-loading-*` classes) for a
-// consistent look, but renders a <div> (not a second <h1>/<main>) to avoid
-// duplicate landmarks/headings on the homepage.
+// ⛔ Do NOT add a `(home)/loading.tsx` back. It was deleted 2026-09-14: a route
+// loading boundary makes the prerendered HTML ship its fallback first and the
+// WHOLE page inside `<div hidden id="S:0">` until React's `$RC` swap, and Chrome
+// drew nothing until that swap — a ~1 s white screen on phones (replay A/B:
+// first paint 732 → 472 ms without it). This splash is the cold-load cover.
+//
+// Uses the `site-loading-*` classes for its look, but renders a <div> (not an
+// <h1>/<main>) to avoid duplicate landmarks/headings on the homepage.
 export default function HomeBootSplash() {
   const [hidden, setHidden] = useState(false);
   const [removed, setRemoved] = useState(false);

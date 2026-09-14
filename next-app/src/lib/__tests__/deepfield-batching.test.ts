@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chunkByImageBudget } from '@/lib/deepfield/sync';
+import { IMAGE_BUDGET_PER_REQUEST, MAX_PRODUCTS_PER_REQUEST, chunkByImageBudget } from '@/lib/deepfield/sync';
 import type { DeepFieldProductPayload } from '@/lib/deepfield/payload';
 
 function p(id: string, images: number): DeepFieldProductPayload {
@@ -114,5 +114,16 @@ describe('chunkByImageBudget', () => {
     }
     expectSaturated(batches, 18, 3);
     expect(batches.flat()).toHaveLength(spread.length);
+  });
+});
+
+// Every test above passes explicit budgets, so nothing pinned the PRODUCTION
+// values — raising 30 to 300 broke no test. These are gateway-safe numbers
+// (see the rationale above IMAGE_BUDGET_PER_REQUEST in lib/deepfield/sync.ts);
+// change them only with a measured reason and update this pin with it.
+describe('production batching defaults', () => {
+  it('pins the gateway-safe production budget', () => {
+    expect(IMAGE_BUDGET_PER_REQUEST).toBe(30);
+    expect(MAX_PRODUCTS_PER_REQUEST).toBe(3);
   });
 });

@@ -1,7 +1,8 @@
 import 'server-only';
 import crypto from 'node:crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { ETSY_API_BASE, ETSY_OAUTH_BASE, EtsyApiError, etsyFetch, requireEtsyApiKey, requireEtsyApiKeyHeader } from './client';
+import { ETSY_API_BASE, ETSY_OAUTH_BASE, EtsyApiError, etsyFetch, requireEtsyApiKey, requireEtsyApiKeyHeader, fetchWithEtsyTimeout } from './client';
+import { MARKETPLACE_TIMEOUT_MS } from '@/lib/marketplace-timeout';
 import { getConnection, updateConnection, type EtsyConnectionRow } from './store';
 
 // OAuth 2.0 + PKCE. See etsy-sync-plan/04-oauth-and-secrets.md.
@@ -90,12 +91,12 @@ async function postTokenEndpoint(body: Record<string, string>): Promise<TokenRes
   // endpoint" needs x-api-key in keystring:shared_secret form — sent here too
   // even though this is the "public" token endpoint, since nothing in the
   // spec exempts it and an extra correct header is harmless either way.
-  const res = await fetch(`${ETSY_API_BASE}/v3/public/oauth/token`, {
+  const res = await fetchWithEtsyTimeout(`${ETSY_API_BASE}/v3/public/oauth/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': requireEtsyApiKeyHeader() },
     body: JSON.stringify(body),
     cache: 'no-store',
-  });
+  }, MARKETPLACE_TIMEOUT_MS.token, { method: 'POST', path: '/v3/public/oauth/token' });
   const data = (await res.json().catch(() => null)) as (TokenResponse & { error?: string; error_description?: string }) | null;
   if (!res.ok || !data?.access_token) {
     throw new EtsyApiError({

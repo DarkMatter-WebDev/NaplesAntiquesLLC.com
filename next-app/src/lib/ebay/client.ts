@@ -1,6 +1,7 @@
 import 'server-only';
 import { XMLParser } from 'fast-xml-parser';
 import type { EbayOrder } from '@/lib/marketplace-sales';
+import { MARKETPLACE_TIMEOUT_MS, isFetchTimeoutError, timeoutLabel } from '@/lib/marketplace-timeout';
 
 // Fetch wrapper for eBay's REST APIs. Modeled on next-app/src/lib/etsy/client.ts's
 // shape (throttle + backoff + typed error + redacted logging) — never imports
@@ -181,6 +182,36 @@ function mapErrorResponse(status: number, body: EbayErrorEnvelope | null): EbayA
   });
 }
 
+/**
+ * A request that hit its time limit (see lib/marketplace-timeout.ts). Not
+ * retryable — the scheduled sweeps re-read on their next run — and never
+ * auth_expired/missing_scope, so it is logged per item, not as a dead connection.
+ */
+function ebayTimeoutError(method: string, path: string, timeoutMs: number): EbayApiError {
+  return new EbayApiError({
+    status: 0,
+    code: 'ebay_timeout',
+    operatorMessage: `eBay did not respond within ${timeoutLabel(timeoutMs)}. Try again in a minute.`,
+    retryable: false,
+    detail: [{ message: `${method} ${path.replace(/\?.*$/, '')}` }],
+  });
+}
+
+/** `fetch` with a time limit that surfaces as a typed ebay_timeout error. Used by every eBay call. */
+export async function fetchWithEbayTimeout(
+  input: string | URL,
+  init: RequestInit,
+  timeoutMs: number,
+  label: { method: string; path: string },
+): Promise<Response> {
+  try {
+    return await fetch(input, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+  } catch (err) {
+    if (isFetchTimeoutError(err)) throw ebayTimeoutError(label.method, label.path, timeoutMs);
+    throw err;
+  }
+}
+
 // Modest throttle (min-interval gate, not a true token bucket) — mirrors
 // etsy/client.ts. eBay's REST APIs don't document a hard per-second QPS cap
 // at this catalog's daily-quota scale (10-rate-limits-and-quotas.md), so this
@@ -206,6 +237,8 @@ export interface EbayRequestOptions {
   query?: Record<string, string | number | boolean | undefined | null>;
   contentLanguage?: boolean; // required by Sell Inventory write calls (Content-Language: en-US)
   maxRetries?: number;
+  /** Per-attempt time limit; default MARKETPLACE_TIMEOUT_MS.api. */
+  timeoutMs?: number;
 }
 
 export interface EbayResponse<T> {
@@ -227,6 +260,14 @@ function buildUrl(path: string, query?: EbayRequestOptions['query']): URL {
 export async function ebayFetch<T>(opts: EbayRequestOptions): Promise<EbayResponse<T>> {
   const url = buildUrl(opts.path, opts.query);
   const maxRetries = opts.maxRetries ?? 3;
+  const timeoutMs = opts.timeoutMs ?? MARKETPLACE_TIMEOUT_MS.api;
+  // A body read can also outlast the limit; that must surface as a timeout,
+  // never as silently-null data.
+  const readJson = async <R>(res: Response): Promise<R | null> =>
+    (await res.json().catch((err: unknown) => {
+      if (isFetchTimeoutError(err)) throw ebayTimeoutError(opts.method, opts.path, timeoutMs);
+      return null;
+    })) as R | null;
 
   // Accept-Language is required on every Sell Inventory API call (not just
   // writes) — GET calls (e.g. getOffers) have no request body, so
@@ -245,14 +286,15 @@ export async function ebayFetch<T>(opts: EbayRequestOptions): Promise<EbayRespon
   let attempt = 0;
   for (;;) {
     await throttle();
-    const res = await fetch(url, { method: opts.method, headers, body, cache: 'no-store' });
+    // Fresh limit per attempt, so a retried 429/5xx gets its own window.
+    const res = await fetchWithEbayTimeout(url, { method: opts.method, headers, body, cache: 'no-store' }, timeoutMs, { method: opts.method, path: opts.path });
 
     if (res.ok) {
-      const data = res.status === 204 ? (null as T) : ((await res.json().catch(() => null)) as T);
+      const data = res.status === 204 ? (null as T) : ((await readJson<T>(res)) as T);
       return { data, headers: res.headers };
     }
 
-    const parsedBody = (await res.json().catch(() => null)) as EbayErrorEnvelope | null;
+    const parsedBody = await readJson<EbayErrorEnvelope>(res);
     const error = mapErrorResponse(res.status, parsedBody);
     if (error.retryable && attempt < maxRetries) {
       const backoffMs = 2 ** attempt * 1000; // 1s -> 2s -> 4s
@@ -365,7 +407,7 @@ export async function ebayTradingGetItemStatus(accessToken: string, itemId: stri
 
   const body = `<?xml version="1.0" encoding="utf-8"?><GetItemRequest xmlns="urn:ebay:apis:eBLBaseComponents"><ItemID>${itemId}</ItemID><DetailLevel>ReturnAll</DetailLevel></GetItemRequest>`;
   await throttle();
-  const res = await fetch(EBAY_TRADING_API_URL, {
+  const res = await fetchWithEbayTimeout(EBAY_TRADING_API_URL, {
     method: 'POST',
     headers: {
       'X-EBAY-API-CALL-NAME': 'GetItem',
@@ -376,7 +418,7 @@ export async function ebayTradingGetItemStatus(accessToken: string, itemId: stri
     },
     body,
     cache: 'no-store',
-  });
+  }, MARKETPLACE_TIMEOUT_MS.api, { method: 'POST', path: '/ws/api.dll GetItem' });
   const parsed = parseTradingGetItemResponse(await res.text());
   if (res.ok && ['SUCCESS', 'WARNING'].includes(parsed.ack.toUpperCase()) && parsed.item) {
     return parsed.item;
@@ -408,7 +450,7 @@ export async function getApplicationToken(): Promise<string> {
     return cachedAppToken.token;
   }
 
-  const res = await fetch(EBAY_TOKEN_URL, {
+  const res = await fetchWithEbayTimeout(EBAY_TOKEN_URL, {
     method: 'POST',
     headers: {
       Authorization: basicAuthHeader(),
@@ -416,7 +458,7 @@ export async function getApplicationToken(): Promise<string> {
     },
     body: new URLSearchParams({ grant_type: 'client_credentials', scope: APP_TOKEN_SCOPE }).toString(),
     cache: 'no-store',
-  });
+  }, MARKETPLACE_TIMEOUT_MS.token, { method: 'POST', path: '/identity/v1/oauth2/token (application)' });
 
   const parsed = (await res.json().catch(() => null)) as
     | { access_token?: string; expires_in?: number; error?: string; error_description?: string }

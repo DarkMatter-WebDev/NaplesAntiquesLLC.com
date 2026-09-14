@@ -1,7 +1,8 @@
 import 'server-only';
 import crypto from 'node:crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { EBAY_AUTH_BASE, EBAY_TOKEN_URL, EbayApiError, basicAuthHeader, ebayFetch, requireEbayClientId } from './client';
+import { EBAY_AUTH_BASE, EBAY_TOKEN_URL, EbayApiError, basicAuthHeader, ebayFetch, requireEbayClientId, fetchWithEbayTimeout } from './client';
+import { MARKETPLACE_TIMEOUT_MS } from '@/lib/marketplace-timeout';
 import { getConnection, updateConnection, type EbayConnectionRow } from './store';
 
 // OAuth 2.0 authorization-code flow (NO PKCE — eBay requires a confidential
@@ -80,7 +81,7 @@ interface TokenResponse {
 }
 
 async function postTokenEndpoint(params: Record<string, string>): Promise<TokenResponse> {
-  const res = await fetch(EBAY_TOKEN_URL, {
+  const res = await fetchWithEbayTimeout(EBAY_TOKEN_URL, {
     method: 'POST',
     headers: {
       Authorization: basicAuthHeader(),
@@ -88,7 +89,7 @@ async function postTokenEndpoint(params: Record<string, string>): Promise<TokenR
     },
     body: new URLSearchParams(params).toString(),
     cache: 'no-store',
-  });
+  }, MARKETPLACE_TIMEOUT_MS.token, { method: 'POST', path: '/identity/v1/oauth2/token (user)' });
   const parsed = (await res.json().catch(() => null)) as (TokenResponse & { error?: string; error_description?: string }) | null;
   if (!res.ok || !parsed?.access_token) {
     const isInvalidGrant = parsed?.error === 'invalid_grant';

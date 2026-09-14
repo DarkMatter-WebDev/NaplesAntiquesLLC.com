@@ -4,6 +4,7 @@ import sharp from 'sharp';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getSiteUrl } from '@/lib/order-email-branding';
 import { etsyFetch, etsyUpload } from './client';
+import { MARKETPLACE_TIMEOUT_MS, isFetchTimeoutError, timeoutLabel } from '@/lib/marketplace-timeout';
 import { ETSY_MAX_IMAGES, resolveImageSourceKey } from './mapping';
 import { insertListingImage, type EtsyListingImageRow } from './store';
 
@@ -61,9 +62,18 @@ export function resolveImageUrl(url: string): string {
 
 export async function fetchImageBytes(url: string): Promise<Buffer> {
   const resolvedUrl = resolveImageUrl(url);
-  const res = await fetch(resolvedUrl, { cache: 'no-store' });
-  if (!res.ok) throw new Error(`Image fetch failed (${res.status}): ${resolvedUrl}`);
-  const arrayBuffer = await res.arrayBuffer();
+  let arrayBuffer: ArrayBuffer;
+  let res: Response;
+  try {
+    res = await fetch(resolvedUrl, { cache: 'no-store', signal: AbortSignal.timeout(MARKETPLACE_TIMEOUT_MS.upload) });
+    if (!res.ok) throw new Error(`Image fetch failed (${res.status}): ${resolvedUrl}`);
+    arrayBuffer = await res.arrayBuffer();
+  } catch (err) {
+    if (isFetchTimeoutError(err)) {
+      throw new Error(`Image fetch timed out after ${timeoutLabel(MARKETPLACE_TIMEOUT_MS.upload)}: ${resolvedUrl}`);
+    }
+    throw err;
+  }
   const buffer = Buffer.from(arrayBuffer);
   if (buffer.byteLength > MAX_UPLOAD_BYTES) {
     throw new Error(`Image exceeds the ${Math.round(MAX_UPLOAD_BYTES / (1024 * 1024))}MB upload cap: ${resolvedUrl}`);

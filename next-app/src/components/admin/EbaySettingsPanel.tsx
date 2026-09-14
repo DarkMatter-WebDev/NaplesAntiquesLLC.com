@@ -7,6 +7,7 @@ import {
   type PricePushCardCopy,
   type PricePushHealth,
 } from '@/lib/marketplace-price-push-health';
+import { describeStatusChecks, formatStatusCheckTime, type StatusCheckRow } from '@/lib/marketplace-status-checks';
 import { ADDRESS } from '@/lib/business-location';
 
 const PRICE_PUSH_TONE_COLOR: Record<PricePushCardCopy['tone'], string> = {
@@ -39,6 +40,7 @@ interface EbayStatusResponse {
     autoMarkSold?: boolean;
   };
   salesSync?: { scopeGranted: boolean; watchingSince: string | null };
+  statusChecks?: { lastCheck: StatusCheckRow | null; lastSales: StatusCheckRow | null };
   priceAutomation: {
     cronSecretConfigured: boolean;
     schedule: string;
@@ -341,6 +343,15 @@ export default function EbaySettingsPanel() {
         lastRunAtLabel: status.priceAutomation.lastRun
           ? new Date(status.priceAutomation.lastRun.createdAt).toLocaleString()
           : null,
+      })
+    : null;
+
+  // Heartbeat of the 30-minute sales sweep + status reconcile (red after 60 min).
+  const statusChecksCopy: PricePushCardCopy | null = status?.statusChecks
+    ? describeStatusChecks({
+        lastCheck: status.statusChecks.lastCheck,
+        lastSales: status.statusChecks.lastSales,
+        lastCheckAtLabel: status.statusChecks.lastCheck ? formatStatusCheckTime(status.statusChecks.lastCheck.createdAt) : null,
       })
     : null;
 
@@ -715,6 +726,23 @@ export default function EbaySettingsPanel() {
                 </button>
               </div>
             </div>
+
+            {statusChecksCopy && (
+              <div
+                className="flex items-start gap-3 border px-3 py-3 text-xs"
+                style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-low)' }}
+              >
+                <AppIcon
+                  name={statusChecksCopy.icon}
+                  style={{ fontSize: '18px', color: PRICE_PUSH_TONE_COLOR[statusChecksCopy.tone] }}
+                  aria-hidden="true"
+                />
+                <div>
+                  <p className="font-bold">30-minute checks</p>
+                  <p style={{ color: 'var(--color-on-surface-variant)' }}>{statusChecksCopy.text}</p>
+                </div>
+              </div>
+            )}
 
             {priceAutomationCopy && (
               <div

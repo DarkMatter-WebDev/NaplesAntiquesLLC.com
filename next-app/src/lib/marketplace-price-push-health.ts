@@ -7,11 +7,15 @@
  * "Ready for Daily at 11:45 UTC. No completed run has been recorded yet."
  * whenever no `scheduled_price_push` row was found. That is exactly the state a
  * shop is in when the cron is silently broken, and it read as reassurance — the
- * Netlify scheduled functions had never once invoked (zero `scheduled_price_push`
- * rows across 1,538 Etsy and 56,480 eBay log rows, and zero `scheduled_drip`
- * rows for the two social workers on the same schedule mechanism) and nothing in
- * the app said so. "Never ran" and "ran and is now stale" are both faults and
- * must look like faults.
+ * then-scheduler had never once invoked the push (zero `scheduled_price_push`
+ * rows across 1,538 Etsy and 56,480 eBay log rows) and nothing in the app said
+ * so. "Never ran" and "ran and is now stale" are both faults and must look like
+ * faults.
+ *
+ * Since 2026-09-07 the pushes fire from Supabase pg_cron (`nej-etsy-price-push`,
+ * `nej-ebay-price-push` in `supabase/scheduled-jobs-pg-cron-2026-09.sql`), the
+ * ONLY scheduler since 2026-09-13 — so a fault now points at the job's run
+ * history in the Supabase dashboard, never at Netlify.
  */
 
 /** Ordered by severity so a caller can pick an icon/colour without a lookup table. */
@@ -30,12 +34,16 @@ export type PricePushHealth =
 /**
  * Minutes of slack after a scheduled fire time before the run counts as missed.
  *
- * A push takes well under a minute, but Netlify does not promise to-the-second
- * scheduling and the run has to finish and write its log row. An hour is long
- * enough that a normal late start never flips the card to a fault, and short
- * enough that a genuinely dead cron is visible the same morning.
+ * A push takes well under a minute, but the run has to start, finish and write
+ * its log row. An hour is long enough that a normal late start never flips the
+ * card to a fault, and short enough that a genuinely dead cron is visible the
+ * same morning.
  */
 export const PRICE_PUSH_GRACE_MINUTES = 60;
+
+/** Where the owner reads what the scheduler actually did. Shared by both fault messages. */
+export const PRICE_PUSH_RUN_HISTORY_HINT =
+  "Check the job's run history in Supabase → Integrations → Cron.";
 
 /**
  * The most recent daily occurrence of `hour:minute` UTC strictly at or before
@@ -60,7 +68,7 @@ export function resolvePricePushHealth(params: {
   cronSecretConfigured: boolean;
   /** ISO timestamp of the newest `scheduled_price_push` log row, or null. */
   lastRunAt: string | null;
-  /** UTC hour the Netlify schedule fires (Etsy 11:15, eBay 11:45). */
+  /** UTC hour the pg_cron job fires (Etsy 11:15, eBay 11:45). */
   scheduleUtcHour: number;
   scheduleUtcMinute: number;
   now?: Date;
@@ -132,20 +140,20 @@ export function describePricePushHealth(params: {
       };
     case 'never_run':
       // Deliberately a fault, not "Ready for …". This is the state a shop sits
-      // in when the Netlify schedule is registered but never invoking, and the
-      // old green-check copy actively hid it.
+      // in when the schedule exists but never invokes the push, and the old
+      // green-check copy actively hid it.
       return {
         icon: 'error',
         tone: 'error',
         text: `${params.schedule} is enabled, but no scheduled run has ever been recorded. `
-          + 'The schedule is not firing — check the function log in Netlify.',
+          + `The schedule is not firing. ${PRICE_PUSH_RUN_HISTORY_HINT}`,
       };
     case 'overdue':
       return {
         icon: 'error',
         tone: 'error',
         text: `Last scheduled run ${params.lastRunAtLabel ?? 'unknown'}, but ${params.schedule.toLowerCase()} `
-          + 'has not run since. Check the function log in Netlify.',
+          + `has not run since. ${PRICE_PUSH_RUN_HISTORY_HINT}`,
       };
     case 'ok':
     default: {

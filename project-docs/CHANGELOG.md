@@ -1,6 +1,312 @@
 
 # Changelog
 
+## 2026-09-14 (build) — Homepage loading screen deleted: first paint no longer waits on React's swap (STAGED)
+
+**Why.** Owner approved the first-paint proposal (decisions 1 and 2: delete it
+and fold it into the staged 09-14 batch). The investigation and replay A/B are in the
+entry below.
+
+**What.**
+- Deleted `src/app/[locale]/(home)/loading.tsx` (covers `/` and `/es`).
+- Deleted `src/components/layout/SiteLoadingScreen.tsx`, which is now unused.
+  `/shop` keeps its own `(list)/loading.tsx` skeleton, which never imported it.
+- Comments updated in `HomeBootSplash.tsx` (now carries the ⛔ do-not-re-add
+  note with the measurement) and `globals.css`. DECISIONS "The homepage renders
+  TWICE" is marked superseded.
+
+**Verified locally (production build, `next start` on :3003).**
+- Built `en.html` / `es.html`:
+  - no `<div hidden id="S:0">`
+  - no `$RC("B:0","S:0")`
+  - exactly one `<h1>`
+  - the splash markup comes before the hero (@13.7K vs @31.4K)
+- Cold phone profile (4× CPU), 5 runs: first paint 584 / 628 / 1616 / 484 / 628 ms.
+  The splash is parsed at 121–291 ms and nothing waits on a reveal any more. This
+  is not directly comparable to the replay: local assets, no brotli. Desktop,
+  3 runs: 664 / 608 / 468 ms.
+- Soft navigation: clicking Home from `/about` loads the homepage client-side
+  (hero present, one `<h1>`, no loading screen, no holder), with 0 console errors.
+
+**After deploy.** Run a cold filmstrip of production (`fp-film.mjs` method in the
+memory note). Expected: no blank frames until the first frame. The live phone
+baseline is 1.06–1.12 s.
+
+```
+npx tsc --noEmit   0
+npm run lint       0
+npx vitest run     1364/1364 (138 files)
+npm run build      0 (no .next/cache/turbopack)
+```
+
+## 2026-09-14 (later) — "30-minute checks" card built (STAGED); homepage first paint investigated, fix proposed
+
+### "30-minute checks" card (item #5, owner-approved mockup)
+
+**Why.** The Etsy/eBay settings panels only said when sales watching *started*,
+so a stalled scheduler looked exactly like a quiet day. Owner approved the
+mockup: same card style, directly above "Daily price automation", red after
+60 minutes without a check (two missed runs), and keep the counts.
+
+**What.**
+- New `lib/marketplace-status-checks.ts` (pure, shared):
+  `resolveStatusCheckHealth` (`never_run` / `stalled` / `ok`,
+  `STATUS_CHECK_STALE_MINUTES = 60`), `formatElapsed`,
+  `formatStatusCheckTime` (owner's Eastern time), `pairedSalesRow` (a sales row
+  counts only if written ≤ 5 min before the reconcile row), `summarizeStatusCheck`,
+  `describeStatusChecks`. Stalled/never-run copy reuses
+  `PRICE_PUSH_RUN_HISTORY_HINT` (Supabase → Integrations → Cron).
+- `lib/etsy/store.ts` + `lib/ebay/store.ts`: `getLastStatusCheck` (newest
+  `reconcile_status` row with `product_id IS NULL` — the run summary or a
+  whole-run failure; per-listing rows carry a product) and `getLastSalesCheck`
+  (newest `marketplace_sales` row).
+- `api/admin/{etsy,ebay}/status`: new `statusChecks: { lastCheck, lastSales }`.
+- `EtsySettingsPanel.tsx` / `EbaySettingsPanel.tsx`: the card.
+- Example copy: "Last check 11 min ago (10:00 PM ET): 134 listings checked,
+  0 sales, nothing to fix." · stalled: "Last check 2 h 14 min ago (7:58 PM ET)
+  — sold items may stay live on the other marketplace until it runs again.
+  Check the job's run history in Supabase → Integrations → Cron."
+- Tests: `lib/__tests__/marketplace-status-checks.test.ts` (14).
+- ⚠️ Not seen in a signed-in admin browser (admin login is the owner's).
+
+### Homepage first paint (TASKS "re-measure first paint")
+
+**Correction.** The 09-14 triage line "the 08-14 fix did not land" was wrong.
+Production emits slot 0 `high`, slot 1 `auto`, slots 2–7 `low`; the stylesheet
+request starts the moment the HTML head is read. `fetchpriority=low` lowers
+priority, it does not delay the request start, so "requests before FCP" was the
+wrong success test.
+
+**Real cause (measured on production, headless Chrome, cold profile).**
+- The white screen lasts until ~1.06–1.12 s on a phone profile (4× CPU, 9 Mbps,
+  150 ms) and ~0.75–1.1 s on desktop. Filmstrip: blank until the first frame, which
+  shows "Preparing your visit".
+- `src/app/[locale]/(home)/loading.tsx` wraps the page in a Suspense boundary.
+  The served HTML (353 KB decoded / 42 KB brotli) sends the loading screen
+  first, the entire page inside `<div hidden id="S:0">`, and reveals it with
+  React's `$RC("B:0","S:0")` at char ~189K.
+- Across 6 cold runs, first paint never came before that reveal, although the
+  fallback was parsed right after the CSS arrived. The 07-07 note ("loading.tsx
+  only shows on soft navigations, the homepage is static") does not hold:
+  the fallback is in every cold load.
+
+**Replay A/B.** The live HTML was served from a local proxy (all assets proxied
+from production), once as served and once with the page inlined where the
+fallback sits and no `S:0`/`$RC`. That is what deleting the file produces.
+- **Phone (4× CPU), 5 runs each:** first paint median **732 → 472 ms**. Filmstrip first
+  frame **951 → 576 ms**.
+- **Desktop, 3 runs:** 560 vs 616 ms, no real change.
+
+**Proposed (not built, awaiting the owner):** delete `(home)/loading.tsx`.
+- The homepage's own `HomeBootSplash` looks identical and paints first.
+- Clicking Home from another page shows the progress bar instead of the loading
+  screen (the page is prerendered and prefetched).
+- The hidden duplicate DOM goes away. The 08-16 DECISIONS note said to revisit it
+  "if the first-paint/DOM-size work is ever resumed".
+- `/shop` has the same pattern and should be measured separately.
+
+Mockup: `mockup-first-paint.html` (scratchpad, sent to the owner).
+
+### Verification
+
+```
+npx vitest run     1364/1364 (138 files)
+npm run lint       0
+npx tsc --noEmit   0
+npm run build      0 (dev server stopped first; no .next/cache/turbopack)
+```
+
+## 2026-09-14 — Triage items worked: search/listing read-outs, database hygiene, Etsy/eBay request timeouts, price-push warning, Deep Field pin, Node 22, first-paint re-measure (code STAGED)
+
+**Why.** Owner: "work through 1-10 except skip #7, on #8 the two watches are
+purposely not listed to ebay, and skip #9, skip #10 marketing emails, and skip
+#10 when it comes to notify search engines when an item sells".
+
+### Read-outs (read-only, owner's Chrome and service key, 09-14)
+
+**Google Search Console** (`.com` URL-prefix property, last 28 days to 09-11).
+- **Totals:** 102 clicks · 3.64K impressions · CTR 2.8% · average position 29.9.
+- **Pages report:** 241 indexed / 206 not.
+  - 129 alternate canonical
+  - 46 page with redirect (validation started)
+  - 13 noindex
+  - 6 crawled, not indexed
+  - 5 discovered, not indexed
+  - 5 404
+  - 2 blocked by robots.txt (validation started)
+- **Breadcrumbs:** 37 valid, 0 invalid.
+- **URL Inspection:** `/reviews` and all six guide URLs (gold-worth, hallmarks,
+  inherited; EN + ES) read "URL is on Google · Page is indexed". No requests
+  were spent.
+- **Page baseline (28 days):**
+
+  | Page | Impressions | Clicks | CTR | Position |
+  |---|---|---|---|---|
+  | `/sell/naples` | 548 | 1 | 0.2% | 42.7 |
+  | `/silver-services` | 185 | 1 | 0.5% | 7.8 |
+  | `/gold-services` | 174 | 0 | 0% | 20.8 |
+  | `/free-evaluation` | 162 | 0 | 0% | 12.0 |
+  | `/jewelry-appraisal` | 132 | 2 | 1.5% | 43.4 |
+  | `/reviews` | 15 | 1 | 6.7% | 6.9 |
+
+- **Queries:**
+  - The brand query "naples estate jewelry" has 22 clicks at position 1.6.
+  - Buyer-intent queries mostly sit at positions 40-80: "estate jewelry buyers"
+    138 impressions at 78.1, "jewelry buyers naples" 32.9, "where can i get
+    jewelry appraised for free" 56.5, "jewelry appraisal naples fl" 64.8.
+  - "sell gold near me" is at 8.4 and "jewelry buyers" at 9.2.
+
+**Google Business Profile (public Maps).**
+- 5.0 rating from 21 reviews.
+- The 09-11 free-appraisal post is still live ("2 days ago").
+- The listing shows a **"Delivery"** attribute, which looks wrong for a buying
+  business (owner check).
+- The description and the four services can't be read from the public page
+  (the About tab did not switch), so that check needs the owner's profile
+  manager.
+
+**Bing.**
+- **Bing Places is PUBLISHED.** Bing Maps shows "Naples Estate Jewelry · Gold
+  buyer in Naples, FL", 6240 Shirley St Suite 104, (239) 404-8505, with hours.
+- **Bing Webmaster URL Inspection:** all six (`/sell/naples`,
+  `/sell/marco-island`, `/jewelry-appraisal`, `/diamond-buyers`, gold-worth
+  guide, hallmarks guide) still read "URL cannot appear on Bing · Indexing
+  allowed? No". The last crawl attempts run 08-20 → 09-03, so Bing hasn't
+  re-crawled since the 09-03 requests. Per `DECISIONS.md` this is not a code
+  issue, and nothing was requested.
+
+**Yelp (public page).**
+- Categories are now **Gold Buyers, Jewelry, Watches**.
+- Diamond Buyers is no longer listed, and Estate Liquidation never appeared.
+- "Established" isn't shown in the owner view.
+
+**Database hygiene (service key, read-only; the two Rolex watches #83/#84 are off eBay on purpose).**
+- The four 07-03/07-09 test orders are gone.
+- 0 duplicate inventory numbers (#21 resolved).
+- **Inquiries since 08-23: only 3, none of them spam.**
+  - The 08-22 probe `a317891f` ("Test Chain", a@b.com) is still present; its
+    notification is already in the recycle bin.
+  - "Zach" on 09-01, with no email.
+  - "Hieu Vuong" on 09-07, with a mistyped email.
+- Two June test inquiries remain: `04cca1ca` "TEST - please delete" and
+  `aa00e2bf` "TEST 2 - please delete". The service role can't delete
+  inquiries, so removing them is the owner's call.
+- Available products with no eBay listing yet: **#132, #136, #137**.
+
+**First paint on production.** Three cold-cache headless Chrome runs with fresh
+profiles, 1366×900, this connection.
+- **Median:** FCP 992 ms (924 / 992 / 1336).
+- **Before first paint:** 30 requests / 536 KB, including 9 images / 158 KB and
+  267 KB of scripts. The first stylesheet starts at 440 ms.
+- **Baseline 08-14:** 30 requests / 533 KB, carousel images 157 KB, stylesheet
+  at 336 ms.
+- 🔴 **The expected improvement did not land: the carousel images still load
+  before first paint.** The FCP milliseconds are not comparable (different
+  connection); the byte and request counts are.
+
+### Built (STAGED, no SQL)
+
+- **Price-push fault copy** (`lib/marketplace-price-push-health.ts`).
+  - `never_run` and `overdue` now end with "Check the job's run history in
+    Supabase → Integrations → Cron." (`PRICE_PUSH_RUN_HISTORY_HINT`).
+  - The stale Netlify comments are fixed.
+  - The test asserts the Supabase hint and "never Netlify".
+  - The "last 30-minute check" line is a mockup only
+    (`mockup-last-check.html`, sent to the owner) and waits for approval.
+- **Etsy/eBay request timeouts** (`lib/marketplace-timeout.ts`: api 15 s, upload
+  30 s, token 10 s, per attempt, not retried).
+  - `fetchWithEtsyTimeout` / `fetchWithEbayTimeout` wrap:
+    - `etsyFetch`, including body reads
+    - both Etsy taxonomy reads
+    - both OAuth token endpoints
+    - `ebayFetch`, including body reads
+    - Trading GetItem
+    - the eBay application token
+  - The own-photo fetch before an Etsy upload also has the limit.
+  - Timeouts raise typed `etsy_timeout` / `ebay_timeout` errors.
+  - Tests: `marketplace-timeout.test.ts` (8). Rule: `DECISIONS.md` → *"Every
+    Etsy and eBay request has a time limit"*.
+- **Deep Field:** `deepfield-batching.test.ts` pins `IMAGE_BUDGET_PER_REQUEST`
+  30 and `MAX_PRODUCTS_PER_REQUEST` 3.
+- **Netlify** `NODE_VERSION` 20 → 22. The Next.js plugin already refused 20 and
+  ran on 22.
+
+### Verification
+
+- tsc 0 · eslint 0 · `npm run lint` 0 · **vitest 1350/1350 (137 files)** ·
+  `npm run build` 0 · no Turbopack build cache.
+- Node 22 can only be proven by the next Netlify build log.
+
+## 2026-09-14 (early) — Docs reconciled: owner-confirmed 09-13 steps, TASKS triage, stale STAGED labels fixed
+
+**Why.** Owner: "ran them successfully.. update docs and then see if there's
+anything left in tasks for us to do".
+
+**Recorded.** The owner ran every post-deploy step successfully:
+- Etsy #33 reset → new listing.
+- #82 re-synced.
+- A real pencil Save.
+- The review window.
+
+No production check was run (owner-confirmed).
+
+**Triage.** A read-only sweep of `TASKS.md` checked every open-looking item
+against this changelog and `CURRENT_STATUS.md`.
+- **Result:** nothing is staged, and many older headers were stale. The real
+  open list is now the top block of `TASKS.md` ("What's actually left").
+- **Spot-checked in code:**
+  - The overdue price-push warning still says "check the function log in
+    Netlify" (`lib/marketplace-price-push-health.ts:141,148`), which has been
+    dead since pg_cron.
+  - The Free Appraisal hero is still the generated placeholder
+    (`free-evaluation/page.tsx:257`).
+- **Fixed labels:**
+  - The 09-12 batch was deployed 2026-09-12 23:14 ET (`main@a985175`) but was
+    still marked "DEPLOY"/"awaiting push".
+  - `CURRENT_STATUS.md`'s 09-13 blocks were relabelled DEPLOYED (71a77d8 /
+    12d76cb).
+- Older sections were not edited line by line; the new top block says to treat
+  them as history.
+
+## 2026-09-13 (night, 21:37 ET) — DEPLOYED + live-verified: pencil edits everywhere, Etsy photo sync fix, Instagram/Facebook Refresh Preview
+
+**Deploy.** Netlify `main@12d76cb` "photos fix, socials fix", published 9:37 PM
+ET (01:37Z 09-14). Owner: "pushed and deployed, verify all the changes live".
+
+**Verified on production** (owner's Chrome, signed-in admin, item #135,
+read-only — nothing saved, no marketplace writes):
+- **Manage eBay:** 10 pencils (Quantity + 9 aspects). The Item Weight editor
+  opened prefilled `3.46` and Cancel closed it.
+- **Manage Etsy:** 5 pencils (Quantity, Materials, When made, Length, category).
+  The category pencil opened the grouped Jewelry list and cancelled.
+- **Manage Instagram / Manage Facebook:** Refresh Preview → "Preview refreshed."
+  and the button re-enabled.
+- **Listing editor** (Products → Actions → Edit): Etsy accordion 5 pencils,
+  eBay 10, a Refresh Preview button in each of Etsy / eBay / Instagram /
+  Facebook.
+- **Etsy background sweeps:** healthy through the deploy (01:30Z ok).
+
+**Not verifiable read-only:**
+- The Etsy photo fix only runs when a sync writes to Etsy. Owner steps for
+  #33 ("Sync Updates" → reset → "Sync to Etsy") and #82 ("Sync Updates") are in
+  TASKS.
+- A real pencil Save and the refactored "Review before submitting" window
+  (owner check).
+
+**Owner follow-up, same night.** The owner ran the post-deploy steps and
+reported them successful ("ran them successfully"):
+- Etsy #33 re-synced (reset → new listing).
+- Etsy #82 re-synced.
+- A real pencil Save.
+- The review window.
+
+Recorded as owner-confirmed; no production check was run.
+
+**First Etsy sweeps on the new code** (read-only, service key): 02:00:02Z
+`marketplace_sales` ok and 02:00:04Z `reconcile_status` ok (134 scanned, 0
+drifted / repaired / failed — one more listing than 01:30's 133, consistent
+with #33's re-created listing).
+
 ## 2026-09-13 (late night, STAGED) — "Refresh Preview" on the Instagram and Facebook panels
 
 **Why.** Owner: the Instagram and Facebook sync panels had no refresh like

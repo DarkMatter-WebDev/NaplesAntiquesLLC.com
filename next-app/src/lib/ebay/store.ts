@@ -357,6 +357,39 @@ export async function getLastScheduledPricePush(service: SupabaseClient): Promis
   return (data as EbaySyncLogRow | null) ?? null;
 }
 
+/**
+ * The newest RUN SUMMARY of the 30-minute status reconcile, for the Admin
+ * "30-minute checks" card. Per-listing `reconcile_status` rows carry a
+ * product_id; the run summary (and a whole-run failure) does not. Its own
+ * query (served by ebay_sync_log_action_created_idx) for the same reason as
+ * getLastScheduledPricePush.
+ */
+export async function getLastStatusCheck(service: SupabaseClient): Promise<EbaySyncLogRow | null> {
+  const { data, error } = await service
+    .from('ebay_sync_log')
+    .select('*')
+    .eq('action', 'reconcile_status')
+    .is('product_id', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) return null;
+  return (data as EbaySyncLogRow | null) ?? null;
+}
+
+/** The newest `marketplace_sales` row (the sales sweep that runs just before the reconcile). */
+export async function getLastSalesCheck(service: SupabaseClient): Promise<EbaySyncLogRow | null> {
+  const { data, error } = await service
+    .from('ebay_sync_log')
+    .select('*')
+    .eq('action', 'marketplace_sales')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) return null;
+  return (data as EbaySyncLogRow | null) ?? null;
+}
+
 export async function pruneOldSyncLogs(service: SupabaseClient): Promise<void> {
   const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
   const { error } = await service.from('ebay_sync_log').delete().lt('created_at', cutoff);

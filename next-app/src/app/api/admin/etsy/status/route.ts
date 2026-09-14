@@ -1,9 +1,21 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
 import { createServiceClient } from '@/lib/supabase/service';
-import { getConnection, getLastScheduledPricePush, getRecentSyncLog } from '@/lib/etsy/store';
+import {
+  getConnection,
+  getLastSalesCheck,
+  getLastScheduledPricePush,
+  getLastStatusCheck,
+  getRecentSyncLog,
+  type EtsySyncLogRow,
+} from '@/lib/etsy/store';
 import { resolvePricePushHealth } from '@/lib/marketplace-price-push-health';
 import { hasSalesScope } from '@/lib/marketplace-sales';
+import type { StatusCheckRow } from '@/lib/marketplace-status-checks';
+
+function toStatusCheckRow(row: EtsySyncLogRow | null): StatusCheckRow | null {
+  return row ? { createdAt: row.created_at, outcome: row.outcome, message: row.message ?? null, detail: row.detail ?? null } : null;
+}
 
 export const runtime = 'nodejs';
 
@@ -21,6 +33,8 @@ export async function GET() {
   const log = await getRecentSyncLog(service, 25);
   // Queried directly, not found inside `log` — see getLastScheduledPricePush.
   const lastScheduledRun = await getLastScheduledPricePush(service);
+  // The 30-minute sales sweep + status reconcile heartbeat (Admin "30-minute checks" card).
+  const [lastStatusCheck, lastSalesCheck] = await Promise.all([getLastStatusCheck(service), getLastSalesCheck(service)]);
   const cronSecretConfigured = Boolean(process.env.ETSY_CRON_SECRET);
   const health = resolvePricePushHealth({
     enabled: connection?.price_push_enabled ?? false,
@@ -66,6 +80,10 @@ export async function GET() {
             message: lastScheduledRun.message,
           }
         : null,
+    },
+    statusChecks: {
+      lastCheck: toStatusCheckRow(lastStatusCheck),
+      lastSales: toStatusCheckRow(lastSalesCheck),
     },
     recentActivity: log.map((row) => ({
       id: row.id,

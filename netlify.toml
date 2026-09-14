@@ -4,7 +4,10 @@
   publish = ".next"
 
 [build.environment]
-  NODE_VERSION = "20"
+  # 22 (2026-09-14): @netlify/plugin-nextjs already refused Node 20.20.2 and ran
+  # itself on 22.x, so the app build and the runtime plugin used different
+  # Node versions. One version everywhere Netlify runs. Local dev is Node 24.
+  NODE_VERSION = "22"
   # PAYPAL_CLIENT_ID is public by design — it ships to the browser inside the
   # PayPal JS SDK URL (so it appears in checkout HTML/RSC). It is NOT the secret;
   # PAYPAL_CLIENT_SECRET stays server-side and must never be added here.

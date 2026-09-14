@@ -2461,10 +2461,10 @@ body:has([data-site-header]) .route-progress {
 
 /* Homepage boot splash: the site-loading visuals rendered as a fixed overlay in
    the homepage's initial HTML (see HomeBootSplash.tsx). It paints on the first
-   frame on every device — covering the cold-load / pre-hydration blank that the
-   route-level loading.tsx (a soft-navigation Suspense fallback) can't, since the
-   homepage is statically prerendered. It fades out on hydration; the failsafe
-   animation guarantees it hides even if JS is slow or disabled. */
+   frame on every device, covering the cold-load / pre-hydration blank. The
+   homepage has NO route loading.tsx (deleted 2026-09-14 — it hid the whole page
+   until React's swap; see HomeBootSplash.tsx). It fades out on hydration; the
+   failsafe animation guarantees it hides even if JS is slow or disabled. */
 .home-boot-splash {
   position: fixed;
   inset: 0;

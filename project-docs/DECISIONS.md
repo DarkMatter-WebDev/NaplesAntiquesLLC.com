@@ -3327,6 +3327,15 @@ an address, so there is nothing to unwind.
 
 ### The homepage renders TWICE in the client DOM — that is React, not our code
 
+> ⚠️ **SUPERSEDED 2026-09-14.** `(home)/loading.tsx` (and the now-unused
+> `SiteLoadingScreen`) were deleted, so the homepage no longer has the hidden
+> `S:0` holder or a second copy. The deletion was not about the duplicate: that
+> holder kept Chrome from drawing ANYTHING until React's `$RC` swap, about 1 s of
+> white on phones (replay A/B first paint 732 → 472 ms). ⛔ Do not add a
+> homepage `loading.tsx` back; `HomeBootSplash` is the cold-load cover. The
+> heading-count advice below still applies to `/shop`, which keeps its
+> `(list)/loading.tsx`.
+
 Measured in a **production build** on 2026-08-16 while verifying the hero:
 `document.querySelectorAll('h1')` returns **2** on the homepage, and there are
 two complete `<main>` trees.
@@ -6155,9 +6164,56 @@ Two rules, both general:
    and must be shown as one. `resolvePricePushHealth`
    (`src/lib/marketplace-price-push-health.ts`) distinguishes `disabled` (the
    owner's choice, not a fault) from `never_run` and `overdue` (both faults), and
-   the copy names the place to look — the Netlify function log. Allow a grace
-   window (60 minutes here) so a merely late run is not flagged, but never let
-   the grace become an indefinite excuse.
+   the copy names the place to look — since 2026-09-14 the job's run history in
+   Supabase → Integrations → Cron (pg_cron is the only scheduler; the Netlify
+   scheduled functions are deleted, so never point at a Netlify log). Allow a
+   grace window (60 minutes here) so a merely late run is not flagged, but never
+   let the grace become an indefinite excuse.
+
+## The "30-minute checks" card turns red after 60 minutes without a check (2026-09-14)
+
+- **Decision (owner-approved mockup).** Settings → Etsy / eBay show a
+  "30-minute checks" card directly above "Daily price automation". It reads the
+  newest `reconcile_status` run summary (`product_id IS NULL`) plus the
+  `marketplace_sales` row from the same run, and goes red when the newest check
+  is more than **60 minutes** old. That is two missed runs, so one late start never flips it.
+  No row at all is also red (rule 1 above: never render "has never happened"
+  as healthy).
+- **Detail sentence keeps the counts** ("134 listings checked, 0 sales, nothing
+  to fix"). A skipped or failed run shows the row's own message instead.
+- **Where.** `lib/marketplace-status-checks.ts` (pure, tested); the stale and
+  never-run copy reuse `PRICE_PUSH_RUN_HISTORY_HINT`, so both cards point at the
+  same Supabase cron history.
+- ⚠️ The per-listing `reconcile_status` rows also use that action. Always filter
+  `product_id IS NULL` for the heartbeat, or a busy repair run can look like
+  a fresh check with no counts.
+
+## Every Etsy and eBay request has a time limit; a timeout is typed, logged and not retried (2026-09-14)
+
+- **Decision.** All marketplace HTTP calls go through `fetchWithEtsyTimeout` /
+  `fetchWithEbayTimeout` with the per-attempt limits in
+  `lib/marketplace-timeout.ts`:
+  - API calls 15 s.
+  - Photo uploads, and fetching our own photo first, 30 s.
+  - OAuth token endpoints 10 s.
+- **How a timeout surfaces.** It becomes a typed `etsy_timeout` /
+  `ebay_timeout` error with `retryable: false`, and it is enforced on the body
+  read too, so it never turns into silently-null data.
+- **Why.** Neither client had a timeout. The 30-minute reconcile route awaits
+  the sales read before the status reconcile, so one hung connection could
+  stall auto-mark-sold and drift repair until Netlify killed the function, with
+  nothing logged. The limits sit under the existing budgets: sales 15 s,
+  reconcile / price push 20 s, the 60 s route cap and Netlify's ~26 s gateway.
+  Not retrying a timeout keeps the worst case bounded; the next scheduled run
+  re-reads.
+- **How to apply.**
+  - A new Etsy/eBay call uses the wrapper, never a bare `fetch`.
+  - A deliberately slow operation passes its own `timeoutMs` instead of raising
+    the defaults.
+  - The timeout message must never contain "reconnect", "not connected",
+    "refresh token" or "shop id": `isConnectionLevelEtsyError` would treat a
+    single slow call as a dead connection and abort a whole bulk run.
+    `marketplace-timeout.test.ts` pins this.
 
 2. **Never derive a rare event's last occurrence from a page of recent rows.**
    Both status routes read 25 log rows and searched them for the scheduled push.

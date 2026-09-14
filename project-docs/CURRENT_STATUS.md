@@ -2,18 +2,46 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-09-13**.
+> in `DECISIONS.md`. Last reconciled: **2026-09-14**.
 
-## Start Here (2026-09-12 — SUPERSEDES the blocks below)
+## Start Here (2026-09-14 — SUPERSEDES the blocks below)
 
 **Read this, then `TASKS.md`.**
 
-🟡 **09-13 late night — "Refresh Preview" on the Instagram and Facebook
-panels, STAGED (no SQL).** Photos, title and price saved in the listing editor
+📋 **09-14 — STAGED (no SQL): the price-push warning points at Supabase cron
+history, Etsy/eBay request timeouts, the Deep Field batch-size pin, Netlify
+Node 22, the new "30-minute checks" card on Settings → Etsy / eBay (red
+after 60 min without a check), and the homepage `loading.tsx` deletion (first
+paint no longer waits on React's swap; local prod build verified).** Checks ran
+the same day:
+- Google Search Console: the reviews and guide pages are indexed.
+- Bing Places is published.
+- First paint: the 08-14 image priorities ARE live. The ~1 s white screen on
+  phones comes from `(home)/loading.tsx` hiding the whole page until React's
+  swap. Fix = delete that file (phone replay 732 → 472 ms), BUILT + STAGED.
+
+Details: `CHANGELOG.md` 2026-09-14. Everything built before that is DEPLOYED. The
+real open list, triaged against the changelog, is the top block of
+`TASKS.md` ("What's actually left"). Many older blocks below and in
+`TASKS.md` still say STAGED / DEPLOY / ◻ but are done; treat them as history.
+
+🟢 **09-13 night — DEPLOYED `main@12d76cb` (21:37 ET) and live-verified:**
+pencil edits on every Etsy/eBay preflight, the Etsy photo sync fix and the
+Instagram/Facebook Refresh Preview buttons (the three blocks below are all
+live). ✅ Owner ran every post-deploy step successfully the same night:
+- Etsy #33 re-created.
+- #82 re-synced.
+- A real pencil Save.
+- The review window.
+
+`CHANGELOG.md` 2026-09-13 (night, 21:37 ET).
+
+🟢 **09-13 late night — "Refresh Preview" on the Instagram and Facebook
+panels — DEPLOYED 12d76cb, live-verified, owner-confirmed.** Photos, title and price saved in the listing editor
 now show up without closing the panel; unsaved lineup and caption edits are
 kept. Verified on dev. `CHANGELOG.md` 2026-09-13 (late night, social refresh).
 
-🟡 **09-13 late night — Etsy photo sync fix, STAGED (no SQL, no env vars).**
+🟢 **09-13 late night — Etsy photo sync fix — DEPLOYED 12d76cb; the owner re-synced #33 and #82.**
 - **Bug 1: new photos were recorded as uploaded but never sent.** The recovery
   step claimed the old Etsy photos (inv #33: 2 of 7 photos on Etsy; #82: 7 of 10).
   Fixed: never claim a tracked image, check records against the live listing,
@@ -21,11 +49,11 @@ kept. Verified on dev. `CHANGELOG.md` 2026-09-13 (late night, social refresh).
 - **Bug 2: a listing deleted on etsy.com stayed stuck in error.** Fixed: it now
   resets to not-listed.
 - Gate: 1341/1341 · build 0 · live dry run confirmed.
-- ◻ After the push: #33 → "Sync to Etsy"; #82 → "Sync Updates".
+- ✅ Owner re-synced #33 (reset → new listing) and #82 on 09-13 night.
 - `CHANGELOG.md` 2026-09-13 (late night, Etsy photos).
 
-🟡 **09-13 late night — pencil edits on every Etsy/eBay preflight, STAGED (no
-SQL, no env vars).**
+🟢 **09-13 late night — pencil edits on every Etsy/eBay preflight — DEPLOYED
+12d76cb, owner-confirmed (a real Save + the review window).**
 - Where: the listing editor's Etsy and eBay accordions and the Manage Etsy/eBay
   pages, with the same editors as the review window (shared
   `ProductFieldInlineEditor`).
@@ -36,18 +64,18 @@ SQL, no env vars).**
 
 🟢 **09-13 night — DEPLOYED `main@71a77d8` (17:28 ET) and live-verified:** the
 webhook fix, owner photo, one scheduler and hero short screens (details below,
-all live). One check owed: the 22:00Z drips log one row per channel. Retention
+all live). ✅ The 22:00Z drips logged one row per channel. Retention
 job `nej-log-retention` scheduled by the owner; its first run is 09-14 07:20Z.
 `CHANGELOG.md` 2026-09-13 (night, deployed).
 
-🟡 **09-13 (late night) — eBay account-deletion webhook writes once per notice,
-STAGED with the same push** (no SQL). The receipt is inserted `processed`, with
+🟢 **09-13 (late night) — eBay account-deletion webhook writes once per notice —
+DEPLOYED 71a77d8, verified 22:26Z** (no SQL). The receipt is inserted `processed`, with
 no `ebay_sync_log` row and no update (~3,500 fewer writes/day). Guarded by
 `post-success.test.ts`. Gate: lint 0 · 1329/1329 · build 0. Separate and
-owner-run: `supabase/log-retention-2026-09.sql` (draft, double-checked, not run).
+owner-run: `supabase/log-retention-2026-09.sql` (run by the owner 09-13; first nightly run 09-14 07:20Z).
 
-🟡 **09-13 (late night) — owner photo replaced sitewide, STAGED with the same
-push.** The showroom-table photo (`pages/chris-owner.webp`, 140 KB WebP) now
+🟢 **09-13 (late night) — owner photo replaced sitewide — DEPLOYED 71a77d8,
+live-verified.** The showroom-table photo (`pages/chris-owner.webp`, 140 KB WebP) now
 shows on About, the homepage owner block and `/free-evaluation`; old
 `chris.webp` deleted, its path and `/chris.png` 301 to the new file in
 `netlify.toml`. Gate: tsc 0 · eslint 0 · 1326/1326. `CHANGELOG.md` 2026-09-13
@@ -55,8 +83,8 @@ shows on About, the homepage owner block and `/free-evaluation`; old
 screens) is ready to push:** full `npm run lint` 0 · `npm run build` 0 · no
 Turbopack build cache; no SQL, no env vars.
 
-🟡 **09-13 (late) — scheduled jobs: ONE scheduler, STAGED with the same push
-(no SQL, no env vars).** Investigating GitHub run #606 (`facebook-drip` 502 —
+🟢 **09-13 (late) — scheduled jobs: ONE scheduler — DEPLOYED 71a77d8,
+live-verified (no SQL, no env vars).** Investigating GitHub run #606 (`facebook-drip` 502 —
 a late scheduled GitHub call, 1 failure in 400 runs, nothing lost) showed
 every job firing three times: Supabase pg_cron, the old Netlify scheduled
 functions (executing since ~09-11) and GitHub's late `schedule`. The drips
@@ -66,8 +94,8 @@ claim nothing before publishing, so overlap risked double posts. GitHub
 YAML valid · tsc 0 · lint 0 · 1326/1326 · build exit 0. After the push: one
 log row per job per run. `CHANGELOG.md` 2026-09-13 (late).
 
-🟡 **09-13 — homepage hero on short screens, three owner-approved steps, BUILT +
-gated + STAGED, one push (no SQL, no env vars):** (1) the headline shrinks in
+🟢 **09-13 — homepage hero on short screens, three owner-approved steps —
+DEPLOYED 71a77d8 (no SQL, no env vars):** (1) the headline shrinks in
 place so it clears the sign-up form; (2) where it still cannot fit, the hero
 goes compact — eyebrow hidden, sign-up block tightened; (3) compact heroes also
 get much smaller fields and buttons and a higher phone headline, and the
@@ -113,12 +141,12 @@ steps + what to look for at the top of `TASKS.md`. Gate: tsc 0 · lint 0 ·
 **1319/1319 (133 files)** · build exit 0. `CHANGELOG.md` 2026-09-12 (night);
 `DECISIONS.md` → *"A marketplace sale marks the product sold"*.
 
-🟡 **09-12 — the marketplace review window now EDITS FIELDS IN PLACE, the
+🟢 **09-12 — the marketplace review window now EDITS FIELDS IN PLACE, the
 Etsy category is a grouped dropdown, length understands `mm`/`cm`, the
 description prints "Purity: 14K", and (later the same day) Admin →
 Subscribers sorts by any column header, default Subscribed newest-first
-(`lib/subscriber-sort.ts`) — BUILT + gated + STAGED, awaiting the owner's
-push (no SQL, no env vars).** Gate after the sort: tsc 0 · lint 0 ·
+(`lib/subscriber-sort.ts`) — DEPLOYED 2026-09-12 23:14 ET (main@a985175); the
+review window was owner-confirmed on production 09-13 (no SQL, no env vars).** Gate after the sort: tsc 0 · lint 0 ·
 **1308/1308 (132 files)** · build exit 0. "Review before submitting to
 Etsy/eBay" has a pencil on every product-backed row (length / ring size /
 height, brand, year, weight, main stone, chain type, purity, metal colour,

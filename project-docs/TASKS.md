@@ -1,11 +1,111 @@
 # Tasks
 
 > Actionable open work plus a short recent-completions summary. Full history is
-> in `CHANGELOG.md`. Last reconciled: **2026-09-12**.
+> in `CHANGELOG.md`. Last reconciled: **2026-09-14**.
 
 ## ◻ OPEN — needs a human
 
-### 🔴 STAGED 2026-09-13 — "Refresh Preview" on the Instagram and Facebook panels (no SQL, no env vars)
+### 📋 WHAT'S ACTUALLY LEFT — triaged 2026-09-14 (start here)
+
+A read-only sweep on 2026-09-14 checked every open-looking item in this file
+against `CHANGELOG.md` / `CURRENT_STATUS.md`. **STAGED 09-14 (no SQL, not yet
+pushed):** price-push warning points at Supabase cron history, Etsy/eBay request
+timeouts, Deep Field batch pin, Netlify Node 22. Everything before that is
+deployed. **Older sections below still carry STAGED / DEPLOY /
+◻ markers that are done or superseded; treat anything not listed here as
+history.**
+
+**Claude can do — status after the 2026-09-14 pass (`CHANGELOG.md` 2026-09-14):**
+- ✅ Done 09-14 (read-outs and results in CHANGELOG):
+  - #1 Search Console
+  - #2 GBP public check (description and services need the owner's profile
+    manager)
+  - #3 Bing
+  - #4 Yelp
+  - #8 database hygiene
+  - #10 Node 22, Deep Field pin, first paint
+- ✅ #6 Etsy/eBay request timeouts BUILT (STAGED).
+- ✅ #5 warning reworded + "30-minute checks" card BUILT (both STAGED). Owner
+  approved the mockup 09-14: card above "Daily price automation", red after
+  60 min, detail sentence keeps the counts. Not yet seen in a signed-in admin
+  browser — look at Settings → Etsy / eBay after the push.
+- ⏭ Skipped by the owner: #7 testimonials, #9 spot checks, #10
+  marketing-email exclusion, #10 IndexNow on sale.
+- 🔎 **New from the checks (owner decisions / next work):**
+  - 🟡 **First paint — fix BUILT + STAGED 09-14 (owner approved):
+    `(home)/loading.tsx` + unused `SiteLoadingScreen` deleted; local prod build
+    verified. ◻ After the push: cold filmstrip of production.** The line that stood here ("the 08-14 fix did not land") was
+    WRONG: the 08-14 priorities are live (slot 0 high, slot 1 auto, rest low)
+    and low-priority images still *start* early by design. The real cause of
+    the ~1 s white screen on phones: `(home)/loading.tsx` makes the server send
+    the loading screen first and the whole page inside `<div hidden id="S:0">`,
+    and nothing is drawn until React's `$RC` swap (char ~189K of 353 KB).
+    Replay A/B (live HTML, local proxy, phone 4× CPU): first paint median
+    732 → 472 ms with the file deleted; desktop unchanged. Proposal = delete
+    that one file. `CHANGELOG.md` 2026-09-14 (later).
+  - GBP listing shows a "Delivery" attribute.
+  - Yelp no longer lists Diamond Buyers (now Gold Buyers / Jewelry / Watches).
+  - #132, #136, #137 have no eBay listing yet.
+  - Three test inquiries are still in the DB (`a317891f`, `04cca1ca`,
+    `aa00e2bf`); only the owner can delete them.
+  - Bing hasn't re-crawled the six "Indexing allowed: No" pages since 09-03
+    (re-requesting is an option, 100/day).
+- ◻ After the next push: the Netlify build log shows Node 22.
+
+(Original list, for reference:)
+1. **Mid-September Search Console read.** Breadcrumbs + Pages reports; are
+   `/reviews` and the six guide URLs indexed; positions for
+   `/silver-services` and `/gold-services`; click-through on `/sell/naples`;
+   a baseline for the free-appraisal pages.
+2. **Public Google Business Profile check.** Is the 09-11 post still up, the
+   description published, and are all four services approved?
+3. **Bing.** Is Bing Places published (ETA was ~09-13)? Bing Webmaster URL
+   inspection on the six city/lander pages.
+4. **Yelp public page.** Estate Liquidation category and the "Established" year.
+5. **Overdue price-push warning.** It sends the owner to "the function log in
+   Netlify" (`lib/marketplace-price-push-health.ts:141,148`; test `:139`),
+   which has been dead since pg_cron took over. Reword it, plus the never-built
+   "last sweep N min ago" line (mockup first).
+6. **Request timeouts for Etsy/eBay API calls** (none today). One hung call
+   could stall the 30-minute auto-sold sales sweep.
+7. **Site testimonials vs live GBP reviews.** The site quotes ~23 reviewers;
+   GBP showed 18 on 09-08. Rule: every quote must still be live.
+8. **Read-only database hygiene.** New spam since 08-22, leftover junk/test
+   inquiries and orders, 2 available products with no eBay link, a duplicate #21.
+9. **Spot checks.** One live Etsy + eBay listing shows "Purity: 14K" and an inch
+   length; Facebook page About (phone/address/hours); Merchant Center (76
+   products, `nej-108` appeal, image warnings).
+10. **Small code.** Leave never-confirmed accounts out of marketing sends; ping
+    IndexNow when an item sells; re-measure first paint on production; pin the
+    Deep Field batch size in a test; Node 20 → 22 on Netlify (`netlify.toml:7`).
+
+**Time-gated (Claude reads when due):**
+- 2026-09-14: the retention job at 07:20Z; ONE `scheduled_price_push` row per
+  channel after 11:45Z; the first pg_cron Instagram token refresh (Mon 12:15Z).
+- ~09-18: Apple place card, BBB.
+- ~09-20: GSC validations ("Page with redirect", "Blocked by robots.txt").
+- ~09-24: Yelp ad metrics.
+- ~10-09: free-appraisal calls look-back.
+- Monthly: GBP Performance → Calls.
+- First real events: marketplace sale, website sale, refund, hard bounce,
+  receipt through the new templates.
+
+**Owner-only (highlights):**
+- ⚠️ **Replace the Facebook Page token before 2026-10-31.**
+- D&B Profile Manager (trade name, phone, website).
+- Reviews that name the metal sold; buying photos; ask callers where they found
+  us for 30 days.
+- Decisions: GBP hours, booking link, "since 2010" vs the Sept 2026 opening
+  wording.
+- Bench photos: the Free Appraisal hero is still the generated desk placeholder
+  (`free-evaluation/page.tsx:257`), plus the text-only marks entries.
+- Decisions: remove the old address landmark (`Sharon Lynch`, 23 mentions in
+  11 files), the /trade-in entry point, `#item=` links.
+- A real iPhone Safari check of the homepage hero.
+- Delete the test Instagram post (item 21).
+- Accountant / legal / Spanish native-speaker reviews.
+
+### ✅ DEPLOYED 2026-09-13 21:37 ET (main@12d76cb, live-verified — CHANGELOG 2026-09-13 night 21:37 ET) — "Refresh Preview" on the Instagram and Facebook panels (no SQL, no env vars)
 
 - **What.** `InstagramProductPanel` / `FacebookProductPanel` loaded their
   preview only on open, so a photo saved in the listing editor never appeared
@@ -16,7 +116,7 @@
 - **Gate.** tsc 0 · `npm run lint` 0 · 1341/1341 · build 0. Dev Chrome (item
   #135): both buttons → "Refreshing…" → "Preview refreshed.".
   `CHANGELOG.md` 2026-09-13 (late night, social refresh).
-- ◻ **Owner, after the push (1 minute).** Add a photo to a listing → Save →
+- ✅ **Owner ran this successfully 2026-09-13 (night, after the 21:37 ET deploy).** Was: Add a photo to a listing → Save →
   open its Instagram (or Facebook) section → Refresh Preview → the new photo
   shows under "not included" (or in the lineup if none was saved).
 
@@ -26,7 +126,7 @@ CURRENT_STATUS, TASKS), 0 extras; copied 5; follow-up 0; SHA-256 MATCH ×5;
 staged panels carry `refreshPreview` (IG 2, FB 2); leak check 0 `.env*` /
 `.log`; 209 = 209 `.tsx`. Docs-only re-sync after this line.
 
-### 🔴 STAGED 2026-09-13 — Etsy photo sync fix: replaced photos never uploaded (inv #33, #82) + deleted listings stuck in error (no SQL, no env vars)
+### ✅ DEPLOYED 2026-09-13 21:37 ET (main@12d76cb, live-verified — CHANGELOG 2026-09-13 night 21:37 ET) — Etsy photo sync fix: replaced photos never uploaded (inv #33, #82) + deleted listings stuck in error (no SQL, no env vars)
 
 - **Photos.** The crash-recovery step adopted the OLD Etsy images as the new
   uploads and the same pass deleted them. Etsy held 2 of 7 photos for #33 and
@@ -41,7 +141,7 @@ staged panels carry `refreshPreview` (IG 2, FB 2); leak check 0 `.env*` /
   dry run: #82 → upload photos 8–10; #33 → 5 uploads, 0 adoptions.
   `CHANGELOG.md` 2026-09-13 (late night, Etsy photos); rule in `DECISIONS.md`
   → *"Etsy photo checkpoints are verified against the live listing"*.
-- ◻ **Owner, after the push (these write your live Etsy shop).**
+- ✅ **Owner ran these successfully 2026-09-13 (night): #33 re-synced (reset → new listing), #82 re-synced.** Was:
   1. **#33** (listing deleted on Etsy): open it → Etsy accordion → "Sync
      Updates" (or "Check Etsy Status"). It resets to not listed; then "Sync to
      Etsy" creates a new listing with all 7 photos (a draft unless
@@ -58,7 +158,7 @@ follow-up 0; SHA-256 MATCH ×8; staged sync.ts has `resetDeletedEtsyListing` ×4
 and images.ts `planImageAdoptions` ×3; temp dry-run script absent; leak check
 0 `.env*` / `.log`; 209 = 209 `.tsx`. Docs-only re-sync after this line.
 
-### 🔴 STAGED 2026-09-13 — pencil edits on every Etsy/eBay preflight: listing-editor accordions + Manage Etsy/eBay pages (no SQL, no env vars)
+### ✅ DEPLOYED 2026-09-13 21:37 ET (main@12d76cb, live-verified — CHANGELOG 2026-09-13 night 21:37 ET) — pencil edits on every Etsy/eBay preflight: listing-editor accordions + Manage Etsy/eBay pages (no SQL, no env vars)
 
 - **What.** The Etsy and eBay accordions in the add/edit listing form, and the
   Manage Etsy / Manage eBay pages, now have the review window's pencil editors
@@ -73,7 +173,7 @@ and images.ts `planImageAdoptions` ×3; temp dry-run script absent; leak check
   read-only check (item #135): drawer and Manage pages show 5 Etsy / 10 eBay
   pencils, editors prefill, Cancel works. `CHANGELOG.md` 2026-09-13 (late
   night, pencils).
-- ◻ **Owner, 2 minutes (dev :3007 now, or production after the push — both
+- ✅ **Owner ran these successfully 2026-09-13 (night): a real pencil Save + the review window.** Was: **Owner, 2 minutes (dev :3007 now, or production after the push — both
   write the live product).**
   1. Open a listing → eBay accordion → pencil a field (e.g. Item Weight) → Save.
   2. Expect "… saved · preview refreshed", with the same value in the form's
@@ -276,7 +376,7 @@ an unexpected response reads as "0 orders", never as a sale.
 
 **Staging (marketplace sales):** ✅ synced 2026-09-12 (night) — dry run listed exactly the 25 touched files (marketplace-sales.ts NEW, marketplace-sales-sweep.ts NEW, marketplace-sales.test.ts NEW, marketplace-sales-2026-09.sql NEW, etsy/ebay auth+client+store, both reconcile-status/status/settings routes, both settings panels + CHANGELOG, CURRENT_STATUS, DECISIONS, STRUCTURE, TASKS, features/etsy-sync, features/ebay-sync), 0 Extras, 1085 total (= 1082 on disk + the 3 `/XF`-excluded); real run copied 25 / 0 FAILED; follow-up dry run 0/0/0; leak check 0 `.env*`/`.log`, 0 `.git`; positive control 208 = 208 `.tsx`; SHA-256 MATCH on both sales libs, the SQL, etsy/auth.ts, EbaySettingsPanel, CHANGELOG. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
 
-### 🔴 DEPLOY the 2026-09-12 batch: review-window inline edits + Etsy category dropdown + mm/cm length + "Purity: 14K" + sortable Subscribers table (no SQL, no env vars)
+### ✅ DEPLOYED 2026-09-12 23:14 ET (main@a985175; review window owner-confirmed on production 09-13) — the 2026-09-12 batch: review-window inline edits + Etsy category dropdown + mm/cm length + "Purity: 14K" + sortable Subscribers table (no SQL, no env vars)
 
 Built, gated (tsc 0 · lint 0 · **1308/1308 (132 files)** · build exit 0) and
 staged — `CHANGELOG.md` 2026-09-12 (two entries). The admin is behind login

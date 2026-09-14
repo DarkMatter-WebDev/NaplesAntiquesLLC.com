@@ -1,5 +1,6 @@
 import 'server-only';
 import type { EtsyReceipt } from '@/lib/marketplace-sales';
+import { MARKETPLACE_TIMEOUT_MS, isFetchTimeoutError, timeoutLabel } from '@/lib/marketplace-timeout';
 
 // Etsy Open API v3 fetch wrapper: x-api-key + bearer auth, a client-side
 // throttle well under Etsy's 5 QPS cap, and 429/5xx backoff. Modeled on
@@ -117,6 +118,37 @@ function mapErrorResponse(status: number, body: Record<string, unknown> | null):
   });
 }
 
+/**
+ * A request that hit its time limit (see lib/marketplace-timeout.ts). Not
+ * retryable: the scheduled sweeps re-read on their next run. The wording must
+ * not match isConnectionLevelEtsyError (reconnect / refresh token / shop id),
+ * or one slow call would abort a whole bulk run as a connection failure.
+ */
+function etsyTimeoutError(method: string, path: string, timeoutMs: number): EtsyApiError {
+  return new EtsyApiError({
+    status: 0,
+    code: 'etsy_timeout',
+    operatorMessage: `Etsy did not respond within ${timeoutLabel(timeoutMs)}. Try again in a minute.`,
+    retryable: false,
+    detail: { method, path: path.replace(/\?.*$/, '') },
+  });
+}
+
+/** `fetch` with a time limit that surfaces as a typed etsy_timeout error. Used by every Etsy call. */
+export async function fetchWithEtsyTimeout(
+  input: string | URL,
+  init: RequestInit,
+  timeoutMs: number,
+  label: { method: string; path: string },
+): Promise<Response> {
+  try {
+    return await fetch(input, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+  } catch (err) {
+    if (isFetchTimeoutError(err)) throw etsyTimeoutError(label.method, label.path, timeoutMs);
+    throw err;
+  }
+}
+
 /** Strip anything that could resemble a token/secret before it lands in a log row. */
 function redactDetail(body: Record<string, unknown>): Record<string, unknown> {
   const clone: Record<string, unknown> = {};
@@ -174,6 +206,8 @@ export interface EtsyRequestOptions {
   accessToken?: string | null;
   /** Max in-invocation retries for 429/5xx (default 3, per 10-rate-limits-and-quotas.md). */
   maxRetries?: number;
+  /** Per-attempt time limit; default MARKETPLACE_TIMEOUT_MS.upload for multipart, .api otherwise. */
+  timeoutMs?: number;
 }
 
 export interface EtsyResponse<T> {
@@ -201,6 +235,14 @@ export async function etsyFetch<T = unknown>(opts: EtsyRequestOptions): Promise<
   const url = buildUrl(opts.path, opts.query);
   const method = opts.method ?? 'GET';
   const maxRetries = opts.maxRetries ?? 3;
+  const timeoutMs = opts.timeoutMs ?? (opts.form ? MARKETPLACE_TIMEOUT_MS.upload : MARKETPLACE_TIMEOUT_MS.api);
+  // A body read can also outlast the limit; that must surface as a timeout,
+  // never as silently-null data.
+  const readJson = async <R>(res: Response): Promise<R | null> =>
+    (await res.json().catch((err: unknown) => {
+      if (isFetchTimeoutError(err)) throw etsyTimeoutError(method, opts.path, timeoutMs);
+      return null;
+    })) as R | null;
 
   const headers: Record<string, string> = { 'x-api-key': apiKeyHeader };
   if (opts.accessToken) headers.Authorization = `Bearer ${opts.accessToken}`;
@@ -218,14 +260,15 @@ export async function etsyFetch<T = unknown>(opts: EtsyRequestOptions): Promise<
   let attempt = 0;
   for (;;) {
     await throttle();
-    const res = await fetch(url, { method, headers, body, cache: 'no-store' });
+    // Fresh limit per attempt, so a retried 429/5xx gets its own window.
+    const res = await fetchWithEtsyTimeout(url, { method, headers, body, cache: 'no-store' }, timeoutMs, { method, path: opts.path });
 
     if (res.ok) {
-      const data = res.status === 204 ? (null as T) : ((await res.json().catch(() => null)) as T);
+      const data = res.status === 204 ? (null as T) : ((await readJson<T>(res)) as T);
       return { data, headers: res.headers };
     }
 
-    const parsedBody = (await res.json().catch(() => null)) as Record<string, unknown> | null;
+    const parsedBody = await readJson<Record<string, unknown>>(res);
     const error = mapErrorResponse(res.status, parsedBody);
 
     if (error.retryable && attempt < maxRetries) {
@@ -306,10 +349,10 @@ export interface TaxonomyLeaf {
  * fetch cache (a day) instead of etsyFetch's no-store/throttled path.
  */
 export async function fetchTaxonomyLeaves(): Promise<TaxonomyLeaf[]> {
-  const res = await fetch(`${ETSY_API_BASE}/v3/application/seller-taxonomy/nodes`, {
+  const res = await fetchWithEtsyTimeout(`${ETSY_API_BASE}/v3/application/seller-taxonomy/nodes`, {
     headers: { 'x-api-key': requireEtsyApiKeyHeader() },
     next: { revalidate: 86400 },
-  });
+  }, MARKETPLACE_TIMEOUT_MS.api, { method: 'GET', path: '/v3/application/seller-taxonomy/nodes' });
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as Record<string, unknown> | null;
     throw mapErrorResponse(res.status, body);
@@ -406,10 +449,10 @@ export interface EtsyTaxonomyProperty {
  * "Gray" incident, session 7's rebuild) for why this matters.
  */
 export async function fetchTaxonomyProperties(taxonomyId: number): Promise<EtsyTaxonomyProperty[]> {
-  const res = await fetch(`${ETSY_API_BASE}/v3/application/seller-taxonomy/nodes/${taxonomyId}/properties`, {
+  const res = await fetchWithEtsyTimeout(`${ETSY_API_BASE}/v3/application/seller-taxonomy/nodes/${taxonomyId}/properties`, {
     headers: { 'x-api-key': requireEtsyApiKeyHeader() },
     next: { revalidate: 86400 },
-  });
+  }, MARKETPLACE_TIMEOUT_MS.api, { method: 'GET', path: '/v3/application/seller-taxonomy/nodes/{id}/properties' });
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as Record<string, unknown> | null;
     throw mapErrorResponse(res.status, body);

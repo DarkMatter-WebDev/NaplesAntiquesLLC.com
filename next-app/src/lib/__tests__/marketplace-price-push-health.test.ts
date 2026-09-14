@@ -134,12 +134,17 @@ describe('describePricePushHealth', () => {
     expect(result.icon).toBe('error');
     expect(result.tone).toBe('error');
     expect(result.text).toContain('not firing');
+    expect(result.text).toContain('Supabase → Integrations → Cron');
   });
 
-  it('points an overdue schedule at the Netlify function log', () => {
+  // pg_cron is the only scheduler (2026-09-13); the Netlify scheduled functions
+  // are deleted, so a fault must never send the owner to a Netlify log.
+  it('points an overdue schedule at the pg_cron run history, never Netlify', () => {
     const result = copy({ health: 'overdue' });
     expect(result.tone).toBe('error');
-    expect(result.text).toContain('Netlify');
+    expect(result.text).toContain('Supabase → Integrations → Cron');
+    expect(result.text).not.toContain('Netlify');
+    expect(copy({ health: 'never_run', lastRunOutcome: null, lastRunMessage: null, lastRunAtLabel: null }).text).not.toContain('Netlify');
     expect(result.text).toContain('8/10/2026, 7:45:12 AM');
   });
 

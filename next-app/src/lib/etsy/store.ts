@@ -318,6 +318,38 @@ export async function getLastScheduledPricePush(service: SupabaseClient): Promis
   return (data as EtsySyncLogRow | null) ?? null;
 }
 
+/**
+ * The newest RUN SUMMARY of the 30-minute status reconcile, for the Admin
+ * "30-minute checks" card. Per-listing `reconcile_status` rows carry a
+ * product_id; the run summary (and a whole-run failure) does not. Its own
+ * query for the same reason as getLastScheduledPricePush.
+ */
+export async function getLastStatusCheck(service: SupabaseClient): Promise<EtsySyncLogRow | null> {
+  const { data, error } = await service
+    .from('etsy_sync_log')
+    .select('*')
+    .eq('action', 'reconcile_status')
+    .is('product_id', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) return null;
+  return (data as EtsySyncLogRow | null) ?? null;
+}
+
+/** The newest `marketplace_sales` row (the sales sweep that runs just before the reconcile). */
+export async function getLastSalesCheck(service: SupabaseClient): Promise<EtsySyncLogRow | null> {
+  const { data, error } = await service
+    .from('etsy_sync_log')
+    .select('*')
+    .eq('action', 'marketplace_sales')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) return null;
+  return (data as EtsySyncLogRow | null) ?? null;
+}
+
 /** Opportunistic housekeeping: prune log rows older than ~90 days (no cron dependency). */
 export async function pruneOldSyncLogs(service: SupabaseClient): Promise<void> {
   const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();

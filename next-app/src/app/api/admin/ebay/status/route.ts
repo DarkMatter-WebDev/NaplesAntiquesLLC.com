@@ -1,9 +1,21 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
 import { createServiceClient } from '@/lib/supabase/service';
-import { getConnection, getLastScheduledPricePush, getRecentSyncLog } from '@/lib/ebay/store';
+import {
+  getConnection,
+  getLastSalesCheck,
+  getLastScheduledPricePush,
+  getLastStatusCheck,
+  getRecentSyncLog,
+  type EbaySyncLogRow,
+} from '@/lib/ebay/store';
 import { resolvePricePushHealth } from '@/lib/marketplace-price-push-health';
 import { hasSalesScope } from '@/lib/marketplace-sales';
+import type { StatusCheckRow } from '@/lib/marketplace-status-checks';
+
+function toStatusCheckRow(row: EbaySyncLogRow | null): StatusCheckRow | null {
+  return row ? { createdAt: row.created_at, outcome: row.outcome, message: row.message ?? null, detail: row.detail ?? null } : null;
+}
 
 export const runtime = 'nodejs';
 
@@ -23,6 +35,8 @@ export async function GET() {
   // getLastScheduledPricePush. This log is the worse case of the two: the
   // account-deletion webhook alone has written 56k rows.
   const lastScheduledRun = await getLastScheduledPricePush(service);
+  // The 30-minute sales sweep + status reconcile heartbeat (Admin "30-minute checks" card).
+  const [lastStatusCheck, lastSalesCheck] = await Promise.all([getLastStatusCheck(service), getLastSalesCheck(service)]);
   const cronSecretConfigured = Boolean(process.env.EBAY_CRON_SECRET);
   const health = resolvePricePushHealth({
     enabled: connection?.price_push_enabled ?? false,
@@ -72,6 +86,10 @@ export async function GET() {
             message: lastScheduledRun.message,
           }
         : null,
+    },
+    statusChecks: {
+      lastCheck: toStatusCheckRow(lastStatusCheck),
+      lastSales: toStatusCheckRow(lastSalesCheck),
     },
     sellingLimit: {
       amount: connection?.selling_limit_amount ?? null,
