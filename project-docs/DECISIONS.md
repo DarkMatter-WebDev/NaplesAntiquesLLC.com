@@ -6170,6 +6170,19 @@ Two rules, both general:
    grace window (60 minutes here) so a merely late run is not flagged, but never
    let the grace become an indefinite excuse.
 
+## The Instagram token refreshes inside 14 days of expiry, so the weekly job gets two tries (2026-09-14)
+
+- **Decision (owner request).** `INSTAGRAM_REFRESH_WINDOW_MS` = 14 days
+  (`lib/instagram/auth.ts:26`), up from 7.
+- **Why.** The keep-warm job runs once a week (pg_cron `nej-instagram-token-refresh`,
+  Mon 12:15 UTC). A window equal to the schedule interval gives exactly one
+  attempt, and one transient Meta or network failure then lets the 60-day token
+  expire before the next run, forcing a manual re-paste.
+- ⛔ The window must stay at least **twice** the job interval. If the schedule ever
+  becomes less frequent, widen the window with it. Refreshing earlier costs
+  nothing: Meta issues a fresh 60-day token, and only tokens younger than 24 h
+  are refused (`INSTAGRAM_MIN_REFRESH_AGE_MS`).
+
 ## The "30-minute checks" card turns red after 60 minutes without a check (2026-09-14)
 
 - **Decision (owner-approved mockup).** Settings → Etsy / eBay show a

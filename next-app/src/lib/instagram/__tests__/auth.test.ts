@@ -89,6 +89,17 @@ describe('decideTokenRefresh', () => {
     expect(result).toEqual({ action: 'refresh' });
   });
 
+  // 2026-09-14: the keep-warm job runs once a week, so the window must span two
+  // runs. With 7 days a token expiring 09-30 skipped on 09-21 (9 days left) and
+  // had a single attempt on 09-28 before dying.
+  it('uses a 14-day window so a weekly job gets two attempts before expiry', () => {
+    expect(INSTAGRAM_REFRESH_WINDOW_MS).toBe(14 * 24 * 60 * 60 * 1000);
+    expect(decideTokenRefresh({ hasToken: true, expiresAt: daysFromNow(9), refreshedAt: daysFromNow(-51), now: NOW }))
+      .toEqual({ action: 'refresh' });
+    expect(decideTokenRefresh({ hasToken: true, expiresAt: daysFromNow(15), refreshedAt: daysFromNow(-45), now: NOW }))
+      .toEqual({ action: 'skip', reason: 'not_due' });
+  });
+
   it('refreshes when expiry is unknown so a known-good expiry gets established', () => {
     const result = decideTokenRefresh({
       hasToken: true,

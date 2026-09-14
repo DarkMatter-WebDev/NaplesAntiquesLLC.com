@@ -1,6 +1,203 @@
 
 # Changelog
 
+## 2026-09-14 (night, later) — Yelp: sterling flatware photo added as slideshow #3 (owner-requested)
+
+- **Source.** A customer photo from Judith Lam's Google review: a Waterford
+  sterling silver flatware set in its chest. **The owner confirmed Judith gave
+  permission to reuse it.**
+  - The owner saved it as `OneDrive\Pictures\2026-09-14 13_34_30-Sterling
+    silver flatware set - Google Maps.png`.
+  - It was cropped of its black screenshot edge (976×953 → 918×953) and
+    uploaded as `sterling-flatware-set.jpg`, 219 KB.
+- **Google Business Profile.** Read only; nothing changed.
+  - Maps would not load past ~10 of the 21 reviews.
+  - The review manager scrolls only by dragging its scrollbar.
+  - Of those 17 reviews, only Cristian Reatiga (gold chain), Ryan Smith
+    (gold/watch) and Yisel Perez (gold jewelry) had photos, none of silver.
+    Judith's review was among the 4 not reached.
+  - None of the listing photos that loaded (logo, portrait, showroom,
+    storefront) show silver.
+- **Yelp Photos.**
+  - Uploaded with the caption "Sterling silver flatware set — we buy sterling
+    silver flatware and silver jewelry in Naples". Yelp confirmed "Your photo
+    has been uploaded."
+  - The first attempt was lost because the page reloaded before Yelp
+    confirmed; nothing was posted twice.
+  - Pinned and dragged to 3rd in the featured slideshow. Yelp confirmed "Your
+    slideshow has been updated."
+  - **Order after reload:** 1 owner arms-crossed, 2 gold-testing, 3 sterling
+    flatware, 4 jewelry pile, 5 SpotCalc tray, 6 bin, 7 ring in hand, 8 logo,
+    9 brooches. 11 photos total; nothing deleted.
+
+## 2026-09-14 (night) — Yelp: owner photo added, slideshow reordered (owner-requested, done in the owner's Chrome)
+
+- **Photo:** `WhatsApp Image 2026-09-13 at 10.05.44 AM.jpeg`, the arms-crossed
+  showroom-table photo (the site uses the same one as `chris-owner.webp`).
+  Uploaded as the original JPEG, 327 KB.
+- **Meet the Business Owner:** the section had no photo (blank avatar). Now it
+  shows this photo. Name "Chris S.", role Business Owner and the bio are
+  unchanged. Yelp confirmed "Your business bio has been updated."; the photo is
+  served at `s3-media0.fl.yelpcdn.com/buphoto/BsoDNAFiViqWtZOaKx9LVQ/o.jpg`
+  (HTTP 200, 184 KB).
+- **Photos:** the same photo was added with the caption "Chris, owner of Naples
+  Estate Jewelry, at the Shirley St showroom — free gold, silver and jewelry
+  evaluations". It was pinned and dragged to first place in the featured
+  slideshow. The gold-testing photo moves from #1 to #2; the other six keep
+  their order. Yelp confirmed "Your slideshow has been updated." After a
+  reload the saved order reads 1 arms-crossed, 2 gold-testing.
+- Nothing deleted; 10 photos total.
+
+## 2026-09-14 (evening) — Instagram refresh window 14 days (STAGED); owner decisions; Yelp category check
+
+**Instagram keep-warm window 7 → 14 days (owner request).**
+- The weekly pg_cron job (Mon 12:15Z) plus a 7-day window gave ONE refresh
+  attempt before expiry. For the current token (expires 2026-09-30 13:17Z)
+  that attempt is 09-28 only.
+- `INSTAGRAM_REFRESH_WINDOW_MS` is now 14 days (`lib/instagram/auth.ts:26`,
+  comment explains the two-Mondays guarantee).
+- New test in `lib/instagram/__tests__/auth.test.ts` pins 14 days: 9 days left →
+  refresh, 15 days left → not_due.
+- **After this is pushed**, 09-21 12:15Z (9 days left) refreshes, and 09-28 is
+  the backup. If it is not pushed by then, 09-28 still refreshes under either
+  window.
+- Gate: tsc 0 · `npm run lint` 0 · vitest 1365/1365 (138 files) · build 0 (no
+  `.next/cache/turbopack`).
+
+**Owner decisions.**
+- GBP "Delivery" attribute: **keep**.
+- #132, #136, #137 not on eBay: **the owner handles them**. Removed from the
+  Claude list.
+
+**Yelp categories (read-only check in the owner's Chrome, nothing saved).**
+- Current: Shopping › Gold Buyers, Jewelry, Watches.
+- The Business Information page shows exactly three category rows, each with
+  Edit, and no "Add category" control.
+- The category picker's "buyers" search offers only **Gold Buyers**, **Diamond
+  Buyers** (both Shopping) and Car Buyers.
+- "silver" returns "The categories entered are invalid": Yelp has no Silver
+  Buyers category and no Jewelry Buyers category.
+- The edit dialog was cancelled and re-read: still Gold Buyers / Jewelry /
+  Watches.
+- **Owner decision:** keep Watches over Diamond Buyers ("I'd rather buy watches
+  than diamonds"). The owner first approved swapping Watches for Diamond
+  Buyers, then reversed it before any change was made. Yelp is unchanged.
+
+## 2026-09-14 (due checks) — log retention first run, Instagram token keep-warm on pg_cron; `/shop` loading screen kept
+
+Read-only, service key (the TASKS time-gated items due today).
+
+**`/shop` loading screen:** owner decision "leave it" (entry below).
+
+**`nej-log-retention` first run (07:20Z) worked.**
+
+| | 09-13 20:46Z (before) | 09-14 14:40Z |
+|---|---|---|
+| `webhook_events` rows | 117,178 | 55,533 |
+| `ebay_sync_log` rows | 120,563 | 15,395 |
+| eBay receipts > 30 days | ~62,298 | 526 |
+| `account_deletion` rows > 7 days | ~104,767 | 653 |
+| any sync log > 90 days | 0 | 0 |
+| `cloudflare_stream_webhook_events` > 30 days | 0 | 0 (table empty) |
+| eBay receipts still holding deleted-user data | 22,552 | **0** |
+
+The 526 / 653 leftovers are rows that aged past their window after 07:20Z
+(~1,760 notices/day). The next run takes them. Oldest eBay receipt is now
+2026-08-15; PayPal receipts are untouched (50). The `cron.job_run_details` row
+isn't readable over REST and wasn't opened in the SQL editor. The counts are
+the evidence.
+
+**Instagram token keep-warm on pg_cron.** It ran Mon 12:15:01Z, ok: "no action
+needed (not_due)". That's the first run on pg_cron; earlier rows came from the
+old schedulers at irregular times.
+- The connection is `connected`; the token expires 2026-09-30 13:17Z and was
+  last refreshed 08-01.
+- The refresh window is 7 days (`lib/instagram/auth.ts:26`), so 09-21 will
+  skip and **09-28 12:15Z is the only scheduled refresh attempt before
+  expiry**. A transient failure there would expire the token before 10-05.
+- Flagged in TASKS; widening the window to 14 days is the owner's call.
+
+## 2026-09-14 (later still) — `/shop` loading screen measured (no change)
+
+**Why.** Owner: "measure /shop's loading screen the same way". Measurement
+only; nothing was changed.
+
+**Structure (live HTML, 548 KB decoded).**
+- `shop/(list)/loading.tsx` wraps the page in B:0: the grey skeleton comes
+  first, and the whole page sits in `<div hidden id="S:0">` until
+  `$RC("B:0","S:0")` at char ~330K.
+- Four inner boundaries (B:1–B:4) reveal at 345K–404K.
+- The skeleton has no text, so first paint is the cookie-banner paragraph.
+
+**Server streaming (6 timed fetches).** The skeleton, the S:0 content and the
+`<h1>` all arrive in the FIRST chunk at TTFB (234–710 ms). The `$RC("B:0")`
+swap follows 1–58 ms later, and `</html>` arrives within ~60 ms. The server
+renders the page before sending anything, so the skeleton gives no streaming
+benefit on a first visit.
+
+**Cold load, live /shop.**
+- Phone profile (4× CPU, 9 Mbps, 150 ms), 5 runs: first paint 2252 / 2152 / 1652 /
+  1360 / 1248 ms (median 1652; TTFB 420–1341 ms varies).
+- Filmstrip: first frame 1,403 ms, showing the skeleton.
+- Desktop, 3 runs: 892 / 1488 / 1056 ms.
+
+**Replay A/B.** The live HTML was served from a local proxy
+(`fp-replay-shop.mjs`): as served, versus S:0 inlined in place of the skeleton,
+with B:1–B:4 kept.
+- **Phone, 5 runs:** first paint median **832 → 428 ms**. Filmstrip first
+  frame 853 → 419 ms. Hero-photo LCP 1860 → 1456 ms.
+- **Desktop, 3 runs:** 584 vs 620 ms, no change.
+
+**The trade-off (live soft navigation, `/about` → click Shop, 4 runs each).**
+- **With the skeleton:** it appears 15–20 ms after the click (desktop) and
+  99–116 ms (phone).
+- **Real shop content:** 445–1,094 ms (desktop) and 1,375–1,469 ms (phone). Without the
+  skeleton, the About page would stay up (with the progress bar) until then.
+- **Filters, sort and paging:** they go through `ShopNavigationProgress`
+  (`startTransition` + overlay spinner), which keeps the old grid, so they are
+  not the skeleton's audience.
+
+**Owner decision (09-14): leave it**, as recommended. Removing it saves ~0.4 s on a cold phone visit
+to `/shop` but costs ~1 s+ of click feedback for in-site shoppers. Search and
+Merchant traffic lands mostly on `/shop/[id]`, which has no loading boundary.
+Revisit if GSC shows `/shop` as a common landing page. Report:
+`report-shop-loading.html` (scratchpad, sent to the owner).
+
+## 2026-09-14 (deployed) — 09-14 batch live-verified: `main@ee231dc`, published 9:19 AM ET
+
+Owner: "pushed and deployed, verify all the changes live". Netlify deploy
+`6aa7f4179a4c4600089580aa` (build 9:18:17 → published 9:19:31 AM ET).
+
+- **Node 22:** the deploy log reads "Now using node v22.23.2 (npm v10.9.8)".
+- **Homepage loading screen removed.**
+  - Live `/` and `/es` HTML (200): no `<div hidden id="S:0">`, no `$RC("B:0",…)`,
+    no `main.site-loading-screen`, exactly one `<h1>`; the splash comes before the
+    hero (@13.7K vs @31.4K).
+  - **Cold first paint on production** (headless Chrome, fresh profile).
+    - **Phone profile** (4× CPU, 9 Mbps, 150 ms latency), 5 runs: **908 / 844 / 860 / 1020 / 856 ms**,
+      median 860. Before the change: 1,064 / 1,104 / 1,868 ms (parse probe) and filmstrip
+      frames at 1,106 / 1,112 ms.
+    - **Phone filmstrip:** first frame **808 ms** (was 1,106 ms) and it is the
+      homepage's own splash; the LCP candidate at first paint is the splash title.
+    - **Desktop**, 3 runs: 856 / 916 / 844 ms. The earlier desktop runs were too
+      noisy to compare (568–1,116 ms).
+- **"30-minute checks" card** (owner's Chrome, `/admin/settings`):
+  - Etsy: "Last check 22 min ago (9:00 AM ET): 134 listings checked, 0 sales,
+    nothing to fix."
+  - eBay: "Last check 22 min ago (9:00 AM ET): 128 listings checked, 0 sales,
+    nothing to fix."
+  - Both are green and sit directly above "Daily price automation".
+- **Price push:** today's scheduled runs logged once per channel.
+  - Etsy 11:15:18Z: 48 pushed, 27 unchanged, 0 failed.
+  - eBay 11:45:14Z: 46 pushed, 25 unchanged, 0 failed.
+  - Both cards are green, so the reworded fault copy only shows when a run is missed.
+- **Etsy/eBay request timeouts:** the first 30-minute run on the new code (13:30Z)
+  was clean on both channels.
+  - Sales sweep: 0 orders, 0 failed.
+  - Reconcile: 134 / 128 scanned, 0 drifted.
+  - 0 error rows and 0 "timed out" rows since the deploy.
+- **Deep Field pin:** test-only, nothing to see live.
+
 ## 2026-09-14 (build) — Homepage loading screen deleted: first paint no longer waits on React's swap (STAGED)
 
 **Why.** Owner approved the first-paint proposal (decisions 1 and 2: delete it

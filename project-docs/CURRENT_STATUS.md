@@ -8,7 +8,16 @@
 
 **Read this, then `TASKS.md`.**
 
-📋 **09-14 — STAGED (no SQL): the price-push warning points at Supabase cron
+📋 **09-14 (evening) — STAGED (no SQL): Instagram token refresh window 7 → 14
+days** (`lib/instagram/auth.ts:26`), so the weekly job gets two tries before
+expiry. Push before Mon 09-21 12:15Z for that to apply to the current token
+(expires 09-30). Gate: tsc 0 · lint 0 · 1365/1365 · build 0. `CHANGELOG.md`
+2026-09-14 (evening).
+
+🟢 **09-14 — DEPLOYED `main@ee231dc` (9:19 AM ET) and live-verified** (Node
+22 in the build log; phone first paint 860 ms median vs 1.06–1.12 s before; both
+"30-minute checks" cards green; 13:30Z run clean). `CHANGELOG.md` 2026-09-14
+(deployed). The batch: the price-push warning points at Supabase cron
 history, Etsy/eBay request timeouts, the Deep Field batch-size pin, Netlify
 Node 22, the new "30-minute checks" card on Settings → Etsy / eBay (red
 after 60 min without a check), and the homepage `loading.tsx` deletion (first

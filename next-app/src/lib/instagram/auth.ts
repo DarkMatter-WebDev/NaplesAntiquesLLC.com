@@ -22,8 +22,15 @@ import { InstagramApiError, fetchInstagramProfile, redactInstagramSecrets } from
 const INSTAGRAM_REFRESH_ENDPOINT = 'https://graph.instagram.com/refresh_access_token';
 const INSTAGRAM_EXCHANGE_ENDPOINT = 'https://graph.instagram.com/access_token';
 
-/** Refresh once the token is inside this window of expiring. */
-export const INSTAGRAM_REFRESH_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+/**
+ * Refresh once the token is inside this window of expiring.
+ *
+ * 14 days, not 7 (2026-09-14): the keep-warm job fires once a week (pg_cron,
+ * Mon 12:15 UTC), so a 7-day window gave exactly ONE scheduled attempt before
+ * expiry — one transient Meta/network failure and the token died before the
+ * next Monday, forcing a manual re-paste. 14 days guarantees two attempts.
+ */
+export const INSTAGRAM_REFRESH_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
 /** Meta refuses to refresh a token younger than this. */
 export const INSTAGRAM_MIN_REFRESH_AGE_MS = 24 * 60 * 60 * 1000;
 

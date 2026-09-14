@@ -8,10 +8,10 @@
 ### 📋 WHAT'S ACTUALLY LEFT — triaged 2026-09-14 (start here)
 
 A read-only sweep on 2026-09-14 checked every open-looking item in this file
-against `CHANGELOG.md` / `CURRENT_STATUS.md`. **STAGED 09-14 (no SQL, not yet
-pushed):** price-push warning points at Supabase cron history, Etsy/eBay request
-timeouts, Deep Field batch pin, Netlify Node 22. Everything before that is
-deployed. **Older sections below still carry STAGED / DEPLOY /
+against `CHANGELOG.md` / `CURRENT_STATUS.md`. **The 09-14 batch is DEPLOYED
+(`main@ee231dc`, 9:19 AM ET) and live-verified:** price-push warning, Etsy/eBay
+request timeouts, Deep Field batch pin, Netlify Node 22, "30-minute checks"
+card, homepage `loading.tsx` removal. Nothing is staged. **Older sections below still carry STAGED / DEPLOY /
 ◻ markers that are done or superseded; treat anything not listed here as
 history.**
 
@@ -24,17 +24,16 @@ history.**
   - #4 Yelp
   - #8 database hygiene
   - #10 Node 22, Deep Field pin, first paint
-- ✅ #6 Etsy/eBay request timeouts BUILT (STAGED).
-- ✅ #5 warning reworded + "30-minute checks" card BUILT (both STAGED). Owner
+- ✅ #6 Etsy/eBay request timeouts DEPLOYED 09-14 (13:30Z run clean).
+- ✅ #5 warning reworded + "30-minute checks" card DEPLOYED 09-14 (both cards seen green live). Owner
   approved the mockup 09-14: card above "Daily price automation", red after
-  60 min, detail sentence keeps the counts. Not yet seen in a signed-in admin
-  browser — look at Settings → Etsy / eBay after the push.
+  60 min, detail sentence keeps the counts.
 - ⏭ Skipped by the owner: #7 testimonials, #9 spot checks, #10
   marketing-email exclusion, #10 IndexNow on sale.
 - 🔎 **New from the checks (owner decisions / next work):**
-  - 🟡 **First paint — fix BUILT + STAGED 09-14 (owner approved):
-    `(home)/loading.tsx` + unused `SiteLoadingScreen` deleted; local prod build
-    verified. ◻ After the push: cold filmstrip of production.** The line that stood here ("the 08-14 fix did not land") was
+  - ✅ **First paint — fix DEPLOYED + live-verified 09-14:
+    `(home)/loading.tsx` + unused `SiteLoadingScreen` deleted; production phone
+    first paint 860 ms median (was 1.06–1.12 s), filmstrip first frame 808 ms.** The line that stood here ("the 08-14 fix did not land") was
     WRONG: the 08-14 priorities are live (slot 0 high, slot 1 auto, rest low)
     and low-priority images still *start* early by design. The real cause of
     the ~1 s white screen on phones: `(home)/loading.tsx` makes the server send
@@ -43,14 +42,23 @@ history.**
     Replay A/B (live HTML, local proxy, phone 4× CPU): first paint median
     732 → 472 ms with the file deleted; desktop unchanged. Proposal = delete
     that one file. `CHANGELOG.md` 2026-09-14 (later).
-  - GBP listing shows a "Delivery" attribute.
-  - Yelp no longer lists Diamond Buyers (now Gold Buyers / Jewelry / Watches).
-  - #132, #136, #137 have no eBay listing yet.
+  - ✅ `/shop` loading screen MEASURED 09-14 — **owner decision: leave it.**
+    Removing it saves ~0.4 s on a cold phone visit (replay 832 → 428 ms) but
+    loses the instant skeleton when shoppers click in (phone real content
+    ~1.4 s after the click). Revisit only if GSC shows `/shop` as a common
+    landing page. `CHANGELOG.md` 2026-09-14 (later still).
+  - ✅ GBP "Delivery" attribute: owner decision 09-14 — **keep it**.
+  - ✅ Yelp categories: owner decision 09-14 — **keep Gold Buyers / Jewelry /
+    Watches; no Diamond Buyers** ("I'd rather buy watches than diamonds").
+    Yelp shows three category slots, all used. Its only buyer categories are
+    Gold Buyers and Diamond Buyers (no Silver, Jewelry or Watch Buyers).
+    ⛔ Don't re-propose Diamond Buyers.
+  - ✅ #132, #136, #137 not on eBay: owner handles them (09-14).
   - Three test inquiries are still in the DB (`a317891f`, `04cca1ca`,
     `aa00e2bf`); only the owner can delete them.
   - Bing hasn't re-crawled the six "Indexing allowed: No" pages since 09-03
     (re-requesting is an option, 100/day).
-- ◻ After the next push: the Netlify build log shows Node 22.
+- ✅ Netlify build log shows Node 22 (v22.23.2), verified 09-14 after the push.
 
 (Original list, for reference:)
 1. **Mid-September Search Console read.** Breadcrumbs + Pages reports; are
@@ -80,8 +88,20 @@ history.**
     Deep Field batch size in a test; Node 20 → 22 on Netlify (`netlify.toml:7`).
 
 **Time-gated (Claude reads when due):**
-- 2026-09-14: the retention job at 07:20Z; ONE `scheduled_price_push` row per
-  channel after 11:45Z; the first pg_cron Instagram token refresh (Mon 12:15Z).
+- ✅ 2026-09-14 (all read; `CHANGELOG.md` 2026-09-14 "due checks"):
+  - The retention job's first run drained the backlog: `webhook_events` 117k →
+    55.5k and `ebay_sync_log` 120k → 15.4k. 0 receipts still hold deleted-user
+    data.
+  - One `scheduled_price_push` row per channel.
+  - The pg_cron Instagram check ran at 12:15:01Z ("not_due").
+- ⚠️ **Instagram token (expires 2026-09-30 13:17Z) must refresh on a Monday
+  12:15Z run.** The window is widened to 14 days, **STAGED 09-14**
+  (`lib/instagram/auth.ts:26`).
+  - If the push lands before Mon 09-21 12:15Z (8:15 AM ET), 09-21 refreshes
+    and 09-28 is the backup.
+  - Otherwise 09-28 is the only attempt.
+  - Read the `instagram_sync_log` `token_refresh` row after each of those
+    runs. An `error` on the last attempt before 09-30 means re-pasting the token.
 - ~09-18: Apple place card, BBB.
 - ~09-20: GSC validations ("Page with redirect", "Blocked by robots.txt").
 - ~09-24: Yelp ad metrics.
