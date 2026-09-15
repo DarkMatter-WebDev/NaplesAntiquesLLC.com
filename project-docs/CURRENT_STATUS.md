@@ -2,18 +2,38 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-09-14**.
+> in `DECISIONS.md`. Last reconciled: **2026-09-15**.
 
-## Start Here (2026-09-14 — SUPERSEDES the blocks below)
+## Start Here (2026-09-15 — SUPERSEDES the blocks below)
 
 **Read this, then `TASKS.md`.**
 
-📋 **09-14 (late) — STAGED (no SQL): Google site-name `WebSite` entity tightened**
+🟡 **09-15 — BUILT + STAGED, NOT deployed: the hero's email form is now ONE
+"Join the List" button that opens an Email / Text / Both window; text-alert
+phone list (Step 1).** Owner-approved mockup v2
+(https://claude.ai/artifact/Wnst13mirihcKMmoSgfT7B), answers recorded in
+`DECISIONS.md` → *"The hero sign-up is one button…"*. Text preselected,
+store-voice checkbox, never pre-ticked, text-only sign-ups allowed, texts are
+for pieces NEVER listed on the site (photo + price overlay from Admin, reply
+= claim — Step 2). ⚠️ **Owner steps before/at deploy:** run
+`supabase/text-subscribers-2026-09.sql` FIRST (the route calls
+`subscribe_homepage_v2`; without it every sign-up fails), then push. Nothing
+sends a text yet: phone rows sit `pending`. Step 2 (Twilio toll-free,
+pay-as-you-go account + toll-free verification, then the confirmation text,
+STOP/HELP, Text Deals composer, replies) waits on the owner's Twilio account.
+Hero compact limits re-measured for the shorter block (seven limits, table in
+`DECISIONS.md`; compact-ON sweep: 0 fitting sizes changed, 0 overlaps). Gate:
+tsc 0 · lint 0 · 1394/1394 · build 0. Twilio: account created by the owner
+2026-09-15, stopped at plan/card (owner); no number yet.
+
+🟢 **09-14 (night) — DEPLOYED + live-verified; GSC re-crawl of `/` requested
+("Indexing requested"): Google site-name `WebSite` entity tightened**
 (`lib/site-ld.ts`: trailing-slash `url`, `@id`, `publisher` → JewelryStore,
 `alternateName: ["NaplesEstateJewelry.com"]` as the fallback site name).
 The WebSite JSON-LD already existed since 08-15; Google shows the bare domain
-because it isn't confident in a descriptive name yet. After the push, request
-indexing for `/` in GSC. Gate: tsc 0 · lint 0 · 1368/1368 · build 0.
+because it isn't confident in a descriptive name yet. Live-verified on `/`
+and `/es`; GSC re-crawl of `/` requested. Recheck the brand SERP ~09-28.
+Gate: tsc 0 · lint 0 · 1368/1368 · build 0. **Nothing is staged.**
 `CHANGELOG.md` 2026-09-14 (evening, late).
 
 🟢 **09-14 (evening) — DEPLOYED `main@beaf772` (2:07 PM ET): Instagram token
@@ -33,7 +53,8 @@ the same day:
 - Bing Places is published.
 - First paint: the 08-14 image priorities ARE live. The ~1 s white screen on
   phones comes from `(home)/loading.tsx` hiding the whole page until React's
-  swap. Fix = delete that file (phone replay 732 → 472 ms), BUILT + STAGED.
+  swap. Fix = delete that file (phone replay 732 → 472 ms), DEPLOYED in
+  `ee231dc`.
 
 Details: `CHANGELOG.md` 2026-09-14. Everything built before that is DEPLOYED. The
 real open list, triaged against the changelog, is the top block of

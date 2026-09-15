@@ -169,6 +169,68 @@ export async function buildMarketingAudience(scope: AudienceScope = 'all', audie
   return [...byEmail.values()].sort((a, b) => a.email.localeCompare(b.email));
 }
 
+/** One line of Admin → Subscribers: an email recipient, a text-alert sign-up, or both. */
+export type SubscriberDirectoryRow = MarketingRecipient & {
+  /** E.164 mobile number when text alerts were requested. */
+  phone: string | null;
+  smsStatus: 'pending' | 'confirmed' | 'stopped' | null;
+};
+
+/**
+ * The email audience plus every text-alert sign-up, for the admin table.
+ *
+ * Email sends keep using `buildMarketingAudience` — this is a DIRECTORY, not a
+ * send list. A text sign-up with a matching reachable email gets its number
+ * attached to that row; one with no email, or whose email is unsubscribed,
+ * appears as its own row with an empty email. Before the text-subscribers
+ * migration has been run the phone columns simply do not exist yet, and the
+ * directory is the email audience alone rather than an error page.
+ */
+export async function buildSubscriberDirectory(audienceClient?: SupabaseClient): Promise<SubscriberDirectoryRow[]> {
+  const supabase = audienceClient ?? createServiceClient();
+  const audience = await buildMarketingAudience('all', supabase);
+  const rows: SubscriberDirectoryRow[] = audience.map((recipient) => ({ ...recipient, phone: null, smsStatus: null }));
+
+  const { data, error } = await supabase
+    .from('homepage_subscribers')
+    .select('email, full_name, source, subscribed_at, phone_e164, sms_status')
+    .not('phone_e164', 'is', null);
+
+  if (error?.code === '42703') return rows;
+  if (error) throw new Error(`Could not load text-alert subscribers. ${error.message}`);
+
+  const byEmail = new Map(rows.map((row) => [row.email, row]));
+  for (const row of data ?? []) {
+    const phone = typeof row.phone_e164 === 'string' ? row.phone_e164 : null;
+    if (!phone) continue;
+    const smsStatus = row.sms_status === 'confirmed' || row.sms_status === 'pending' || row.sms_status === 'stopped'
+      ? row.sms_status
+      : null;
+    const email = normalizeEmail(row.email);
+    const existing = email ? byEmail.get(email) : undefined;
+    if (existing) {
+      existing.phone = phone;
+      existing.smsStatus = smsStatus;
+      continue;
+    }
+    rows.push({
+      email: '',
+      name: row.full_name ?? null,
+      source: 'subscriber',
+      subscriberSource: row.source ?? null,
+      unsubscribeToken: null,
+      userId: null,
+      subscriberEmail: null,
+      subscribedAt: row.subscribed_at ?? null,
+      accountCreatedAt: null,
+      phone,
+      smsStatus,
+    });
+  }
+
+  return rows;
+}
+
 export async function getMarketingSettings(): Promise<MarketingSettings> {
   const supabase = createServiceClient();
   const { data } = await supabase

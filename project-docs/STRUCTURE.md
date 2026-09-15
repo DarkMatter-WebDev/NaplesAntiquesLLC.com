@@ -1,7 +1,7 @@
 # Structure And Build Integrity
 
 > Canonical project map and single sources of truth. Last reconciled:
-> **2026-09-10**.
+> **2026-09-15**.
 
 ## Runtime Shape
 
@@ -68,6 +68,7 @@ let additional loose app assets accumulate at root.
 | Concern | Source |
 |---|---|
 | Localized pages/routes | `next-app/src/app/[locale]/` |
+| Homepage "Join the List" sign-up (email / text / both) + text-alert phone rules | `components/home/HomeSubscriberForm.tsx` (caption + the one button; hooks `home-subscriber-label` / `-join` for the hero's compact mode) → `components/home/HomeSubscribeModal.tsx` (the window, loaded on tap, portalled); `lib/subscriber-phone.ts` (US-number normalizer, channel parsing, `SMS_CONSENT_TEXT` + version, admin labels); `app/api/subscribe/route.ts` → `subscribe_homepage_v2` (`supabase/text-subscribers-2026-09.sql`: nullable email, `phone_e164`, `sms_*` columns); Admin → Subscribers reads `lib/marketing.ts` `buildSubscriberDirectory` and sorts via `lib/subscriber-sort.ts` (`phone` / `alerts` keys); legal anchor `[locale]/terms` section `id: 'text-messages'` (EN in the page, ES in `lib/spanish-legal-copy.ts`); guards `lib/__tests__/home-subscribe-modal.test.ts` + `subscriber-phone.test.ts`; rules `DECISIONS.md` → *"The hero sign-up is one button"* |
 | SEO guide pages (nested under the parent lander, never `/guides/` or `/blog/`) | `[locale]/silver-services/flatware-value/` (the template), `[locale]/silver-services/silver-marks/` and `[locale]/gold-services/gold-marks/` (the illustrated marks guides — copy lives in `components/silver/SilverMarksSection.tsx` / `components/gold/GoldMarksSection.tsx`, no FAQ LD), `[locale]/gold-services/what-is-my-gold-worth/`, `[locale]/jewelry-appraisal/hallmarks/`, `[locale]/estate-services/selling-inherited-jewelry/` — each `page.tsx` self-contains its copy, FAQPage + BreadcrumbList JSON-LD, and metadata; listed in `sitemap.ts` at 0.6; content rules in `DECISIONS.md` → *"Guide pages live UNDER their parent"* |
 | Breadcrumbs — schema AND visible trail (every sitemap page except `/`, plus product pages) | `src/lib/breadcrumb-ld.ts` (the one `BreadcrumbList` shape + tests), `src/components/BreadcrumbJsonLd.tsx` (the script tag), `src/components/BreadcrumbTrail.tsx` (the visible "Home › Sell Gold" line; `BreadcrumbTrailFromLd` variant for pages that build the LD object by hand). Legal pages get both through `LegalPolicyPage`'s `path` prop. Pages that pre-date the helper (`/sell`, `/sell/[city]`, `/shop/[id]`, `/jewelry-appraisal`, `/diamond-buyers`, `/watch-buyers`, the four guides) still build the LD shape by hand and feed it to the trail — same names for the same parents, placement/tone rules in `DECISIONS.md` |
 | Business-card QR landing page (`/card`, `/es/card`; noindex, not in the sitemap, no site chrome) | `[locale]/card/page.tsx` + `src/components/card/CardTodayHours.tsx`; facts from `business-location.ts` + admin hours; "Read Our Reviews" → `/reviews`; the EN/ES toggle is a soft navigation with NO entrance fade (`components/layout/CustomerReveal.tsx` exempts locale-only pathname changes sitewide; `lib/__tests__/customer-reveal-locale-switch.test.ts`); rules in `DECISIONS.md` → *"The /card page"* + *"A language switch is a text swap"*; guarded by `lib/__tests__/card-page.test.ts` + `reviews-page.test.ts` (labels) |

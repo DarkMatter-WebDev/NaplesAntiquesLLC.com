@@ -55,15 +55,31 @@ describe('compact hero', () => {
 
   it('keeps the measured hero-height limits, one table per headline language', () => {
     expect(overlay).toContain('(isEs ? COMPACT_BANDS_ES : COMPACT_BANDS_EN).map(compactBandCss)');
-    for (const limit of [600, 580, 560, 540, 520, 498, 478, 398, 460]) {
+    // Re-measured 2026-09-15 for the one-button sign-up block (CHANGELOG 2026-09-15).
+    for (const limit of [393, 373, 353, 318, 328, 388, 392]) {
       expect(overlay).toContain(`maxHeroHeight: ${limit},`);
+    }
+    for (const old of [600, 580, 560, 540, 520, 498, 478, 398, 460]) {
+      expect(overlay).not.toContain(`maxHeroHeight: ${old},`);
     }
   });
 
-  it('styles the sign-up form through its class hooks', () => {
-    for (const hook of ['home-subscriber-label', 'home-subscriber-fields', 'home-subscriber-input', 'home-subscriber-join', 'home-subscriber-privacy']) {
+  it('styles the sign-up block through its class hooks', () => {
+    // Since 2026-09-15 the block is the caption and ONE "Join the List" button
+    // (the fields live in HomeSubscribeModal), so these are the only hooks.
+    for (const hook of ['home-subscriber-label', 'home-subscriber-join']) {
       expect(form).toContain(hook);
       expect(overlay).toContain(`.${hook}`);
     }
+    for (const gone of ['home-subscriber-fields', 'home-subscriber-input', 'home-subscriber-privacy']) {
+      expect(form).not.toContain(gone);
+      expect(overlay).not.toContain(gone);
+    }
+  });
+
+  it('loads the sign-up window on the tap, never with the homepage', () => {
+    // The window must not join the hero's first paint / LCP path.
+    expect(form).toMatch(/dynamic\(\(\) => import\('\.\/HomeSubscribeModal'\), \{ ssr: false \}\)/);
+    expect(form).toContain('{open && <HomeSubscribeModal');
   });
 });

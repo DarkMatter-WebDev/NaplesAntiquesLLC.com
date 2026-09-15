@@ -1,6 +1,156 @@
 
 # Changelog
 
+## 2026-09-15 — hero email form → ONE "Join the List" button + Email / Text / Both window; text-alert phone list (Step 1) BUILT, dev-verified, STAGED (⚠️ needs owner SQL before deploy; no env vars)
+
+**Owner asks, in order.** (1) "convert the email subscriber sign up fields on
+the homepage hero into a button that opens up a new modal … give the option
+for the user to add their phone number for subscriber text messages … allow
+the admin to grow a phone number or text message mailing list where I can
+text out deals and people can respond quickly to claim them, mock it up and
+plan it and show it to me before implementation." (2) "fold the input fields
+into a single button that opens the modal and allowed users to choose either
+email signup only or text message, etc." (3) On mockup v1's seven questions:
+"1B, 2text, 3 use stores phrasing, 4 go with recommended, 5 txts will be for
+pieces never listed on the site, informal photos with price overlay if we can
+do that from within admin, 6 twilio free, 7 explain better." (4) On v2's two
+open questions: "yes to both". Mockup (v1 → v2, same URL):
+https://claude.ai/artifact/Wnst13mirihcKMmoSgfT7B. Rules recorded in
+`DECISIONS.md` → *"The hero sign-up is one button…"* and *"The hero's compact
+limits were re-measured…"*.
+
+**Built — Step 1 (this batch, no texting provider needed):**
+- `components/home/HomeSubscriberForm.tsx` (name kept): today's caption over
+  ONE gold **Join the List** button (Option B). The window is
+  `components/home/HomeSubscribeModal.tsx` (NEW), loaded on the tap via
+  `next/dynamic` `ssr: false`, portalled into `<body>` (the overlay lives inside
+  transformed panes), `role="dialog"`, focus moved in/out, Tab trapped, Escape
+  and backdrop close, page scroll locked while open. Email / Text / Both
+  radiogroup, **Text preselected**; Name (optional); Email (email/both); Cell
+  number with `+1` (text/both) + the "Text-only deals" box: pitch, the
+  store-voice checkbox ("Text me the moment a good deal drops. Pieces move
+  fast; first reply takes it."), the carrier statement with Privacy Policy +
+  Text Message Terms links. Consent box NEVER pre-ticked. Success: email-only
+  "You're on the list."; text: "Before any deal goes out, you'll get one text
+  asking you to reply YES. Nothing is sent until you do." (true now and after
+  the texting batch). EN + ES throughout.
+- `lib/subscriber-phone.ts` (NEW, pure): `normalizeUsPhone` (US only, E.164,
+  rejects non-dialable / fiction-block numbers), `formatUsPhone`, channel
+  parsing, `SMS_CONSENT_TEXT` en/es + `SMS_CONSENT_VERSION` = 1,
+  `SMS_CONSENT_LINKS`, admin labels.
+- `app/api/subscribe/route.ts`: `{ channel, fullName, email?, phone?,
+  smsConsent?, locale }` → per-channel validation (email required for
+  email/both; dialable number AND ticked box for text/both) → RPC
+  `subscribe_homepage_v2` with the SERVER's copy of the consent statement +
+  version (never text from the browser). Returns `{ success, channel,
+  smsStatus }`.
+- `supabase/text-subscribers-2026-09.sql` (NEW, ⚠️ owner runs BEFORE deploy):
+  `homepage_subscribers.email` nullable; `phone_e164` (unique partial index,
+  format check), `sms_status` (pending / confirmed / stopped),
+  `sms_consent_at`, `sms_consent_text`, `sms_consent_version`,
+  `sms_confirmed_at`, `sms_stopped_at`; check "email or phone";
+  `subscribe_homepage_v2(...)` (security definer, service_role only): match by
+  email then phone, merge, a phone already on another row stays there, fresh
+  tick → `pending` unless already confirmed on the same number. The old
+  `subscribe_homepage` is left in place.
+- Admin → Subscribers: `lib/marketing.ts` `buildSubscriberDirectory` (email
+  audience + every phone row; a phone-only or unsubscribed-email row appears
+  with an empty email; tolerates the migration not being run yet — code
+  `42703` → email audience alone); `lib/subscriber-sort.ts` + `SubscriberRow`
+  gain `phone` / `smsStatus`, sort keys `phone` / `alerts`,
+  `subscriberAlertsLabel`, `subscriberRowKey`; `SubscribersManager.tsx`:
+  Phone + Alerts columns (channel pill + status pill), "N reachable by email ·
+  M on the text list", "Show: text list only", "Copy Confirmed Numbers"
+  (YES-confirmed only), Delete by number for text-only rows;
+  `admin/subscribers/page.tsx`: three tiles (reachable by email · confirmed for
+  texts · text pending YES); `api/admin/subscribers` DELETE accepts `{ phone }`.
+- Legal: `LegalSection.id` (anchor, `scroll-mt-28`); Terms → **"Text Message
+  Program"** section (`#text-messages`, EN in the page, ES in
+  `lib/spanish-legal-copy.ts`: recurring automated marketing texts, not a
+  condition of purchase, frequency, rates, the YES step, STOP / HELP, carriers
+  not liable, numbers never shared with third parties); Privacy → one bullet
+  (STOP; "We do not share mobile numbers or text-message consent with third
+  parties or affiliates for their marketing purposes.").
+- Hero compact mode (`HomeHeroOverlay.tsx`): the compact rule bodies dropped
+  the `-fields` / `-input` / `-privacy` hooks; **every band limit
+  re-measured** (table in `DECISIONS.md`; seven limits: 393 / 373 / 353 / 318 /
+  328 / 388 / 392, per language below 640, shared from 640 up).
+- Tests: `lib/__tests__/subscriber-phone.test.ts` (NEW, 10),
+  `home-subscribe-modal.test.ts` (NEW, 9 source guards: Text preselected,
+  never pre-ticked, store wording, statement + links, dialog + portal, no
+  "we just sent", terms anchor EN+ES, privacy sentence),
+  `subscriber-sort.test.ts` (+4), `app/api/subscribe/route.test.ts` (+3; the
+  old RPC expectation → v2), `hero-short-screens.test.ts` (hooks + the seven
+  limits, rejects the nine old ones, pins the on-tap dynamic import).
+- Docs: `features/lead-capture.md`, `STRUCTURE.md`, `DECISIONS.md` (two
+  entries), this file, `CURRENT_STATUS.md`, `TASKS.md`.
+
+**Hero re-measure (the sign-up block is ~80px shorter, so the 09-13 limits
+would have compacted screens that now fit).** Headless Chrome over CDP
+(`chrome.exe --headless=new --remote-debugging-port`, a ~120-line node script
+in the session scratchpad, not kept): per locale × width, load `/` or `/es`,
+wait for `.home-hero-overlay.is-ready` AND for `document.getAnimations()` to
+settle, then per height `Emulation.setDeviceMetricsOverride` + write
+`--app-vh` = `innerHeight` (exactly what a fresh load does) + two rAF, and
+measure the headline / sign-up block / buttons / New Arrivals rects.
+- ⚠️ **Trap found and fixed:** the first pass measured the low heights while
+  the bottom block was still sliding up (720ms after a 500ms delay, 18px), which
+  shifted the block 9–17px between runs, produced 19 phantom "overlaps"
+  (in cells where compact was not even active) and a phantom non-monotonic
+  column at 349px. Waiting for the animations made every column monotonic.
+- Compact OFF (temporary `return ''` in `compactBandCss`, removed): EN + ES,
+  84 widths 320–1920 × 15 heights 340–620 = 2,520 cells. Tallest tight/
+  overlapping window per width → the limits in `DECISIONS.md`; each also sits
+  below every width's 16px ceiling in its band, so no fitting window is
+  compacted.
+- Compact ON (final code), same 84 widths × 40 heights 320–1100 = 6,720
+  cells (EN + ES): **0 sizes that fit without compact changed** (1,402 cells
+  identical to the compact-off pass; every changed cell was compact or did
+  not fit), **0 buttons or New Arrivals past the hero bottom, 0 sideways
+  scroll, 0 headline above the hero top.** The one leftover was a row at
+  exactly the 308 limit (614–639 × 400, −3.4px: the hero measures a hair over
+  308 so the band never engaged) → limit raised to 318 (ceiling 327) and the
+  610–640 strip re-swept at 7 heights: **0 overlaps**; 17 tight cells sit just
+  above each limit (6.6–6.7px at 614–639 × 410 and 640 × 420), never
+  overlapping — the accepted "tight just past the switch" edge the 09-13
+  entry also carries.
+
+**Verification (from `next-app/`):** `npx tsc --noEmit` exit 0 · `npm run
+lint` exit 0 · `npx vitest run` **1394/1394 (141 files)** · dev: `/` and `/es`
+render the caption + button; the window opens on Text, Email shows only the
+email field, Both shows both, empty number → "Please enter a valid US mobile
+number.", number without the box → "Please tick the box to receive text
+alerts.", number + box → `POST /api/subscribe` reaches the RPC (500 "Could not
+save subscription." because `subscribe_homepage_v2` does not exist in Supabase
+yet — the SQL is the owner's step; nothing was written); Escape closes;
+`/terms`, `/es/terms` carry `id="text-messages"` + the section, `/privacy`,
+`/es/privacy` the new bullet (curl). Admin page NOT opened in a browser (needs
+the owner's login); it type-checks and its data path is unit-tested.
+`npm run build` exit 0 (dev server left running; `.next/cache/` holds only
+`fetch-cache` + `images` — no Turbopack build cache). Compact-ON sweep: the
+re-measure block above.
+
+**Twilio (Step 2 prerequisite), same session:** the owner created the account
+in Chrome (email + password + verification are theirs; this agent only opened
+the pages). Stopped at "Select a plan": Pay as you go is preselected and the
+next step is the card — the owner's. Account SID visible in the console URL
+(`ACf0213b…`); nothing bought, no number yet.
+
+## 2026-09-14 (night, deployed) — site-name entity live-verified; homepage re-crawl requested in GSC
+
+- **Live check** (Googlebot user agent):
+  - `/` and `/es` each carry exactly ONE `WebSite` node:
+    `{"@id":"https://naplesestatejewelry.com/#website","name":"Naples Estate Jewelry","alternateName":["NaplesEstateJewelry.com"],"url":"https://naplesestatejewelry.com/","publisher":{"@id":"https://naplesestatejewelry.com/#business"}}`.
+  - The JewelryStore `@id` is `…/#business` (the publisher link resolves).
+    `og:site_name` is "Naples Estate Jewelry".
+  - `/about` has no `WebSite` node, as intended.
+- **GSC** (`.com` URL-prefix property): URL Inspection for
+  `https://naplesestatejewelry.com/` read "URL is on Google · Page is indexed".
+  Request indexing was used anyway so Google re-reads the new entity sooner:
+  "Indexing requested — URL was added to a priority crawl queue."
+- **Next:** recheck the brand SERP site-name line every ~2 weeks. It should
+  become "Naples Estate Jewelry" or "NaplesEstateJewelry.com"; expect days to weeks.
+
 ## 2026-09-14 (evening, late) — `main@beaf772` live; Google site-name entity tightened (STAGED)
 
 **Deploy check.** Netlify deploy `6aa837ea521019000956e91c` (`main@beaf772`)

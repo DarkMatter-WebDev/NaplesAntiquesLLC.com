@@ -1,6 +1,56 @@
 # Feature: Lead Capture
 
-> Current lead and subscriber capture surfaces. Last updated: **2026-09-10**.
+> Current lead and subscriber capture surfaces. Last updated: **2026-09-15**.
+
+## Homepage "Join the List" window — email, text alerts, or both (2026-09-15)
+
+The hero's Name / Email / Join row is gone. The block is the caption ("Get
+first look at new pieces") over ONE gold **Join the List** button
+(`components/home/HomeSubscriberForm.tsx`, file name kept for the hero's
+imports and guard test). The button opens `HomeSubscribeModal.tsx`, loaded on
+the tap (`next/dynamic`, `ssr: false`, portalled into `<body>`), so it never
+joins the homepage's first paint.
+
+- **Choice at the top:** Email / Text / Both — **Text preselected** (owner).
+  Fields change to match: Name (optional) · Email (email/both) · Cell number
+  (text/both) with the "Text-only deals" box: the pitch, the consent checkbox
+  (store wording: "Text me the moment a good deal drops. Pieces move fast;
+  first reply takes it."), and the carrier-required statement.
+- ⛔ **The consent box is never pre-ticked.** The statement shown is
+  `SMS_CONSENT_TEXT` in `lib/subscriber-phone.ts`; the server stores ITS copy
+  of that wording on the row (`sms_consent_text` + `sms_consent_version`) as
+  the record of consent — never text the browser sends. A rewording bumps
+  `SMS_CONSENT_VERSION`; old rows keep the wording they agreed to.
+- **Text-only sign-ups are allowed** (no email). `homepage_subscribers.email`
+  is nullable since `supabase/text-subscribers-2026-09.sql`; a row must have
+  an email or a `phone_e164` (check constraint), phones are unique.
+- **API:** `POST /api/subscribe` with `{ channel, fullName, email?, phone?,
+  smsConsent?, locale }` → `subscribe_homepage_v2` (service-role only).
+  Numbers are US only, stored as `+1` + ten digits (`normalizeUsPhone`,
+  rejects anything not dialable — no "cleanup" into a wrong number).
+  Matching: by email first, then by phone; a phone already on ANOTHER row
+  stays there and the sign-up is saved without it.
+- **Nothing sends a text yet.** A phone row is saved as `sms_status =
+  'pending'`. The window tells the visitor "Before any deal goes out, you'll
+  get one text asking you to reply YES" — true now (nothing is sent) and after
+  the texting batch (which sends it at once). `confirmed` / `stopped` are set
+  by that later batch (Twilio toll-free, the owner's account).
+- **Admin → Subscribers** (`lib/marketing.ts` `buildSubscriberDirectory`):
+  Phone + Alerts columns (channel pill + Confirmed / Pending YES / Stopped),
+  three tiles (reachable by email · confirmed for texts · pending), "Copy
+  Confirmed Numbers" (only YES-confirmed numbers), a text-list-only filter;
+  text-only rows can be deleted by number (`DELETE /api/admin/subscribers`
+  with `{ phone }`). Email sends still use `buildMarketingAudience`, which
+  skips rows without a valid email.
+- **Legal:** Terms → "Text Message Program" section (`id="text-messages"`,
+  EN + ES) and one Privacy bullet (STOP + "we do not share mobile numbers…"),
+  both linked from the consent statement. Carriers check for these.
+- Guards: `lib/__tests__/home-subscribe-modal.test.ts`,
+  `subscriber-phone.test.ts`, `subscriber-sort.test.ts`,
+  `app/api/subscribe/route.test.ts`, `hero-short-screens.test.ts`.
+- Rules: `DECISIONS.md` → *"The hero sign-up is one button; the window offers
+  Email, Text or Both"*. Mockup (owner-approved, v2):
+  https://claude.ai/artifact/Wnst13mirihcKMmoSgfT7B
 
 The September 10 audit and authorized seller-acquisition implementation are in
 `../SEO_LEAD_AUDIT.md`. Local seller copy/call presentation is built and verified,

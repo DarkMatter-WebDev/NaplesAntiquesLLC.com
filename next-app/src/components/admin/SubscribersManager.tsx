@@ -7,21 +7,45 @@ import {
   DEFAULT_SUBSCRIBER_SORT,
   nextSubscriberSort,
   sortSubscriberRows,
+  subscriberRowKey,
   subscriberSourceLabel,
   type SubscriberRow,
   type SubscriberSortKey,
 } from '@/lib/subscriber-sort';
+import { formatUsPhone, smsStatusLabel, subscriberChannelLabel } from '@/lib/subscriber-phone';
 
 export type { SubscriberRow } from '@/lib/subscriber-sort';
 
 // Column headers; a `sortKey` makes the header a sort button (lib/subscriber-sort.ts).
+// Phone + Alerts since 2026-09-15: the "Join the List" window can sign a
+// visitor up for text deals, with or without an email.
 const COLUMNS: { label: string; sortKey: SubscriberSortKey | null }[] = [
   { label: 'Name', sortKey: 'name' },
   { label: 'Email', sortKey: 'email' },
+  { label: 'Phone', sortKey: 'phone' },
+  { label: 'Alerts', sortKey: 'alerts' },
   { label: 'Source', sortKey: 'source' },
   { label: 'Subscribed', sortKey: 'subscribed' },
   { label: 'Actions', sortKey: null },
 ];
+
+// The Alerts column: which channel the row is on, then where the number stands.
+const STATUS_COLORS: Record<string, string> = {
+  confirmed: '#2f6b3a',
+  pending: '#8a5a00',
+  stopped: 'var(--color-error)',
+};
+
+function Pill({ children, color }: { children: React.ReactNode; color: string }) {
+  return (
+    <span
+      className="inline-block rounded-full border px-2 py-0.5 text-[0.58rem] font-bold uppercase tracking-[0.12em]"
+      style={{ color, borderColor: color, fontFamily: 'var(--font-label)' }}
+    >
+      {children}
+    </span>
+  );
+}
 
 // Pinned to Eastern so the server render and the owner's browser agree (a
 // hydration mismatch otherwise) and so the time reads as the showroom's clock,
@@ -69,10 +93,19 @@ export default function SubscribersManager({ initialRows }: { initialRows: Subsc
   const [busyEmail, setBusyEmail] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ text: string; ok: boolean } | null>(null);
   const [sort, setSort] = useState(DEFAULT_SUBSCRIBER_SORT);
+  const [textOnly, setTextOnly] = useState(false);
 
   const sortedRows = useMemo(() => sortSubscriberRows(rows, sort), [rows, sort]);
+  const visibleRows = useMemo(() => (textOnly ? sortedRows.filter((row) => row.phone) : sortedRows), [sortedRows, textOnly]);
   // "Copy All Emails" follows the visible order so a pasted list reads like the table.
-  const emailList = useMemo(() => sortedRows.map((row) => row.email).join(', '), [sortedRows]);
+  const emailList = useMemo(() => sortedRows.filter((row) => row.email).map((row) => row.email).join(', '), [sortedRows]);
+  // Only numbers that replied YES are ever texted, so only those are copied.
+  const confirmedNumbers = useMemo(
+    () => sortedRows.filter((row) => row.phone && row.smsStatus === 'confirmed').map((row) => formatUsPhone(row.phone)),
+    [sortedRows],
+  );
+  const emailCount = useMemo(() => rows.filter((row) => row.email).length, [rows]);
+  const textCount = useMemo(() => rows.filter((row) => row.phone).length, [rows]);
 
   function beginEdit(row: SubscriberRow) {
     setEditingEmail(row.subscriberEmail);
@@ -130,6 +163,8 @@ export default function SubscribersManager({ initialRows }: { initialRows: Subsc
             subscriberEmail: normalizedEmail,
             subscribedAt: new Date().toISOString(),
             accountCreatedAt: null,
+            phone: null,
+            smsStatus: null,
           },
           ...current,
         ];
@@ -182,25 +217,31 @@ export default function SubscribersManager({ initialRows }: { initialRows: Subsc
   }
 
   async function remove(row: SubscriberRow) {
-    if (!row.subscriberEmail) return;
-    const confirmed = window.confirm(`Delete ${row.subscriberEmail} from newsletter subscribers? Account-holder records will not be deleted.`);
+    // An email row is removed by its email (the number goes with it); a
+    // text-only row has no email and is removed by its number.
+    const byPhone = !row.subscriberEmail && row.phone;
+    if (!row.subscriberEmail && !byPhone) return;
+    const who = row.subscriberEmail ?? formatUsPhone(row.phone);
+    const confirmed = window.confirm(`Delete ${who} from subscribers? Account-holder records will not be deleted.`);
     if (!confirmed) return;
 
-    setBusyEmail(row.subscriberEmail);
+    const busyKey = row.subscriberEmail ?? (row.phone as string);
+    setBusyEmail(busyKey);
     setNotice(null);
     try {
       const res = await fetch('/api/admin/subscribers', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: row.subscriberEmail }),
+        body: JSON.stringify(byPhone ? { phone: row.phone } : { email: row.subscriberEmail }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error || 'Could not delete subscriber.');
 
       setRows((current) => current
         .map((item) => {
+          if (byPhone) return item.phone === row.phone && !item.subscriberEmail ? null : item;
           if (item.subscriberEmail !== row.subscriberEmail) return item;
-          if (item.source === 'both') return { ...item, source: 'account', subscriberEmail: null };
+          if (item.source === 'both') return { ...item, source: 'account', subscriberEmail: null, phone: null, smsStatus: null };
           return null;
         })
         .filter((item): item is SubscriberRow => item !== null));
@@ -217,7 +258,19 @@ export default function SubscribersManager({ initialRows }: { initialRows: Subsc
     try {
       const copied = await copyText(emailList);
       setNotice({
-        text: copied ? `Copied ${rows.length} email${rows.length === 1 ? '' : 's'}.` : 'Could not copy automatically.',
+        text: copied ? `Copied ${emailCount} email${emailCount === 1 ? '' : 's'}.` : 'Could not copy automatically.',
+        ok: copied,
+      });
+    } catch {
+      setNotice({ text: 'Could not copy automatically.', ok: false });
+    }
+  }
+
+  async function copyNumbers() {
+    try {
+      const copied = await copyText(confirmedNumbers.join(', '));
+      setNotice({
+        text: copied ? `Copied ${confirmedNumbers.length} confirmed number${confirmedNumbers.length === 1 ? '' : 's'}.` : 'Could not copy automatically.',
         ok: copied,
       });
     } catch {
@@ -269,11 +322,26 @@ export default function SubscribersManager({ initialRows }: { initialRows: Subsc
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
-          {rows.length} reachable recipient{rows.length === 1 ? '' : 's'}
+          {emailCount} reachable by email · {textCount} on the text list
+          {textOnly ? ` · showing ${visibleRows.length} with a number` : ''}
         </p>
-        <button type="button" className="outline-button text-sm" onClick={copyEmails} disabled={rows.length === 0}>
-          Copy All Emails
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="outline-button text-sm"
+            onClick={() => setTextOnly((current) => !current)}
+            aria-pressed={textOnly}
+            style={textOnly ? { background: 'color-mix(in srgb, var(--color-primary) 12%, transparent)' } : undefined}
+          >
+            {textOnly ? 'Showing: text list' : 'Show: text list only'}
+          </button>
+          <button type="button" className="outline-button text-sm" onClick={copyNumbers} disabled={confirmedNumbers.length === 0} title="Only numbers that replied YES">
+            Copy Confirmed Numbers
+          </button>
+          <button type="button" className="outline-button text-sm" onClick={copyEmails} disabled={emailCount === 0}>
+            Copy All Emails
+          </button>
+        </div>
       </div>
 
       {notice && (
@@ -290,7 +358,7 @@ export default function SubscribersManager({ initialRows }: { initialRows: Subsc
       )}
 
       <div className="responsive-table-wrap border" style={{ borderColor: 'var(--color-outline-variant)', background: 'white' }}>
-        <table className="w-full min-w-[980px] text-left text-sm">
+        <table className="w-full min-w-[1180px] text-left text-sm">
           <thead style={{ background: 'var(--color-surface-container-low)' }}>
             <tr>
               {COLUMNS.map(({ label, sortKey }) => {
@@ -326,13 +394,16 @@ export default function SubscribersManager({ initialRows }: { initialRows: Subsc
             </tr>
           </thead>
           <tbody>
-            {sortedRows.map((subscriber) => {
+            {visibleRows.map((subscriber) => {
               const canManage = Boolean(subscriber.subscriberEmail);
+              const canRemoveByPhone = !canManage && Boolean(subscriber.phone);
               const isEditing = editingEmail === subscriber.subscriberEmail && canManage;
-              const busy = busyEmail === subscriber.subscriberEmail;
+              const busy = busyEmail === (subscriber.subscriberEmail ?? subscriber.phone);
+              const channel = subscriberChannelLabel({ email: subscriber.email || null, phone: subscriber.phone });
+              const statusLabel = subscriber.phone ? smsStatusLabel(subscriber.smsStatus) : '';
 
               return (
-                <tr key={`${subscriber.source}-${subscriber.email}-${subscriber.subscriberEmail ?? ''}`} className="border-t" style={{ borderColor: 'var(--color-outline-variant)' }}>
+                <tr key={`${subscriber.source}-${subscriberRowKey(subscriber)}-${subscriber.subscriberEmail ?? ''}`} className="border-t" style={{ borderColor: 'var(--color-outline-variant)' }}>
                   <td className="px-4 py-3 font-semibold" style={{ color: 'var(--color-on-surface)' }}>
                     {isEditing ? (
                       <input className="form-field w-full" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} />
@@ -344,8 +415,19 @@ export default function SubscribersManager({ initialRows }: { initialRows: Subsc
                     {isEditing ? (
                       <input className="form-field w-full" type="email" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} />
                     ) : (
-                      subscriber.email
+                      subscriber.email || '-'
                     )}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap tabular-nums" style={{ color: 'var(--color-on-surface)' }}>
+                    {formatUsPhone(subscriber.phone) || '-'}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <span className="inline-flex flex-wrap items-center gap-1.5">
+                      <Pill color="var(--color-on-surface-variant)">{channel}</Pill>
+                      {statusLabel && (
+                        <Pill color={STATUS_COLORS[subscriber.smsStatus ?? ''] ?? 'var(--color-on-surface-variant)'}>{statusLabel}</Pill>
+                      )}
+                    </span>
                   </td>
                   <td className="px-4 py-3" style={{ color: 'var(--color-on-surface-variant)' }}>
                     {subscriberSourceLabel(subscriber)}
@@ -383,6 +465,10 @@ export default function SubscribersManager({ initialRows }: { initialRows: Subsc
                           </>
                         )}
                       </div>
+                    ) : canRemoveByPhone ? (
+                      <button type="button" className="outline-button text-xs" onClick={() => void remove(subscriber)} disabled={busyEmail !== null} style={{ color: 'var(--color-error)' }}>
+                        {busy ? 'Deleting...' : 'Delete'}
+                      </button>
                     ) : (
                       <span className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
                         {[
@@ -395,10 +481,10 @@ export default function SubscribersManager({ initialRows }: { initialRows: Subsc
                 </tr>
               );
             })}
-            {rows.length === 0 && (
+            {visibleRows.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-12 text-center" style={{ color: 'var(--color-on-surface-variant)' }}>
-                  No reachable marketing recipients yet.
+                <td colSpan={COLUMNS.length} className="px-4 py-12 text-center" style={{ color: 'var(--color-on-surface-variant)' }}>
+                  {textOnly ? 'Nobody has asked for text alerts yet.' : 'No reachable marketing recipients yet.'}
                 </td>
               </tr>
             )}

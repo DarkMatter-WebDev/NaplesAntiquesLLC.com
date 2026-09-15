@@ -1,118 +1,56 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useState } from 'react';
-import FormPrivacyNotice from '@/components/legal/FormPrivacyNotice';
 
 const GOLD = '#e9c349';
 
+// The window is loaded on the first tap, never with the homepage: it is not
+// part of the hero's first paint or its measured LCP (DECISIONS, "Media &
+// hero loading"). `ssr: false` because it portals into document.body.
+const HomeSubscribeModal = dynamic(() => import('./HomeSubscribeModal'), { ssr: false });
+
+/**
+ * The hero's sign-up block: today's caption over ONE gold button that opens
+ * the "Join the List" window (owner, 2026-09-15, "Option B"). Until then this
+ * component WAS the form — Name / Email / Join on one row with the consent
+ * line under it. The fields, the consent line and the choice of email or text
+ * alerts now live in `HomeSubscribeModal`.
+ *
+ * The file keeps its name so the hero's imports and guard test are stable;
+ * the `home-subscriber-*` class names are hooks for the hero's compact mode
+ * (HomeHeroOverlay), which shrinks these two elements on screens too short to
+ * fit them. They carry no styles of their own.
+ */
 export default function HomeSubscriberForm({ locale }: { locale: string }) {
   const isEs = locale === 'es';
-  const [email, setEmail] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [status, setStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
-  const [message, setMessage] = useState('');
-
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const submittedEmail = email;
-    const submittedFullName = fullName;
-    setStatus('saving');
-    setMessage('');
-    setEmail('');
-    setFullName('');
-
-    const res = await fetch('/api/subscribe', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: submittedEmail, fullName: submittedFullName, locale }),
-    });
-    const data = await res.json().catch(() => null);
-
-    if (!res.ok || !data?.success) {
-      setEmail(submittedEmail);
-      setFullName(submittedFullName);
-      setStatus('error');
-      setMessage(data?.error ?? (isEs ? 'No se pudo guardar.' : 'Could not save.'));
-      return;
-    }
-
-    setStatus('success');
-    setMessage(isEs ? 'Gracias. Ya está en la lista.' : "You're on the list.");
-  }
-
-  // Inputs use a solid light fill with dark text so they're clearly legible
-  // over both the white and black hero backgrounds the carousel sweeps through.
-  const inputStyle: React.CSSProperties = {
-    background: 'rgba(255,255,255,0.96)',
-    borderColor: GOLD,
-    color: '#1a1a1a',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.18)',
-  };
+  const [open, setOpen] = useState(false);
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="w-full max-w-2xl"
-      style={{
-        color: 'var(--hero-text)',
-        fontFamily: 'var(--font-label)',
-      }}
+    <div
+      className="flex w-full max-w-2xl flex-col items-center"
+      style={{ color: 'var(--hero-text)', fontFamily: 'var(--font-label)' }}
     >
-      {/* The home-subscriber-* class names are hooks for the hero's compact
-          mode (HomeHeroOverlay), which shrinks these controls on screens too
-          short to fit them. They carry no styles of their own. */}
       <p
         className="home-subscriber-label mb-2 text-[0.6rem] sm:mb-3 sm:text-[0.68rem] font-bold uppercase tracking-[0.24em]"
         style={{ color: 'var(--hero-eyebrow)', textShadow: '0 1px 10px rgba(var(--hero-fade), 0.9)' }}
       >
         {isEs ? 'Reciba nuevas piezas primero' : 'Get first look at new pieces'}
       </p>
-      <div
-        className="home-subscriber-fields grid gap-1.5 sm:gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)_auto]"
-        style={{ alignItems: 'stretch' }}
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        className="home-subscriber-join inline-flex h-10 items-center gap-2 rounded-full px-6 text-[0.7rem] font-extrabold uppercase tracking-[0.18em] sm:h-11 sm:px-7 sm:text-xs"
+        style={{ background: GOLD, color: '#171717', boxShadow: '0 2px 12px rgba(0,0,0,0.2)' }}
       >
-        {/* aria-label, not a visible <label>: the design is a compact inline row
-            where placeholders carry the visual cue. A placeholder is NOT an
-            accessible name — it is not exposed as one by every AT and it
-            disappears on input — so the name is supplied explicitly. */}
-        <input
-          value={fullName}
-          onChange={(event) => setFullName(event.target.value)}
-          placeholder={isEs ? 'Nombre' : 'Name'}
-          aria-label={isEs ? 'Nombre' : 'Name'}
-          autoComplete="name"
-          className="home-subscriber-input h-9 min-w-0 rounded-xl border px-3 text-xs outline-none placeholder:text-black/50 sm:h-11 sm:text-sm"
-          style={inputStyle}
-        />
-        <input
-          type="email"
-          required
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          placeholder={isEs ? 'Correo electrónico' : 'Email address'}
-          aria-label={isEs ? 'Correo electrónico' : 'Email address'}
-          autoComplete="email"
-          className="home-subscriber-input h-9 min-w-0 rounded-xl border px-3 text-xs outline-none placeholder:text-black/50 sm:h-11 sm:text-sm"
-          style={inputStyle}
-        />
-        <button
-          type="submit"
-          disabled={status === 'saving'}
-          className="home-subscriber-join h-9 rounded-full px-4 text-[0.7rem] font-bold uppercase tracking-widest disabled:opacity-60 sm:h-11 sm:px-5 sm:text-xs"
-          style={{ background: GOLD, color: '#171717', boxShadow: '0 2px 10px rgba(0,0,0,0.18)' }}
-        >
-          {status === 'saving' ? (isEs ? 'Enviando' : 'Joining') : (isEs ? 'Unirse' : 'Join')}
-        </button>
-      </div>
-      {message && (
-        <p
-          className="mt-2 text-xs"
-          style={{ color: status === 'error' ? '#d33' : 'var(--hero-text)', textShadow: '0 1px 10px rgba(var(--hero-fade), 0.9)' }}
-        >
-          {message}
-        </p>
-      )}
-      <FormPrivacyNotice locale={locale} className="home-subscriber-privacy mt-2" color="var(--hero-text)" linkColor={GOLD} />
-    </form>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.6 8.6 0 0 1-3.6-.8L3 21l1.9-4.6A8.4 8.4 0 0 1 3 11.5a8.4 8.4 0 0 1 9-8.4 8.4 8.4 0 0 1 9 8.4z" />
+        </svg>
+        {isEs ? 'Unirse a la lista' : 'Join the List'}
+      </button>
+      {open && <HomeSubscribeModal locale={locale} onClose={() => setOpen(false)} />}
+    </div>
   );
 }

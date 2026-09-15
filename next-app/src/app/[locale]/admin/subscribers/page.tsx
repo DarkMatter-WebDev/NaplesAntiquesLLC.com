@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getVerifiedUser } from '@/lib/auth-claims';
 import AdminHeader from '@/components/admin/AdminHeader';
 import SubscribersManager, { type SubscriberRow } from '@/components/admin/SubscribersManager';
-import { buildMarketingAudience } from '@/lib/marketing';
+import { buildSubscriberDirectory } from '@/lib/marketing';
 
 export const metadata: Metadata = { title: 'Admin - Subscribers' };
 
@@ -37,7 +37,7 @@ export default async function AdminSubscribersPage({ params }: Props) {
   const [audienceResult, { count: unreadMessagesCount }] = await Promise.all([
     Promise.resolve().then(async () => {
       try {
-        return { data: await buildMarketingAudience('all', supabase), error: null };
+        return { data: await buildSubscriberDirectory(supabase), error: null };
       } catch (err) {
         console.error('Admin marketing audience load failed:', err);
         return { data: [], error: err instanceof Error ? err : new Error('Could not load marketing audience.') };
@@ -57,7 +57,15 @@ export default async function AdminSubscribersPage({ params }: Props) {
     subscriberEmail: recipient.subscriberEmail,
     subscribedAt: recipient.subscribedAt,
     accountCreatedAt: recipient.accountCreatedAt,
+    phone: recipient.phone,
+    smsStatus: recipient.smsStatus,
   }));
+
+  // The three counts at the top: email is the newsletter, texts only count
+  // once the number has replied YES (nothing is ever sent to a pending one).
+  const emailCount = rows.filter((row) => row.email).length;
+  const confirmedTexts = rows.filter((row) => row.smsStatus === 'confirmed').length;
+  const pendingTexts = rows.filter((row) => row.smsStatus === 'pending').length;
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-background, #fafaf8)' }}>
@@ -85,9 +93,21 @@ export default async function AdminSubscribersPage({ params }: Props) {
                 Reachable Recipients
               </h1>
             </div>
-            <div className="border px-4 py-3 text-center" style={{ borderColor: 'var(--color-outline-variant)', background: 'white' }}>
-              <p className="text-2xl font-bold" style={{ color: 'var(--color-on-surface)' }}>{rows.length}</p>
-              <p className="text-[0.62rem] uppercase tracking-widest" style={{ color: 'var(--color-on-surface-variant)' }}>Reachable</p>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { count: emailCount, label: 'Reachable by email', accent: false },
+                { count: confirmedTexts, label: 'Confirmed for texts', accent: true },
+                { count: pendingTexts, label: 'Text pending YES', accent: true },
+              ].map(({ count, label, accent }) => (
+                <div
+                  key={label}
+                  className="min-w-[8.5rem] border px-4 py-3 text-center"
+                  style={{ borderColor: accent ? 'var(--color-primary-container)' : 'var(--color-outline-variant)', background: 'white' }}
+                >
+                  <p className="text-2xl font-bold" style={{ color: 'var(--color-on-surface)' }}>{count}</p>
+                  <p className="text-[0.62rem] uppercase tracking-widest" style={{ color: 'var(--color-on-surface-variant)' }}>{label}</p>
+                </div>
+              ))}
             </div>
           </div>
 

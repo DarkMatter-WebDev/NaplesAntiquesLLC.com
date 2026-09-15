@@ -75,28 +75,13 @@ const COMPACT_PHONE_ROOM = `
             .home-hero-bottom { gap: 0.5rem; }
             .home-hero-newest { margin-top: 0; }`;
 
-/** Phones: Name, Email and Join on one slim row; Buy / Sell / Visit Us on one row. */
+/** Phones: a slimmer Join the List button; Buy / Sell / Visit Us on one row. */
 const COMPACT_PHONE_CONTROLS = `
             .home-subscriber-label { margin-bottom: 0.3rem; }
-            .home-subscriber-fields {
-              grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
-              gap: 0.3rem;
-            }
-            .home-subscriber-input,
-            .home-subscriber-join { height: 1.9rem; }
-            .home-subscriber-input {
-              padding-inline: 0.55rem;
-              font-size: 0.72rem;
-              border-radius: 0.6rem;
-            }
             .home-subscriber-join {
-              padding-inline: 0.75rem;
+              height: 1.9rem;
+              padding-inline: 0.9rem;
               font-size: 0.62rem;
-            }
-            .home-subscriber-privacy {
-              margin-top: 0.3rem;
-              font-size: 0.62rem;
-              line-height: 1.35;
             }
             .home-hero-actions {
               grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -128,15 +113,9 @@ const COMPACT_DESKTOP_ROOM = `
             }
             .home-hero-newest { margin-top: -0.25rem; }`;
 
-/** Laptops and the 640px one-row form: shorter fields, slimmer buttons. */
+/** Laptops: a shorter Join the List button, slimmer buttons. */
 const COMPACT_DESKTOP_CONTROLS = `
-            .home-subscriber-input,
             .home-subscriber-join { height: 2.25rem; }
-            .home-subscriber-input { font-size: 0.8rem; }
-            .home-subscriber-privacy {
-              margin-top: 0.35rem;
-              font-size: 0.7rem;
-            }
             .home-hero-actions .hero-cta {
               padding-block: 0.4rem;
               min-width: 8rem;
@@ -156,31 +135,41 @@ type CompactBand = {
   rules: string;
 };
 
-/** Wider than 430px the English and Spanish headlines behave the same. */
+/**
+ * Limits re-measured 2026-09-15 after the sign-up block became the caption +
+ * ONE "Join the List" button (the three stacked phone fields are gone, so the
+ * block is ~80px shorter and every limit fell). Same method as 09-13: a
+ * headless-Chrome sweep of the live page with compact OFF (EN + ES, 84 widths
+ * 320-1920 x 15 heights 340-620, measured only after the entrance animations
+ * had finished); each limit is the HERO height of the tallest window that was
+ * tight (under 16px) or overlapping, checked against every width in its band
+ * (the limit must also sit below the height at which each width's tallest
+ * tight window would reach 16px, so no window that fits is compacted).
+ * Verified with a compact-ON sweep: CHANGELOG 2026-09-15.
+ */
+
+/** From 640px up the English and Spanish headlines behave the same. */
 const COMPACT_BANDS_SHARED: CompactBand[] = [
-  { minWidth: 431, maxWidth: 614, maxHeroHeight: 498, rules: COMPACT_PHONE },
-  { minWidth: 615, maxWidth: 639, maxHeroHeight: 478, rules: COMPACT_PHONE },
-  // Exactly 640: the form's sm breakpoint puts Name / Email / Join on one row,
-  // so it keeps that row and takes the laptop-sized controls.
-  { minWidth: 640, maxWidth: 640, maxHeroHeight: 398, rules: COMPACT_PHONE_ROOM + COMPACT_DESKTOP_CONTROLS },
-  { minWidth: 641, maxHeroHeight: 460, rules: COMPACT_DESKTOP_ROOM + COMPACT_DESKTOP_CONTROLS },
+  // Exactly 640: the phone layout (max-width: 640px) with the sm-sized button.
+  { minWidth: 640, maxWidth: 640, maxHeroHeight: 328, rules: COMPACT_PHONE },
+  { minWidth: 641, maxWidth: 767, maxHeroHeight: 388, rules: COMPACT_DESKTOP_ROOM + COMPACT_DESKTOP_CONTROLS },
+  { minWidth: 768, maxHeroHeight: 392, rules: COMPACT_DESKTOP_ROOM + COMPACT_DESKTOP_CONTROLS },
 ];
 
-/** Narrow phones, English headline. */
+/** English headline. */
 const COMPACT_BANDS_EN: CompactBand[] = [
-  { maxWidth: 348, maxHeroHeight: 580, rules: COMPACT_PHONE },
-  { minWidth: 349, maxWidth: 349, maxHeroHeight: 540, rules: COMPACT_PHONE },
-  { minWidth: 350, maxWidth: 430, maxHeroHeight: 520, rules: COMPACT_PHONE },
+  { maxWidth: 349, maxHeroHeight: 393, rules: COMPACT_PHONE },
+  { minWidth: 350, maxWidth: 618, maxHeroHeight: 353, rules: COMPACT_PHONE },
+  { minWidth: 619, maxWidth: 639, maxHeroHeight: 318, rules: COMPACT_PHONE },
   ...COMPACT_BANDS_SHARED,
 ];
 
-/** Narrow phones, Spanish headline (wraps differently, so its limits differ). */
+/** Spanish headline (wraps differently on narrow phones, so its edges differ). */
 const COMPACT_BANDS_ES: CompactBand[] = [
-  { maxWidth: 335, maxHeroHeight: 600, rules: COMPACT_PHONE },
-  { minWidth: 336, maxWidth: 339, maxHeroHeight: 580, rules: COMPACT_PHONE },
-  { minWidth: 340, maxWidth: 350, maxHeroHeight: 560, rules: COMPACT_PHONE },
-  { minWidth: 351, maxWidth: 368, maxHeroHeight: 540, rules: COMPACT_PHONE },
-  { minWidth: 369, maxWidth: 430, maxHeroHeight: 520, rules: COMPACT_PHONE },
+  { maxWidth: 336, maxHeroHeight: 393, rules: COMPACT_PHONE },
+  { minWidth: 337, maxWidth: 365, maxHeroHeight: 373, rules: COMPACT_PHONE },
+  { minWidth: 366, maxWidth: 612, maxHeroHeight: 353, rules: COMPACT_PHONE },
+  { minWidth: 613, maxWidth: 639, maxHeroHeight: 318, rules: COMPACT_PHONE },
   ...COMPACT_BANDS_SHARED,
 ];
 

@@ -3,6 +3,8 @@ import {
   DEFAULT_SUBSCRIBER_SORT,
   nextSubscriberSort,
   sortSubscriberRows,
+  subscriberAlertsLabel,
+  subscriberRowKey,
   subscriberSourceLabel,
   type SubscriberRow,
 } from '../subscriber-sort';
@@ -15,6 +17,8 @@ function row(overrides: Partial<SubscriberRow> & { email: string }): SubscriberR
     subscriberEmail: overrides.email,
     subscribedAt: null,
     accountCreatedAt: null,
+    phone: null,
+    smsStatus: null,
     ...overrides,
   };
 }
@@ -56,6 +60,39 @@ describe('subscriber sort', () => {
     const copy = [...ROWS];
     sortSubscriberRows(ROWS, { key: 'email', direction: 'desc' });
     expect(ROWS).toEqual(copy);
+  });
+
+  describe('text-alert rows (2026-09-15)', () => {
+    const TEXT_ROWS: SubscriberRow[] = [
+      row({ email: 'carol@example.com', name: 'Carol', phone: '+12395550199', smsStatus: 'confirmed', subscribedAt: '2026-09-01T12:00:00Z' }),
+      // A text-only sign-up: no email at all, keyed by its number.
+      row({ email: '', subscriberEmail: null, name: null, phone: '+12395550122', smsStatus: 'pending', subscribedAt: '2026-09-15T12:00:00Z' }),
+      row({ email: 'alice@example.com', name: 'alice', subscribedAt: '2026-09-11T12:00:00Z' }),
+      row({ email: 'dana@example.com', name: 'Dana', phone: '+12395550177', smsStatus: 'stopped', subscribedAt: '2026-09-05T12:00:00Z' }),
+    ];
+    const keys = (rows: SubscriberRow[]) => rows.map(subscriberRowKey);
+
+    it('labels the Alerts column from what the row holds', () => {
+      expect(subscriberAlertsLabel(TEXT_ROWS[0])).toBe('Both · Confirmed');
+      expect(subscriberAlertsLabel(TEXT_ROWS[1])).toBe('Text · Pending YES');
+      expect(subscriberAlertsLabel(TEXT_ROWS[2])).toBe('Email');
+      expect(subscriberAlertsLabel(TEXT_ROWS[3])).toBe('Both · Stopped');
+    });
+
+    it('sorts by phone with rows that have none last, either way', () => {
+      // Keys are the email where there is one, so dana's row reads by her email even though it sorts by her number.
+      expect(keys(sortSubscriberRows(TEXT_ROWS, { key: 'phone', direction: 'asc' }))).toEqual(['+12395550122', 'dana@example.com', 'carol@example.com', 'alice@example.com']);
+      expect(keys(sortSubscriberRows(TEXT_ROWS, { key: 'phone', direction: 'desc' }))).toEqual(['carol@example.com', 'dana@example.com', '+12395550122', 'alice@example.com']);
+    });
+
+    it('sorts by the Alerts label and keeps a text-only row in the date order', () => {
+      expect(keys(sortSubscriberRows(TEXT_ROWS, { key: 'alerts', direction: 'asc' }))).toEqual(['carol@example.com', 'dana@example.com', 'alice@example.com', '+12395550122']);
+      expect(keys(sortSubscriberRows(TEXT_ROWS, DEFAULT_SUBSCRIBER_SORT))).toEqual(['+12395550122', 'alice@example.com', 'dana@example.com', 'carol@example.com']);
+    });
+
+    it('sorts a blank email last without crashing on the empty string', () => {
+      expect(keys(sortSubscriberRows(TEXT_ROWS, { key: 'email', direction: 'asc' }))).toEqual(['alice@example.com', 'carol@example.com', 'dana@example.com', '+12395550122']);
+    });
   });
 });
 

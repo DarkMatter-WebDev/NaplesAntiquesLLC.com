@@ -1,9 +1,59 @@
 # Tasks
 
 > Actionable open work plus a short recent-completions summary. Full history is
-> in `CHANGELOG.md`. Last reconciled: **2026-09-14**.
+> in `CHANGELOG.md`. Last reconciled: **2026-09-15**.
 
 ## ◻ OPEN — needs a human
+
+### 🟡 STAGED 2026-09-15 — "Join the List" hero button + Email / Text / Both window + text-alert list (Step 1) — needs SQL, then push
+
+Built and dev-verified (`CHANGELOG.md` 2026-09-15; rules `DECISIONS.md`
+2026-09-15 ×2; feature notes `features/lead-capture.md`).
+
+**Owner, in this order:**
+1. ◻ **Supabase SQL Editor → run `supabase/text-subscribers-2026-09.sql`**
+   (makes `homepage_subscribers.email` optional, adds the phone / consent
+   columns and `subscribe_homepage_v2`). ⚠️ Do this BEFORE the push: the new
+   `/api/subscribe` calls the v2 function and every sign-up, email included,
+   fails with "Could not save subscription." until it exists.
+2. ◻ Push the staged batch (no env vars). After it is live: tap **Join the
+   List** on the homepage, join with your own cell on **Text**, then check
+   Admin → Subscribers shows the row as *Text · Pending YES* and the three
+   tiles count it. (Nothing will text you — that is Step 2.)
+3. ◻ **Step 2 prerequisites (your accounts):** open a Twilio account
+   (pay-as-you-go, small top-up — the free trial only texts hand-verified
+   numbers with a trial stamp), buy a **toll-free** number, submit toll-free
+   verification (business info, a sample deal message, a screenshot of the
+   "Join the List" window on Text as the opt-in proof; the Terms
+   `#text-messages` section and the Privacy bullet are already live for the
+   reviewer). Approval: days to a couple of weeks. Tell me when the number is
+   verified and I build Step 2: the reply-YES confirmation text, STOP / HELP,
+   the **Text Deals** page (phone photo + price overlay drawn on the server +
+   one line → picture message to confirmed numbers, per-number send log,
+   "Reply STOP to opt out" appended), the replies page (first reply flagged,
+   every reply forwarded to (239) 404-8505, "Mark sold" → one-line auto-reply
+   to late responders, wording yours) and "Resend confirmation" for pending
+   rows.
+
+**Claude, after the push (on "verify it live"):** `/`, `/es` show the button;
+the window's three states; `/terms#text-messages` EN + ES; a real Text
+sign-up round-trips to Admin as Pending YES; IndexNow not needed (no new
+URLs).
+
+**Staging (Join the List batch):** ✅ synced 2026-09-15 — dry run listed
+exactly the 26 touched files (5 NEW: HomeSubscribeModal.tsx,
+subscriber-phone.ts, subscriber-phone.test.ts, home-subscribe-modal.test.ts,
+supabase/text-subscribers-2026-09.sql; 21 modified: HomeSubscriberForm,
+HomeHeroOverlay, api/subscribe route + test, api/admin/subscribers route,
+admin/subscribers page, SubscribersManager, marketing.ts, subscriber-sort +
+test, hero-short-screens.test, LegalPolicyPage, terms + privacy pages,
+spanish-legal-copy, CHANGELOG, CURRENT_STATUS, DECISIONS, STRUCTURE, TASKS,
+features/lead-capture), 0 Extras, 1094 total; real run copied 26 / 0 FAILED
+(robocopy exit 1 = copied only); follow-up dry run 0 / 0 / 0, exit 0; leak
+check 0 `.env*` / `.log`, 0 `.git` dirs, no node_modules / .next; positive
+control 208 = 208 `.tsx`; SHA-256 MATCH on the modal, launcher, overlay,
+phone lib, subscribe route, the SQL and CHANGELOG. Docs-only re-sync after
+this line: dry run 1 (TASKS.md) → copied → follow-up 0.
 
 ### 📋 WHAT'S ACTUALLY LEFT — triaged 2026-09-14 (start here)
 
@@ -12,10 +62,12 @@ against `CHANGELOG.md` / `CURRENT_STATUS.md`. **The 09-14 batch is DEPLOYED
 (`main@ee231dc`, 9:19 AM ET) and live-verified:** price-push warning, Etsy/eBay
 request timeouts, Deep Field batch pin, Netlify Node 22, "30-minute checks"
 card, homepage `loading.tsx` removal. `main@beaf772` (Instagram 14-day
-window) is also DEPLOYED. **STAGED 09-14 (no SQL):** Google site-name
-`WebSite` entity tightened (`lib/site-ld.ts`: trailing-slash url, `@id`,
-`publisher` → JewelryStore, `alternateName: ["NaplesEstateJewelry.com"]`).
-- ◻ After that push: GSC → URL Inspection → Request indexing for `/`.
+window) is also DEPLOYED. **DEPLOYED + live-verified 09-14 (night):** Google
+site-name `WebSite` entity tightened (`lib/site-ld.ts`: trailing-slash url,
+`@id`, `publisher` → JewelryStore, `alternateName: ["NaplesEstateJewelry.com"]`).
+Nothing is staged.
+- ✅ GSC Request indexing for `/`: "Indexing requested" (09-14 night; the page
+  was already indexed, so this was a re-crawl request).
 - ◻ Recheck the brand SERP site-name line every ~2 weeks. It should become
   "Naples Estate Jewelry" or "NaplesEstateJewelry.com", not the lowercase domain.
 - ⛔ Never a slogan name. **Older sections below still carry STAGED / DEPLOY /
@@ -101,14 +153,15 @@ history.**
     data.
   - One `scheduled_price_push` row per channel.
   - The pg_cron Instagram check ran at 12:15:01Z ("not_due").
-- ⚠️ **Instagram token (expires 2026-09-30 13:17Z) must refresh on a Monday
-  12:15Z run.** The window is widened to 14 days, **STAGED 09-14**
-  (`lib/instagram/auth.ts:26`).
-  - If the push lands before Mon 09-21 12:15Z (8:15 AM ET), 09-21 refreshes
-    and 09-28 is the backup.
-  - Otherwise 09-28 is the only attempt.
-  - Read the `instagram_sync_log` `token_refresh` row after each of those
-    runs. An `error` on the last attempt before 09-30 means re-pasting the token.
+- ⚠️ **Mon 2026-09-21 after 12:15Z: Instagram token refresh.** The token
+  expires 2026-09-30 13:17Z. The 14-day window is DEPLOYED (`main@beaf772`,
+  `lib/instagram/auth.ts:26`), so 09-21 (9 days left) should log "Instagram
+  token refreshed; now valid until …"; 09-28 is the backup.
+  - Read the `instagram_sync_log` `token_refresh` row after 09-21 (and 09-28 if
+    09-21 failed).
+  - An `error` on 09-28 means re-pasting the token before 09-30.
+- ~09-28: brand SERP site-name line (first recheck after the 09-14 re-crawl
+  request).
 - ~09-18: Apple place card, BBB.
 - ~09-20: GSC validations ("Page with redirect", "Blocked by robots.txt").
 - ~09-24: Yelp ad metrics.

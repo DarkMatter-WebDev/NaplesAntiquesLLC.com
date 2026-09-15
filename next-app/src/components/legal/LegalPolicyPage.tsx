@@ -8,6 +8,8 @@ export interface LegalSection {
   title: string;
   body?: string[];
   bullets?: string[];
+  /** Optional anchor, so a form's fine print can link straight to one section (e.g. `/terms#text-messages`). */
+  id?: string;
 }
 
 export interface LegalPolicyPageProps {
@@ -71,7 +73,8 @@ export default function LegalPolicyPage({
           {sections.map((section, index) => (
             <section
               key={section.title}
-              className="rounded-2xl border bg-white/70 p-5 shadow-[0_10px_34px_rgba(38,28,6,0.045)] md:p-6"
+              id={section.id}
+              className="scroll-mt-28 rounded-2xl border bg-white/70 p-5 shadow-[0_10px_34px_rgba(38,28,6,0.045)] md:p-6"
               style={{ borderColor: 'rgba(115, 92, 0, 0.12)' }}
             >
               <h2 className="mb-3 flex items-start gap-3 font-[family-name:var(--font-headline)] text-2xl font-bold text-[#1a1c1c]">

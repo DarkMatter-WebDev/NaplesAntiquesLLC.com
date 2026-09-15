@@ -4,7 +4,116 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-09-12**.
+> compaction. Last reconciled: **2026-09-15**.
+
+## The hero sign-up is one button; the window offers Email, Text or Both, and text deals are pieces that never reach the site (2026-09-15)
+
+**Owner answers on mockup v2** (https://claude.ai/artifact/Wnst13mirihcKMmoSgfT7B):
+"1B, 2 text, 3 use store's phrasing, 4 go with recommended, 5 txts will be for
+pieces never listed on the site, informal photos with price overlay … from
+within admin, 6 twilio free, 7 explain better" → then "yes to both" (reply-YES
+confirmation; Text Deals + claiming as drawn, with the late-reply auto-reply).
+
+**The hero** (`HomeSubscriberForm.tsx`): today's caption ("Get first look at
+new pieces") over ONE gold **Join the List** button — Option B, not the longer
+"Get First Look at New Pieces" pill (Option A). The Name / Email / Join row and
+the consent line are gone from the hero. The window loads on the tap
+(`next/dynamic`, `ssr: false`, portalled into `<body>`) so it never joins the
+homepage's first paint; a guard test pins that.
+- ⛔ Do not put fields back in the hero. The three stacked phone fields were
+  what made the block tall; with them gone the hero's compact limits were
+  re-measured (entry below).
+
+**The window** (`HomeSubscribeModal.tsx`): Email / Text / Both at the top,
+**Text preselected** — text deals are the point of the change. Fields follow
+the choice. The text pitch says what the texts ARE: "Some pieces never make it
+to the website. We text a quick photo with the price, and the first person to
+reply takes it. Things move quickly here; email is too slow for these." The
+checkbox is the **store's** wording ("Text me the moment a good deal drops.
+Pieces move fast; first reply takes it."), not the customer's-voice draft.
+- ⛔ **Never pre-tick the consent box** and never trim the statement under it
+  (`SMS_CONSENT_TEXT`, `lib/subscriber-phone.ts`): recurring automated
+  marketing texts, not a condition of purchase, frequency varies, msg & data
+  rates, STOP / HELP, Privacy Policy + Text Message Terms links. Carriers
+  refuse a toll-free number without each of those. A rewording bumps
+  `SMS_CONSENT_VERSION`; the server stores its own copy of the statement on
+  the row as the record of consent (never text from the browser).
+- **Text-only sign-ups are allowed** (owner: "either"): `email` is nullable,
+  `phone_e164` unique, a row needs one or the other. US numbers only, stored
+  `+1` + ten digits; anything not dialable is rejected, never "cleaned up".
+- **Reply-YES confirmation (double opt-in): yes.** Only `sms_status =
+  'confirmed'` numbers may ever be texted; a sign-up is `pending` until the
+  handset replies YES. The window promises "one text BEFORE any deal", which
+  is true before and after the texting batch exists.
+
+**Text deals** (Step 2, not built): pieces that are NOT listed on the site — a
+phone photo, a price and a line, the price drawn onto the photo on the server
+in the brand fonts (a smaller version of `lib/instagram/card.ts`), sent as a
+picture message; **the reply IS the claim** (first reply by the clock, flagged
+in Admin, every reply forwarded to the owner's cell, "Mark sold" auto-replies
+to later responders). No site link and no checkout involved, so the
+no-reservation checkout rule is untouched. Provider: **Twilio toll-free,
+pay-as-you-go** — the free trial only texts hand-verified numbers with a trial
+stamp, so it is for testing only.
+
+**Admin → Subscribers** shows Phone + Alerts (channel · Confirmed / Pending
+YES / Stopped), three tiles, "Copy Confirmed Numbers" (YES-confirmed only) and
+a text-list filter. Email campaigns still build from the email audience, which
+skips rows without a valid email.
+
+**Legal:** Terms gained a "Text Message Program" section (`#text-messages`,
+EN + ES) and Privacy one bullet (STOP; mobile numbers never shared with third
+parties for marketing) — both are what a toll-free reviewer checks for.
+
+⚠️ **Deploy order:** run `supabase/text-subscribers-2026-09.sql` BEFORE the
+batch goes live — the route calls `subscribe_homepage_v2`, and without it every
+sign-up (email included) fails with "Could not save subscription."
+
+## The hero's compact limits were re-measured for the one-button sign-up block (2026-09-15)
+
+The 09-13 limits (entries below) were measured against a block of caption +
+Name / Email / Join + consent line — three stacked fields on phones. With the
+block now a caption + one button it is ~70–100px shorter, the headline has
+more room everywhere, and the old limits would have compacted screens that
+now fit (the owner's rule: a hero that already fits is never touched). Same
+method as 09-13 (headless Chrome over CDP, compact OFF, EN + ES, 84 widths
+320–1920 × 15 heights 340–620; scripts were session scratch, method in
+`CHANGELOG.md` 2026-09-15). Each limit is the HERO height of the tallest window
+that was tight (< 16px) or overlapping, and must also sit below the height at
+which every width in the band would reach a 16px gap — so nothing that fits is
+compacted; a few windows just under each limit stay tight (never overlapping).
+- ⚠️ **Measure only after the entrance animations finish.** The bottom block
+  slides up 18px over 720ms after a 500ms delay; a first pass measured the
+  low heights mid-slide, which shifted the block 9–17px and produced phantom
+  "overlaps" and a phantom non-monotonic column at 349px. Wait for
+  `document.getAnimations()` to settle before the first cell.
+
+| Width | English (hero height ≤) | Spanish (hero height ≤) |
+|---|---|---|
+| ≤ 336 | 393 | 393 |
+| 337–349 | 393 | 373 |
+| 350–365 | 353 | 373 |
+| 366–612 | 353 | 353 |
+| 613–618 | 353 | 318 |
+| 619–639 | 318 | 318 |
+| exactly 640 | 328 (phone layout with the sm-sized button) | 328 |
+
+- The 613/619–639 limit is 318, not the measured 308: at exactly 308 the
+  hero measures a hair over the limit and the band never engaged (the
+  compact-ON sweep left 614–639 × 400 overlapping by 3.4px). 318 is inside
+  that band's 327 ceiling, so no fitting window is touched.
+| 641–767 | 388 | 388 |
+| ≥ 768 | 392 | 392 |
+
+- `HomeHeroOverlay.tsx`: `COMPACT_BANDS_EN` / `COMPACT_BANDS_ES` +
+  `COMPACT_BANDS_SHARED` (640 and up); the compact rule bodies lost the
+  `-fields` / `-input` / `-privacy` hooks and keep `home-subscriber-label` +
+  `home-subscriber-join`. Guard: `lib/__tests__/hero-short-screens.test.ts`
+  pins the seven limits and rejects the old ones.
+- The minimum hero heights (`--hero-min-vh`, entry below) were NOT lowered;
+  they are still safe (shorter block, same floor) and changing them alters
+  which tiny windows pin, which the owner did not ask for.
+- The headline fit ratios (23.5 / 12.6) are unchanged — the wording did not.
 
 ## The homepage headline shrinks in place on a short window; its position never moves (2026-09-13)
 

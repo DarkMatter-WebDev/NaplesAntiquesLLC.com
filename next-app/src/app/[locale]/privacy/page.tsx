@@ -85,6 +85,7 @@ export default async function PrivacyPage({ params }: Props) {
             'You may request corrections to inaccurate account, order, or contact information.',
             'You may request deletion of personal information, subject to legal, tax, fraud-prevention, inventory, transaction, and record-keeping obligations.',
             'You may opt out of marketing emails at any time by using an unsubscribe link where available or contacting us directly.',
+            'If you opted in to text alerts, you may stop them at any time by replying STOP to any message or contacting us directly. We do not share mobile numbers or text-message consent with third parties or affiliates for their marketing purposes.',
             'You may use Cookie Preferences to reset the site cookie notice. Essential cookies and storage are required for core site functions.',
           ],
         },

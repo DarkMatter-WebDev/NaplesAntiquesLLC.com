@@ -94,6 +94,18 @@ export default async function TermsPage({ params }: Props) {
           ],
         },
         {
+          // Linked from the "Join the List" window's consent statement
+          // (`/terms#text-messages`). Carriers look for these statements before
+          // approving a business texting number; keep the STOP / HELP lines.
+          id: 'text-messages',
+          title: 'Text Message Program',
+          body: [
+            'If you choose text alerts when joining our list, Naples Estate Jewelry will send recurring automated marketing text messages to the mobile number you provide, such as photos and prices of pieces available for purchase. Consent is not a condition of any purchase. Message frequency varies. Message and data rates may apply.',
+            'Before any alert is sent you will receive one confirmation text; alerts begin only after you reply YES. Reply STOP at any time to cancel and you will receive one final message confirming that you have been unsubscribed. Reply HELP for help, or call or text (239) 404-8505. Carriers are not liable for delayed or undelivered messages.',
+            'We do not share mobile numbers or text-message consent with third parties or affiliates for their marketing purposes. See the Privacy Policy for how we handle your information.',
+          ],
+        },
+        {
           title: isEs ? 'Resolución de Disputas y Ley de Florida' : 'Dispute Resolution and Florida Law',
           body: [
             'These terms are governed by Florida law, without regard to conflict-of-law rules. Before filing a formal claim, you agree to contact us and try to resolve the issue informally. Courts located in Collier County, Florida will be the preferred venue for disputes unless applicable law requires another venue.',

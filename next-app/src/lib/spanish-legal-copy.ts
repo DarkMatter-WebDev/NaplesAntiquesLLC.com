@@ -91,6 +91,7 @@ export const SPANISH_LEGAL_COPY: Record<LegalPageKey, SpanishLegalPageCopy> = {
           'Puede solicitar correcciones de información inexacta de cuenta, pedido o contacto.',
           'Puede solicitar la eliminación de información personal, sujeta a obligaciones legales, fiscales, de prevención de fraude, inventario, transacciones y conservación de registros.',
           'Puede cancelar los correos de marketing en cualquier momento mediante el enlace de cancelación disponible o comunicándose directamente con nosotros.',
+          'Si aceptó recibir alertas por texto, puede detenerlas en cualquier momento respondiendo STOP a cualquier mensaje o comunicándose directamente con nosotros. No compartimos números de celular ni el consentimiento para mensajes de texto con terceros o afiliados para sus fines de marketing.',
           'Puede utilizar Preferencias de Cookies para restablecer el aviso del sitio. Las cookies y el almacenamiento esenciales son necesarios para las funciones principales.',
         ],
       },
@@ -181,6 +182,15 @@ export const SPANISH_LEGAL_COPY: Record<LegalPageKey, SpanishLegalPageCopy> = {
       {
         title: 'Descargos y Limitación de Responsabilidad',
         body: ['El sitio se proporciona según disponibilidad. En la máxima medida permitida por la ley, rechazamos garantías implícitas y no somos responsables de daños indirectos, incidentales, especiales, consecuentes o punitivos. Nuestra responsabilidad total por una reclamación relacionada con el sitio o una transacción se limita al importe que nos pagó por el artículo o servicio específico que originó la reclamación, salvo que la ley de Florida exija lo contrario.'],
+      },
+      {
+        id: 'text-messages',
+        title: 'Programa de Mensajes de Texto',
+        body: [
+          'Si elige alertas por texto al unirse a nuestra lista, Naples Estate Jewelry enviará mensajes de texto de marketing automatizados y recurrentes al número de celular que proporcione, como fotos y precios de piezas disponibles para la compra. El consentimiento no es condición de ninguna compra. La frecuencia de mensajes varía. Pueden aplicarse tarifas de mensajes y datos.',
+          'Antes de enviar cualquier alerta recibirá un solo texto de confirmación; las alertas comienzan únicamente después de que responda YES. Responda STOP en cualquier momento para cancelar y recibirá un último mensaje confirmando la baja. Responda HELP para obtener ayuda, o llame o escriba al (239) 404-8505. Las operadoras no son responsables por mensajes retrasados o no entregados.',
+          'No compartimos números de celular ni el consentimiento para mensajes de texto con terceros o afiliados para sus fines de marketing. Consulte la Política de Privacidad para saber cómo manejamos su información.',
+        ],
       },
       {
         title: 'Resolución de Disputas y Ley de Florida',
