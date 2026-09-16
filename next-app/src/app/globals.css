@@ -3116,6 +3116,17 @@ body:has(main[data-no-cookie-notice]) [data-cookie-notice] {
     font-size: 1rem;
   }
 }
+
+/* The homepage "Join the List" window on phones (owner, 2026-09-15): the
+   same accidental zoom — iOS Safari zooms the page when a focused field is
+   under 16px, and the window's fields are 14px `.form-field`s. 16px on touch
+   screens only; desktop keeps the 14px look. Unlayered for the same reason
+   as the editor rule above. */
+@media (hover: none) {
+  .home-subscribe-modal :is(input, textarea) {
+    font-size: 1rem;
+  }
+}
 .product-editor-more-button {
   display: inline-flex;
   align-items: center;

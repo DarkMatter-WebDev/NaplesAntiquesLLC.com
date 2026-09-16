@@ -5,7 +5,16 @@
 
 ## ◻ OPEN — needs a human
 
-### 🟡 2026-09-15 night — STEP 2 BUILT + STAGED (Twilio sending, YES confirmation, Text Deals, replies) — owner: SQL, two secrets, push, webhook, then the first real test
+### 🟡 STAGED 2026-09-15 late night — window fields 16px on touch screens (stops the iOS focus zoom the owner saw) — push whenever convenient, check on the phone
+
+One CSS rule in `globals.css` (`.home-subscribe-modal` inputs at 1rem under
+`@media (hover: none)`), guard test, build 0. No SQL, no env vars. After the
+push: open the window on the phone, tap Name / Cell number — the page should
+not zoom. `CHANGELOG.md` 2026-09-15 (late night).
+
+**Staging (iOS zoom):** ✅ synced 2026-09-15 (late night) — dry run listed exactly the 4 touched files (globals.css, home-subscribe-modal.test.ts, CHANGELOG, TASKS), 0 Extras, 1119 total; real run copied 4 / 0 FAILED (robocopy exit 1 = copied only); follow-up dry run 0/0/0, exit 0; leak check 0 `.env*` / `.log`, 0 `.git`, no node_modules / .next / worktrees, launch.json present; positive control 210 = 210 `.tsx`; SHA-256 MATCH on all 4. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+### 🟢 2026-09-15 night — STEP 2 DEPLOYED (Twilio sending, YES confirmation, Text Deals, replies) — waiting on Twilio's toll-free verification, then the first real test
 
 Built per `CHANGELOG.md` 2026-09-15 (night); rules `DECISIONS.md` → *"Text
 deals: the reply is the claim…"*. Safe to deploy before Twilio's approval:
@@ -18,15 +27,39 @@ nothing sends until the number is verified AND the variables are set.
    route that does not exist yet (404s in `net._http_response`, harmless).
 2. ✅ Netlify: all five variables present (SID / FROM / FORWARD_TO by this
    agent; AUTH_TOKEN + CRON_SECRET pasted by the owner, secret-marked).
-3. ◻ Push the staged batch.
-4. ◻ **Twilio → Phone Numbers → (888) 423-7522 → Configure → Messaging → "A
-   message comes in": Webhook, `https://naplesestatejewelry.com/api/webhooks/twilio/inbound`, HTTP POST → Save.** (I can drive this in Chrome.)
-5. ◻ When Twilio's verification email arrives ("verified"): Admin →
-   Subscribers → your own row → **Resend YES** → reply YES from your phone →
-   the row flips to *Confirmed*. Then Admin → Text Deals: photo, price, line
-   → Preview → "Send a test to (239) 404-8505" → check the picture and the
-   text on your phone → reply to it → the reply should reach your cell as a
-   forward and show under the deal in Admin.
+3. ✅ Pushed 2026-09-15 night and **live-verified**: unsigned POST to
+   `/api/webhooks/twilio/inbound` → 403 and to `/status` → 403 (proves the
+   Twilio variables are loaded — an unconfigured deploy answers 503);
+   `/api/admin/text-alerts/sweep` without the secret → 401; `/api/admin/text-deals`
+   signed-out → 401. The first pg_cron tick before the deploy logged a 404
+   (`net._http_response` id 1082, 02:00Z) as expected.
+4. ✅ Inbound webhook SAVED 2026-09-15 night (owner fronted the tab): primary
+   AND backup "Webhook URL" =
+   `https://naplesestatejewelry.com/api/webhooks/twilio/inbound`, HTTP POST,
+   confirmed on the number's summary after the save. ⚠️ Twilio's drawer
+   silently refuses to save while the BACKUP webhook URL is empty (the only
+   hint is "Provide webhook URL." under that field) — that is why the first
+   two attempts showed "-". Same URL in both slots is deliberate.
+5. ◻ **Test plan (owner, 2026-09-15 night): the personal cell (239)
+   304-6229 plays the customer; the business cell (239) 404-8505 stays the
+   owner's side (forward target + "Send a test").** Twilio shows the
+   registration *In review* (Trust Hub → Toll-free, HH `eab4c178…`).
+   - Now, before approval: join from the personal phone on the live site
+     (Join the List → Text → (239) 304-6229 → tick → Join). It sits Pending;
+     the first sweep after approval sends its YES text automatically.
+   - ◻ Owner decision: remove the business cell's subscriber row (Admin →
+     Subscribers → the (239) 404-8505 row → Delete) so the owner's phone is
+     never treated as a customer (it would otherwise be sent every deal and
+     its replies forwarded to itself).
+   - Optional now: draft the first deal in Admin → Text Deals (photo, price,
+     line → Preview) so it is ready; Preview works without Twilio.
+   - After "verified": reply YES from the personal phone (or Resend YES
+     first if the text never came) → row flips to *Confirmed* → Text Deals →
+     "Send a test to (239) 404-8505" (owner's view) → "Send to 1" (the
+     customer view on the personal phone) → reply from the personal phone →
+     the forward lands on the business cell with `[1st]` and the reply shows
+     under the deal → "Mark sold to …" → a second reply from the personal
+     phone gets the auto-reply.
 6. ◻ First real deal: "Send to N". Then "Mark sold to <first>" and have
    someone reply late to see the auto-reply.
 

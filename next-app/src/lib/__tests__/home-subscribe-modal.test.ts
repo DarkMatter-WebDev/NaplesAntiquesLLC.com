@@ -56,6 +56,13 @@ describe('the window', () => {
     expect(modal).toContain('createPortal(content, document.body)');
   });
 
+  it('keeps its fields at 16px on touch screens so iOS Safari does not zoom on focus', () => {
+    // Owner-reported 2026-09-15 on the phone; same rule as the admin editor.
+    const globals = readFileSync(join(SRC, 'app', 'globals.css'), 'utf8');
+    expect(modal).toContain('className="home-subscribe-modal');
+    expect(globals).toMatch(/@media \(hover: none\) \{\s*\.home-subscribe-modal :is\(input, textarea\) \{\s*font-size: 1rem;/);
+  });
+
   it('never promises a text was already sent', () => {
     // Nothing sends until the texting batch exists; the promise is "one text
     // BEFORE any deal", which stays true after it.

@@ -1,6 +1,18 @@
 
 # Changelog
 
+## 2026-09-15 (late night) — Join the List window: no iOS focus zoom — STAGED (one CSS rule, no SQL, no env vars)
+
+Owner, on the phone: tapping a field in the window "zooms in a bit" and the
+page has to be zoomed back out afterwards. Cause: iOS Safari zooms the page
+whenever a focused field's text is under 16px, and the window's fields are
+the site's 14px `.form-field`. Fix (`globals.css`, next to the identical
+admin-editor rule from 09-02): `@media (hover: none) { .home-subscribe-modal
+:is(input, textarea) { font-size: 1rem } }` — touch screens only, desktop
+unchanged. Guard added to `home-subscribe-modal.test.ts` (10/10). Build 0.
+⛔ Chromium cannot reproduce the zoom; the owner checks it on the phone
+after the next push (memory: phone-editor-safari-measure-first).
+
 ## 2026-09-15 (night) — Step 2 BUILT + STAGED: Twilio sending, reply-YES confirmation, STOP/HELP, Text Deals (photo + price overlay → picture message), replies forwarded to the owner's cell, Mark sold auto-reply, 15-minute sweep (⚠️ owner SQL + 2 secret env vars + the number's webhook, then push)
 
 Owner: "build step 2" (and, mid-build, "do the netlify variable work for me
@@ -100,6 +112,19 @@ social panels) · build + full lint: see the staging line in `TASKS.md`.
 **Not verified in a browser:** the admin page needs the owner's login, and
 no message can be sent until the number is verified. Verification plan in
 `TASKS.md` (the first real test = the owner's own cell).
+
+**Later the same night — DEPLOYED.** Owner ran the SQL (verified from the
+editor: 4 tables, `nej-text-alerts-sweep` active `*/15`, Vault secret
+present), pasted the two secrets in Netlify, pushed. Live: unsigned POSTs to
+both webhooks → 403 (so the Twilio variables are loaded), sweep without the
+secret → 401, admin API signed-out → 401, homepage intact. The cron tick
+before the deploy logged one 404. **Inbound webhook saved** on the third
+try, once the owner fronted the tab: Twilio's "Edit messaging
+configuration" drawer refuses to save while the BACKUP webhook URL is
+empty, and says so only in small grey text under that field — the first
+two saves silently did nothing. Both slots now carry
+`…/api/webhooks/twilio/inbound`, HTTP POST, confirmed on the summary.
+Step 2 is fully deployed; the only wait is Twilio's toll-free verification.
 
 ## 2026-09-15 (evening) — Join the List batch DEPLOYED + live-verified; Twilio account, toll-free number and registration form done to the review screen; follow-up STAGED (window copy + the two opt-in proof screenshots the registration links to)
 

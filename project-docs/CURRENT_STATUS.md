@@ -8,7 +8,14 @@
 
 **Read this, then `TASKS.md`.**
 
-🟡 **09-15 night — STEP 2 BUILT + STAGED, not deployed: Twilio sending
+🟢 **09-15 night, later — STEP 2 DEPLOYED** (SQL run + Vault secret + all
+five Netlify variables + push; live: both webhooks 403 unsigned, sweep 401,
+admin 401; the number's inbound webhook saved — primary + backup — and
+confirmed on the summary). ◻ Left: Twilio's toll-free verification email
+→ "verified" → first test with the owner's cell (`TASKS.md` step 5). Nothing
+is texted until then. The block below is the build record.
+
+🟡 **09-15 night — STEP 2 BUILT + STAGED (now deployed, see above): Twilio sending
 (`lib/text-alerts/`), reply-YES confirmation at sign-up + 15-min sweep,
 STOP/HELP recorded (Twilio answers them), Admin → Text Deals (photo + price
 overlay → picture message to confirmed numbers, replies forwarded to the
