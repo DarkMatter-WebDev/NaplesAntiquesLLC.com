@@ -69,6 +69,43 @@ parties for marketing) — both are what a toll-free reviewer checks for.
 batch goes live — the route calls `subscribe_homepage_v2`, and without it every
 sign-up (email included) fails with "Could not save subscription."
 
+## Text deals: the reply is the claim, only YES-confirmed numbers are texted, and every send is a row before it is a request (2026-09-15, Step 2)
+
+Owner ("build step 2", after mockup v2 §3b/3c and "yes to both"):
+- **Deals go out from the Twilio toll-free number +1 (888) 423-7522**, never
+  the owner's cell (Twilio sends only from numbers it hosts; hosted-SMS is
+  landline/toll-free only). Replies are **forwarded to the cell** and the
+  owner answers from the phone or Admin; subscribers never see the cell.
+- **Only `sms_status = 'confirmed'` numbers are ever sent a deal.** A
+  sign-up is `pending` until the handset replies YES (any case, punctuation
+  ignored: `classifyInbound`). The confirmation text is attempted at sign-up
+  and by the 15-minute sweep (≤ 5 attempts, 6 h apart) — so nothing loops
+  while Twilio has not approved the number.
+- **STOP and HELP are answered by Twilio, not by us** (US numbers get
+  Twilio's default opt-out handling); we only record them. Replying too
+  would send two texts.
+- **The picture is the owner's photo, only resized**, with the price (Caslon
+  Bold), the line (Hanken), the brand mark and a "FIRST REPLY WINS" pill
+  drawn on a dark band; ≤ ~600 KB JPEG so carriers deliver it. Same
+  no-generative rule as the Instagram card.
+- **Send discipline** (memory: `after()` is best-effort on Netlify): one
+  `text_deal_sends` row per recipient is written first, each row is claimed
+  `queued → sending` before its Twilio call, 40 per request, and the sweep
+  finishes what a cut-off function left. Unique (deal, phone) makes a
+  second "Send" click inert.
+- **"Mark sold" answers late replies once per number** with the polite line
+  (default "Sorry, that one is spoken for. Next one soon."; editable per
+  deal). The first reply is by the clock (`text_inbound.received_at`), shown
+  as `[1st]` in the forward and in Admin.
+- **Deploy order:** run `supabase/text-deals-2026-09.sql`, set the five
+  Netlify variables, push, THEN set the number's "A message comes in"
+  webhook to `https://naplesestatejewelry.com/api/webhooks/twilio/inbound`
+  (HTTP POST). Until the toll-free verification lands, Twilio refuses sends
+  from the number; the code treats that as a failed attempt, not an error
+  page.
+- ⛔ Never mark a number confirmed from the website; only an inbound YES
+  does. ⛔ Never send a deal to `pending` or `stopped`.
+
 ## The hero's compact limits were re-measured for the one-button sign-up block (2026-09-15)
 
 The 09-13 limits (entries below) were measured against a block of caption +

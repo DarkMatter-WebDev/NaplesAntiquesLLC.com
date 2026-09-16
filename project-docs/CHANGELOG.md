@@ -1,6 +1,106 @@
 
 # Changelog
 
+## 2026-09-15 (night) — Step 2 BUILT + STAGED: Twilio sending, reply-YES confirmation, STOP/HELP, Text Deals (photo + price overlay → picture message), replies forwarded to the owner's cell, Mark sold auto-reply, 15-minute sweep (⚠️ owner SQL + 2 secret env vars + the number's webhook, then push)
+
+Owner: "build step 2" (and, mid-build, "do the netlify variable work for me
+too"). Design = mockup v2 sections 3b/3c + the 09-15 decisions; rules in
+`DECISIONS.md` → *"Text deals: reply is the claim…"*.
+
+**New `lib/text-alerts/`** (server unless noted):
+- `config.ts` — env (`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`,
+  `TWILIO_FROM_NUMBER`, `TWILIO_FORWARD_TO` default +12394048505,
+  `TEXT_ALERTS_CRON_SECRET`), `twilioConfigured()`, the two webhook URLs from
+  `SITE_URL`. **Nothing sends while the three TWILIO_* are missing** — every
+  sender returns "not configured", so the batch is safe to deploy before
+  Twilio approves the number.
+- `twilio.ts` — Messages API over plain `fetch` (no SDK), 15 s timeout, typed
+  `TwilioError`, StatusCallback on every send (so delivery results need no
+  console setup).
+- `signature.ts` (pure) — `X-Twilio-Signature` HMAC-SHA1 check + form-body
+  parse; test uses Twilio's documented vector.
+- `messages.ts` (pure) — the words on file with Twilio (confirmation, opt-in
+  reply, HELP), `dealText()` (brand + line + price + owner's message + STOP
+  line once, ≤ 600 chars), `forwardText()` (who, which deal, `[1st]`),
+  `classifyInbound()` (yes/y/yeah/start/si… in any case with punctuation →
+  confirm; stop/unsubscribe/cancel/end/quit → stop; help/info → help; a
+  sentence containing "yes" → reply), `twiml()`.
+- `deal-input.ts` (pure) — form → row (`$1,460` formatting, default message).
+- `card.ts` — the picture: photo fitted inside 1080×1350 (never enlarged),
+  dark band, price in Caslon Bold, line in Hanken, brand mark, "FIRST REPLY
+  WINS" pill; JPEG ≤ ~600 KB (re-encode at 70, then 0.8×); `toOwnedBuffer`
+  before Storage (the SAB trap). Fonts traced into
+  `/api/admin/text-deals/**` + `/api/admin/text-alerts/**` in next.config.
+- `confirmations.ts` — `sendConfirmation(phone)`: attempt recorded on the row
+  BEFORE the send (`sms_confirmation_attempts`, `_attempted_at`,
+  `_sent_at`), ≤ 5 attempts, logged in `text_system_messages`; never throws.
+  Twilio errors 30032 / 30034 ("our number is not verified / registered
+  yet") do NOT count toward the cap, so everyone who joins while Twilio is
+  still reviewing the number is confirmed by the first sweep after approval
+  (added after the SQL was run, before the push).
+- `deals.ts` — `storeDealPhoto` (WebP under `text-deals/<id>/`),
+  `buildDealCard`, `startDealSend` (queue one `text_deal_sends` row per
+  CONFIRMED number FIRST, then a pass), `runDealSendPass` (claims each row
+  `queued → sending` before the Twilio call, 40 per request, marks the deal
+  `sent` when none remain), `sendDealTest`, `markDealSold` /
+  `markDealAvailable`.
+- `inbound.ts` — YES → confirmed + TwiML opt-in reply; STOP → stopped, no
+  reply (Twilio answers STOP itself on US numbers); HELP → recorded only
+  (same reason); anything else → stored in `text_inbound` keyed by
+  MessageSid (retries inert), tied to the number's last deal, forwarded to
+  the owner's cell with `[1st]`, and answered with the sold line once per
+  number when the deal is already sold. Unknown numbers are forwarded too.
+- `sweep.ts` — confirmations missed by the sign-up (25/run, 6 h between
+  retries, 5 max) + another send pass for deals still `sending`.
+
+**Routes:** `POST /api/webhooks/twilio/inbound` (signed; TwiML) ·
+`POST /api/webhooks/twilio/status` (signed; updates the send / system row by
+SID) · `POST /api/admin/text-alerts/sweep` (`x-cron-secret`) ·
+`/api/admin/text-deals` GET list + POST draft · `photo` (raw body,
+`?dealId=`) · `preview` (renders + stores, returns URL + bytes) ·
+`[id]` GET (tally + replies with `first`) / PATCH (edit draft | `sold` |
+`available`) · `[id]/send` (`{}` = everyone confirmed, `{ test: true }` =
+the owner's cell only) · `POST /api/admin/subscribers/resend-confirmation`.
+`/api/subscribe` now `await`s `sendConfirmation` inside try/catch (never
+fails the sign-up; guarded by test + source guard).
+
+**Admin:** new **Text Deals** page (`[locale]/admin/text-deals`,
+`components/admin/TextDealsManager.tsx`): photo → price → one line →
+message (live "text as it will read") → Preview (server render) → "Send a
+test to (239) 404-8505" → "Send to N" (confirm dialog); deals list; a
+selected deal shows the tally and the replies in clock order with the first
+flagged, an editable late-reply line, **Mark sold to <first>** / Mark still
+available. Nav entry after Subscribers. Subscribers table: **Resend YES** on
+pending rows. Storage GC now keeps `text_deals.photo_path / card_path`.
+
+**SQL `supabase/text-deals-2026-09.sql`** (⚠️ owner runs BEFORE the push):
+subscriber columns (`sms_confirmation_*`, `sms_last_deal_id`), tables
+`text_deals`, `text_deal_sends` (unique deal+phone), `text_inbound`
+(unique MessageSid), `text_system_messages` — all service-role only;
+pg_cron `nej-text-alerts-sweep` every 15 min reading
+`TEXT_ALERTS_CRON_SECRET` from Vault.
+
+**Netlify (in the owner's Chrome):** `TWILIO_ACCOUNT_SID` (from the console
+URL), `TWILIO_FROM_NUMBER` +18884237522, `TWILIO_FORWARD_TO` +12394048505
+created (all scopes, same value everywhere; the SID saved "without marking
+as secret"). `TWILIO_AUTH_TOKEN` and `TEXT_ALERTS_CRON_SECRET` are the
+owner's to paste (secret-marked) — this agent never handles token values.
+
+**Tests:** `lib/__tests__/text-alerts.test.ts` (16: keywords, the words,
+deal text cap + single STOP line, forward text, TwiML escaping, Twilio's
+signature vector, form-body parse, price formatting, form validation, source
+guards: both webhooks check the signature, the sign-up wraps the
+confirmation in try/catch, sends are queued before sending and only to
+confirmed numbers, GC keeps deal paths, fonts traced);
+`app/api/subscribe/route.test.ts` +1 (email-only never texts; a failed
+confirmation cannot fail the sign-up). **1411/1411 (142 files)** · tsc 0 ·
+eslint 0 errors (3 `<img>` warnings in the admin composer, same as the
+social panels) · build + full lint: see the staging line in `TASKS.md`.
+
+**Not verified in a browser:** the admin page needs the owner's login, and
+no message can be sent until the number is verified. Verification plan in
+`TASKS.md` (the first real test = the owner's own cell).
+
 ## 2026-09-15 (evening) — Join the List batch DEPLOYED + live-verified; Twilio account, toll-free number and registration form done to the review screen; follow-up STAGED (window copy + the two opt-in proof screenshots the registration links to)
 
 **Deployed and live-verified** (owner ran the SQL and pushed; "verify it
@@ -40,7 +140,17 @@ Subscribers shows the row as *Text · Pending YES* with the three tiles.
   only (no upload) for the proof, hence the screenshots ship on the site.
 - Status callback / webhook URL fields left blank (Step 2 sets them).
 
-**Follow-up batch (STAGED, needs a push, no SQL, no env vars):**
+**Late evening — follow-up DEPLOYED, registration SUBMITTED.** After the
+owner's push: both proof PNGs live (200, `image/png`, 235,911 B and 659,413 B
+= the staged bytes); the Twilio review re-checked (volume 100, Marketing,
+both proof links, terms + privacy) and **Submit registration** clicked at the
+owner's word → "Thanks for submitting your toll-free registration! Your
+toll-free registration is being reviewed." Number stays *Messaging disabled*
+until Twilio approves (email to info@). ⚠️ Chrome-driving note: a background
+tab stops repainting — five identical screenshots and a capture timeout —
+so the submit waited until the owner fronted the tab ("front").
+
+**Follow-up batch (DEPLOYED with the above; no SQL, no env vars):**
 - `HomeSubscribeModal.tsx` pitch (owner, two asks): "We text a quick photo
   with the details (metal, weight, size) and the price. These often go at
   scrap price or just above, never full price, and the first person to reply

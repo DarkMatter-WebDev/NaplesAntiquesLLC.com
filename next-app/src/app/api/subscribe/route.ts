@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
+import { sendConfirmation } from '@/lib/text-alerts/confirmations';
 import {
   channelWantsEmail,
   channelWantsText,
@@ -91,11 +92,25 @@ export async function POST(req: Request) {
   }
 
   const row = Array.isArray(data) ? data[0] : data;
+  const smsStatus = channelWantsText(channel) ? (row?.sms_status ?? 'pending') : null;
+
+  // The "reply YES" text, right away. Awaited (not after(): that is
+  // best-effort on Netlify) but never allowed to fail the sign-up — the
+  // 15-minute sweep sends anything this misses, and nothing goes out while
+  // Twilio is not configured.
+  if (smsStatus === 'pending' && phone && row?.phone_saved !== false) {
+    try {
+      await sendConfirmation(phone);
+    } catch (err) {
+      console.error('[subscribe] confirmation text failed', err instanceof Error ? err.message : err);
+    }
+  }
+
   return NextResponse.json({
     success: true,
     channel,
     // What the window tells the visitor about their number: saved and waiting
     // for the YES reply, or already confirmed from an earlier sign-up.
-    smsStatus: channelWantsText(channel) ? (row?.sms_status ?? 'pending') : null,
+    smsStatus,
   });
 }

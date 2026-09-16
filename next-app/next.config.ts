@@ -61,6 +61,10 @@ const nextConfig: NextConfig = {
     '/api/admin/facebook/**': ['./src/assets/fonts/**'],
     // On-demand card rendering for the panels' "Generate card" button.
     '/api/admin/card-preview': ['./src/assets/fonts/**'],
+    // Text deals draw the price on the owner's photo with the same faces
+    // (lib/text-alerts/card.ts); the preview, send and sweep routes render.
+    '/api/admin/text-deals/**': ['./src/assets/fonts/**'],
+    '/api/admin/text-alerts/**': ['./src/assets/fonts/**'],
   },
   // Dev-only: lets `npm run dev` (which already binds 0.0.0.0) accept requests
   // from this machine's LAN IP too, not just localhost — needed so hot-reload

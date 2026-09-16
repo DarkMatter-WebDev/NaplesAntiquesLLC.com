@@ -777,6 +777,39 @@ posts, refresh may derive a second composite read id from a numeric Facebook
 permalink when the stored id is ambiguous; deletion still requires same-Page
 profile and feed-read proof before local cleanup.
 
+## Text Alerts (Twilio) — sign-up confirmation + Text Deals (2026-09-15, Step 2 staged)
+
+Owner-facing flow: homepage **Join the List** window → `homepage_subscribers`
+row with `phone_e164`, `sms_status = 'pending'` → one confirmation text →
+handset replies YES → `confirmed` → Admin → **Text Deals** sends a picture
+message (the owner's photo with the price drawn on it) to confirmed numbers →
+replies come back to the toll-free number and are forwarded to the owner's
+cell. Pieces sold this way are never listed on the site; the reply is the
+claim (`DECISIONS.md` → *"Text deals: the reply is the claim…"*).
+
+- **Provider:** Twilio, toll-free +1 (888) 423-7522, Messages API over
+  `fetch` (`src/lib/text-alerts/twilio.ts`), StatusCallback on every send.
+  Credentials in Netlify (`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`,
+  `TWILIO_FROM_NUMBER`, `TWILIO_FORWARD_TO`); every sender no-ops while they
+  are missing.
+- **Inbound:** `POST /api/webhooks/twilio/inbound` (signature-checked,
+  answers TwiML) — the number's "A message comes in" webhook. Delivery:
+  `POST /api/webhooks/twilio/status`.
+- **Tables** (service-role only): `text_deals` (photo_path, card_path,
+  status draft/sending/sent/sold, sold_reply_text), `text_deal_sends`
+  (unique deal+phone, queued→sending→sent/failed, message_sid),
+  `text_inbound` (unique message_sid, kind confirm/stop/help/reply,
+  deal_id, forwarded_at, auto_reply_sent_at), `text_system_messages`
+  (confirmations, tests, forwards). Storage under
+  `product-images/text-deals/<deal>/` (GC-referenced).
+- **Scheduler:** pg_cron `nej-text-alerts-sweep` every 15 min →
+  `/api/admin/text-alerts/sweep` (`x-cron-secret` = `TEXT_ALERTS_CRON_SECRET`
+  from Vault): retries missed confirmations and finishes deals cut off
+  mid-send. Same trigger-agnostic pattern as the marketplace reconciles.
+- **Rendering:** `src/lib/text-alerts/card.ts` — sharp + Satori (next/og)
+  with the vendored fonts, traced into the text-deals routes in
+  `next.config.ts`.
+
 ## Public-shop cache invalidation (2026-07-02)
 
 `/shop` is server-cached (`unstable_cache`, tag `shop-catalog`, `revalidate: 300`).

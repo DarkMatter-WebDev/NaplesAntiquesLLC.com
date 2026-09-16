@@ -5,6 +5,56 @@
 
 ## ◻ OPEN — needs a human
 
+### 🟡 2026-09-15 night — STEP 2 BUILT + STAGED (Twilio sending, YES confirmation, Text Deals, replies) — owner: SQL, two secrets, push, webhook, then the first real test
+
+Built per `CHANGELOG.md` 2026-09-15 (night); rules `DECISIONS.md` → *"Text
+deals: the reply is the claim…"*. Safe to deploy before Twilio's approval:
+nothing sends until the number is verified AND the variables are set.
+
+**Owner, in this order:**
+1. ✅ SQL run 2026-09-15 night (verified from the editor: 4 tables present,
+   `nej-text-alerts-sweep` `*/15 * * * *` active, Vault secret
+   `TEXT_ALERTS_CRON_SECRET` present). Until the push the job posts to a
+   route that does not exist yet (404s in `net._http_response`, harmless).
+2. ✅ Netlify: all five variables present (SID / FROM / FORWARD_TO by this
+   agent; AUTH_TOKEN + CRON_SECRET pasted by the owner, secret-marked).
+3. ◻ Push the staged batch.
+4. ◻ **Twilio → Phone Numbers → (888) 423-7522 → Configure → Messaging → "A
+   message comes in": Webhook, `https://naplesestatejewelry.com/api/webhooks/twilio/inbound`, HTTP POST → Save.** (I can drive this in Chrome.)
+5. ◻ When Twilio's verification email arrives ("verified"): Admin →
+   Subscribers → your own row → **Resend YES** → reply YES from your phone →
+   the row flips to *Confirmed*. Then Admin → Text Deals: photo, price, line
+   → Preview → "Send a test to (239) 404-8505" → check the picture and the
+   text on your phone → reply to it → the reply should reach your cell as a
+   forward and show under the deal in Admin.
+6. ◻ First real deal: "Send to N". Then "Mark sold to <first>" and have
+   someone reply late to see the auto-reply.
+
+**Claude, after each of those (on your word):** live checks of the two
+webhooks (signed-request refusal = 403 on an unsigned POST), the sweep
+endpoint (401 without the secret), the pg_cron job row, the first
+`text_system_messages` / `text_deal_sends` rows.
+
+**Gate (Step 2):** `npx tsc --noEmit` 0 · `npm run lint` 0 (3 `<img>`
+warnings in the composer) · `npx vitest run` **1411/1411 (142 files)** ·
+`npm run build` exit 0 · no Turbopack build cache.
+
+**Staging (Step 2):** ✅ synced 2026-09-15 night — dry run listed exactly the
+36 touched files (23 NEW: 9 `lib/text-alerts/*.ts`, 7 routes under
+`api/admin/text-deals`, `api/admin/text-alerts/sweep`,
+`api/admin/subscribers/resend-confirmation`, the two
+`api/webhooks/twilio/*` routes, `admin/text-deals/page.tsx`,
+`TextDealsManager.tsx`, `text-alerts.test.ts`, `supabase/text-deals-2026-09.sql`;
+13 modified: next.config.ts, storage-gc route, subscribe route + test,
+AdminHeader, SubscribersManager, ARCHITECTURE, CHANGELOG, CURRENT_STATUS,
+DECISIONS, STRUCTURE, TASKS, features/lead-capture), 13 new dirs, 0 Extras,
+1119 total; real run copied 36 / 0 FAILED; follow-up dry run 0 / 0 / 0, exit
+0; SHA-256 MATCH ×8 (deals, inbound, card, inbound webhook, TextDealsManager,
+next.config, the SQL, CHANGELOG); leak check 0 `.env*` / `.log`, 0 `.git`
+dirs; positive control 210 = 210 `.tsx`, 10 = 10 `.ts` in `lib/text-alerts`.
+Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied →
+follow-up 0.
+
 ### 🟡 2026-09-15 evening — Join the List DEPLOYED + live-verified · Twilio number bought · registration at the review screen · small follow-up STAGED (push, then I submit)
 
 Step 1 is live (`CHANGELOG.md` 2026-09-15 evening). Twilio: account, approved
@@ -12,14 +62,13 @@ compliance profile, **+1 (888) 423-7522** bought, toll-free registration
 filled to "Review and submit" in the owner's Chrome.
 
 **Owner, in this order:**
-1. ◻ **Push the staged follow-up** (window copy: "photo with the details
-   (metal, weight, size) and the price"; the two opt-in proof screenshots at
-   `/assets/images/compliance/sms-optin-{phone,desktop}.png`). No SQL, no env
-   vars. Say "pushed" and I confirm the two PNG URLs return 200, then **click
-   Submit on the Twilio review screen** (it is sitting open in your Chrome;
-   don't close that tab, or I re-fill it — ~5 minutes).
+1. ✅ Follow-up pushed 2026-09-15 late evening (both PNG URLs 200, byte-exact);
+   **toll-free registration SUBMITTED** the same minute ("Thanks for
+   submitting your toll-free registration! … being reviewed").
 2. ◻ Wait for Twilio's toll-free verification (email to info@; days to ~2
    weeks). "Messaging disabled" on the number flips to enabled when approved.
+   If it is REJECTED, the email says why — usual causes are the proof
+   screenshot or the disclosure wording; send me the text and I fix + resubmit.
 3. ◻ Tell me "verified" → I build **Step 2** (reply-YES confirmation text,
    STOP / HELP, the Text Deals composer with the server-drawn price overlay,
    replies forwarded to (239) 404-8505 + the replies page with "Mark sold"

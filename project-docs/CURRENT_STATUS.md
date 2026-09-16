@@ -8,14 +8,27 @@
 
 **Read this, then `TASKS.md`.**
 
+🟡 **09-15 night — STEP 2 BUILT + STAGED, not deployed: Twilio sending
+(`lib/text-alerts/`), reply-YES confirmation at sign-up + 15-min sweep,
+STOP/HELP recorded (Twilio answers them), Admin → Text Deals (photo + price
+overlay → picture message to confirmed numbers, replies forwarded to the
+cell with `[1st]`, Mark sold auto-reply), Resend YES on pending rows.**
+Owner steps in `TASKS.md` top: run `supabase/text-deals-2026-09.sql` (+ the
+Vault secret), paste `TWILIO_AUTH_TOKEN` + `TEXT_ALERTS_CRON_SECRET` in
+Netlify (the other three are set), push, set the number's inbound webhook,
+then the first real test once Twilio verifies the number. Gate: tsc 0 ·
+lint 0 · 1411/1411 · build — `TASKS.md` staging line. Rules `DECISIONS.md`
+→ *"Text deals: the reply is the claim…"*.
+
 🟢 **09-15 evening — DEPLOYED + live-verified** (owner ran the SQL + pushed;
 real Text sign-up round-tripped to Admin as *Pending YES*). **Twilio:**
 account + approved compliance profile + **+1 (888) 423-7522** bought;
-toll-free registration filled to the review screen, **submitted only after
-the small STAGED follow-up is pushed** (window copy "photo with the details
-(metal, weight, size) and the price" + the two opt-in proof PNGs under
-`public/assets/images/compliance/` that the registration links to). Then
-wait for verification → Step 2. Details `CHANGELOG.md` 2026-09-15 (evening),
+**toll-free registration SUBMITTED** (late evening, after the follow-up
+deploy: window copy "photo with the details (metal, weight, size) and the
+price. These often go at scrap price or just above, never full price" + the
+two opt-in proof PNGs under `public/assets/images/compliance/` the
+registration links to). Now waiting on Twilio's review (days to ~2 weeks;
+email to info@) → then Step 2. Nothing is texted until then. Details `CHANGELOG.md` 2026-09-15 (evening),
 steps `TASKS.md` top. The block below is the build record.
 
 🟡 **09-15 — BUILT + STAGED (now deployed, see above): the hero's email form is now ONE

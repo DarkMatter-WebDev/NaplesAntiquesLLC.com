@@ -254,6 +254,27 @@ export default function SubscribersManager({ initialRows }: { initialRows: Subsc
     }
   }
 
+  // The "reply YES" text again, for a number still pending (Step 2, 2026-09-15).
+  async function resendConfirmation(row: SubscriberRow) {
+    if (!row.phone) return;
+    setBusyEmail(row.subscriberEmail ?? row.phone);
+    setNotice(null);
+    try {
+      const res = await fetch('/api/admin/subscribers/resend-confirmation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: row.phone }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || 'Could not resend the confirmation.');
+      setNotice({ text: `Confirmation text sent to ${formatUsPhone(row.phone)}.`, ok: true });
+    } catch (err) {
+      setNotice({ text: err instanceof Error ? err.message : 'Could not resend the confirmation.', ok: false });
+    } finally {
+      setBusyEmail(null);
+    }
+  }
+
   async function copyEmails() {
     try {
       const copied = await copyText(emailList);
@@ -426,6 +447,18 @@ export default function SubscribersManager({ initialRows }: { initialRows: Subsc
                       <Pill color="var(--color-on-surface-variant)">{channel}</Pill>
                       {statusLabel && (
                         <Pill color={STATUS_COLORS[subscriber.smsStatus ?? ''] ?? 'var(--color-on-surface-variant)'}>{statusLabel}</Pill>
+                      )}
+                      {subscriber.phone && subscriber.smsStatus === 'pending' && (
+                        <button
+                          type="button"
+                          className="text-[0.62rem] font-bold uppercase tracking-[0.1em] underline underline-offset-2"
+                          style={{ color: 'var(--color-primary)' }}
+                          onClick={() => void resendConfirmation(subscriber)}
+                          disabled={busyEmail !== null}
+                          title="Send the reply-YES text again"
+                        >
+                          Resend YES
+                        </button>
                       )}
                     </span>
                   </td>

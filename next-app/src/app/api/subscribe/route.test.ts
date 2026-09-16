@@ -4,11 +4,16 @@ const mocks = vi.hoisted(() => ({
   checkRateLimit: vi.fn(),
   createServiceClient: vi.fn(),
   rpc: vi.fn(),
+  sendConfirmation: vi.fn(),
 }));
 
 vi.mock('@/lib/rate-limit', () => ({
   checkRateLimit: mocks.checkRateLimit,
   getClientIp: vi.fn().mockReturnValue('192.0.2.1'),
+}));
+
+vi.mock('@/lib/text-alerts/confirmations', () => ({
+  sendConfirmation: mocks.sendConfirmation,
 }));
 
 vi.mock('@/lib/supabase/service', () => ({
@@ -23,6 +28,27 @@ describe('POST /api/subscribe', () => {
     mocks.checkRateLimit.mockReset().mockResolvedValue(true);
     mocks.rpc.mockReset().mockResolvedValue({ error: null });
     mocks.createServiceClient.mockReset().mockReturnValue({ rpc: mocks.rpc });
+    mocks.sendConfirmation.mockReset().mockResolvedValue({ outcome: 'sent', sid: 'SM1' });
+  });
+
+  it('never texts an email-only sign-up, and survives a failed confirmation text', async () => {
+    const emailOnly = await POST(new Request('https://example.com/api/subscribe', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ channel: 'email', email: 'customer@example.com' }),
+    }));
+    expect(emailOnly.status).toBe(200);
+    expect(mocks.sendConfirmation).not.toHaveBeenCalled();
+
+    mocks.rpc.mockResolvedValue({ data: [{ subscriber_id: 'id', phone_saved: true, sms_status: 'pending' }], error: null });
+    mocks.sendConfirmation.mockRejectedValue(new Error('Twilio down'));
+    const text = await POST(new Request('https://example.com/api/subscribe', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ channel: 'text', phone: '239-404-8505', smsConsent: true }),
+    }));
+    expect(text.status).toBe(200);
+    expect(mocks.sendConfirmation).toHaveBeenCalledWith('+12394048505');
   });
 
   it('writes through the service-only RPC after validation', async () => {

@@ -148,6 +148,17 @@ export async function POST(req: Request) {
     for (const path of asStringArray(row.rendition_paths)) referencedPaths.add(path);
   }
 
+  // Text deals (2026-09-15): the owner's photo (WebP) and the rendered
+  // picture message (JPEG) under text-deals/<deal>/. Twilio fetches the
+  // picture by URL at send time, so deleting one would break a deal mid-send.
+  const { data: textDeals } = await supabase
+    .from('text_deals')
+    .select('photo_path, card_path');
+  for (const row of (textDeals as Array<{ photo_path: string | null; card_path: string | null }> | null) ?? []) {
+    if (row.photo_path) referencedPaths.add(row.photo_path);
+    if (row.card_path) referencedPaths.add(row.card_path);
+  }
+
   const storage = supabase.storage.from(PRODUCT_IMAGES_BUCKET);
   const objectRows = await listObjectDetails(storage);
   const now = Date.now();

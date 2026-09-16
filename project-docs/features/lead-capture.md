@@ -52,6 +52,28 @@ joins the homepage's first paint.
   Email, Text or Both"*. Mockup (owner-approved, v2):
   https://claude.ai/artifact/Wnst13mirihcKMmoSgfT7B
 
+## Text alerts — Step 2: Twilio, confirmation, Text Deals, replies (2026-09-15 night, STAGED)
+
+- **Number:** Twilio toll-free +1 (888) 423-7522 (bought 09-15; toll-free
+  registration submitted 09-15; sends refused until verified). Twilio account
+  = the owner's; Netlify holds the credentials (`lib/text-alerts/config.ts`).
+- **Flow:** web sign-up → `sendConfirmation` (attempt recorded first) →
+  handset replies YES → `/api/webhooks/twilio/inbound` marks `confirmed` and
+  answers with the opt-in text → Admin → Text Deals sends a picture message
+  (`lib/text-alerts/card.ts`) to confirmed numbers only, one queued
+  `text_deal_sends` row per number before any request → replies land in
+  `text_inbound`, forward to `TWILIO_FORWARD_TO` with `[1st]`, and get the
+  sold line once the deal is marked sold. STOP → `stopped` (Twilio replies).
+  Sweep every 15 min: `/api/admin/text-alerts/sweep` (pg_cron, Vault secret).
+- **Tables** (`supabase/text-deals-2026-09.sql`, service-role only):
+  `text_deals`, `text_deal_sends`, `text_inbound`, `text_system_messages`;
+  subscriber columns `sms_confirmation_sent_at/_attempted_at/_attempts`,
+  `sms_last_deal_id`. Storage: `product-images/text-deals/<deal>/photo-*.webp`
+  + `card-*.jpg` (GC-referenced).
+- **Words** are in `lib/text-alerts/messages.ts` and match the registration.
+- Guards: `lib/__tests__/text-alerts.test.ts`; rules `DECISIONS.md` →
+  *"Text deals: the reply is the claim…"*.
+
 The September 10 audit and authorized seller-acquisition implementation are in
 `../SEO_LEAD_AUDIT.md`. Local seller copy/call presentation is built and verified,
 deployment blocked by Netlify's secrets alert; another agent owns repair. See audit handoff.
