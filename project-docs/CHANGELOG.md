@@ -1,6 +1,61 @@
 
 # Changelog
 
+## 2026-09-15 (evening) — Join the List batch DEPLOYED + live-verified; Twilio account, toll-free number and registration form done to the review screen; follow-up STAGED (window copy + the two opt-in proof screenshots the registration links to)
+
+**Deployed and live-verified** (owner ran the SQL and pushed; "verify it
+live"): `/` and `/es` carry the button (curl + Chrome); `/terms`, `/es/terms`
+have `id="text-messages"` + the section; `/privacy` the bullet; `POST
+/api/subscribe` with a fiction-block number → 400; a real **Text** sign-up
+from the live window with the owner's cell → "You're on the list. One more
+step for texts" (so `subscribe_homepage_v2` exists in production); Admin →
+Subscribers shows the row as *Text · Pending YES* with the three tiles.
+
+**Twilio, driven in the owner's Chrome (`memory: hero-join-list-text-alerts`):**
+- Account created by the owner (sign-up, plan, card = theirs). Onboarding:
+  Messaging, with code; Pay as you go; balance $50.
+- Primary compliance profile **Approved** the same hour (friendly name Naples
+  Estate Jewelry, legal name "Naples antiques llc" — matches the EIN's
+  entity; the owner did the photo-ID / selfie step on their phone; the
+  "business website" field there wanted the bare `https://` URL).
+- **Toll-free number bought: +1 (888) 423-7522** (SMS + MMS + Voice, $2.15
+  now and monthly; owner said "buy it"). Nine numbers containing 4653 (GOLD)
+  existed, none at a clean word break.
+- ⛔ The owner's cell (239) 404-8505 cannot be the sending number: Twilio only
+  sends from numbers it hosts, and hosted-SMS is landline/toll-free only.
+  Deals go out from the 888 number; replies are forwarded to the cell.
+- **Toll-free registration filled to "Review and submit"** (not submitted):
+  legal name Naples Antiques LLC · DBA Naples Estate Jewelry · Private
+  profit · US EIN (owner typed it) · website · volume 1,000/mo · use case
+  Marketing · description (≤500 chars: what we text, web-form opt-in with an
+  unchecked box beside the full disclosure, YES confirmation, only confirmed
+  numbers, STOP in every message) · sample message ("Naples Estate Jewelry:
+  Just in - 14K gold rope chain, 22 in, 18.4 g, $1,460. Not on the website.
+  First reply takes it. Pickup at our Naples showroom or we ship. Reply STOP
+  to opt out.") · opt-in type Web form · **opt-in proof = two hosted
+  screenshot URLs** (`/assets/images/compliance/sms-optin-phone.png` and
+  `-desktop.png`, see below) · terms `/terms` · privacy `/privacy` · keywords
+  YES, START · opt-in auto-reply · HELP auto-reply · not age-gated ·
+  additional-info paragraph · notification email info@. Twilio takes URLs
+  only (no upload) for the proof, hence the screenshots ship on the site.
+- Status callback / webhook URL fields left blank (Step 2 sets them).
+
+**Follow-up batch (STAGED, needs a push, no SQL, no env vars):**
+- `HomeSubscribeModal.tsx` pitch (owner, two asks): "We text a quick photo
+  with the details (metal, weight, size) and the price. These often go at
+  scrap price or just above, never full price, and the first person to reply
+  takes it." (EN + ES; the owner's own pricing statement, not a site claim
+  invented here).
+- `public/assets/images/compliance/sms-optin-phone.png` (780×1688, 236 KB)
+  and `sms-optin-desktop.png` (1600×1125, 659 KB): the live window on Text,
+  captured headless (`Page.captureScreenshot`, deviceScaleFactor 2 for the
+  phone) — PNG on purpose, a compliance screenshot a reviewer opens, not a
+  site image (the WebP rule is for site media). They are the URLs the
+  registration links to; the registration is submitted only after this is
+  live.
+- Gate: `home-subscribe-modal.test.ts` 9/9 · tsc 0 · eslint 0 on the file ·
+  `npm run build` exit 0 (below).
+
 ## 2026-09-15 — hero email form → ONE "Join the List" button + Email / Text / Both window; text-alert phone list (Step 1) BUILT, dev-verified, STAGED (⚠️ needs owner SQL before deploy; no env vars)
 
 **Owner asks, in order.** (1) "convert the email subscriber sign up fields on

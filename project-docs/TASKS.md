@@ -5,40 +5,49 @@
 
 ## ◻ OPEN — needs a human
 
-### 🟡 STAGED 2026-09-15 — "Join the List" hero button + Email / Text / Both window + text-alert list (Step 1) — needs SQL, then push
+### 🟡 2026-09-15 evening — Join the List DEPLOYED + live-verified · Twilio number bought · registration at the review screen · small follow-up STAGED (push, then I submit)
 
-Built and dev-verified (`CHANGELOG.md` 2026-09-15; rules `DECISIONS.md`
-2026-09-15 ×2; feature notes `features/lead-capture.md`).
+Step 1 is live (`CHANGELOG.md` 2026-09-15 evening). Twilio: account, approved
+compliance profile, **+1 (888) 423-7522** bought, toll-free registration
+filled to "Review and submit" in the owner's Chrome.
 
 **Owner, in this order:**
-1. ◻ **Supabase SQL Editor → run `supabase/text-subscribers-2026-09.sql`**
-   (makes `homepage_subscribers.email` optional, adds the phone / consent
-   columns and `subscribe_homepage_v2`). ⚠️ Do this BEFORE the push: the new
-   `/api/subscribe` calls the v2 function and every sign-up, email included,
-   fails with "Could not save subscription." until it exists.
-2. ◻ Push the staged batch (no env vars). After it is live: tap **Join the
-   List** on the homepage, join with your own cell on **Text**, then check
-   Admin → Subscribers shows the row as *Text · Pending YES* and the three
-   tiles count it. (Nothing will text you — that is Step 2.)
-3. ◻ **Step 2 prerequisites (your accounts):** open a Twilio account
-   (pay-as-you-go, small top-up — the free trial only texts hand-verified
-   numbers with a trial stamp), buy a **toll-free** number, submit toll-free
-   verification (business info, a sample deal message, a screenshot of the
-   "Join the List" window on Text as the opt-in proof; the Terms
-   `#text-messages` section and the Privacy bullet are already live for the
-   reviewer). Approval: days to a couple of weeks. Tell me when the number is
-   verified and I build Step 2: the reply-YES confirmation text, STOP / HELP,
-   the **Text Deals** page (phone photo + price overlay drawn on the server +
-   one line → picture message to confirmed numbers, per-number send log,
-   "Reply STOP to opt out" appended), the replies page (first reply flagged,
-   every reply forwarded to (239) 404-8505, "Mark sold" → one-line auto-reply
-   to late responders, wording yours) and "Resend confirmation" for pending
-   rows.
+1. ◻ **Push the staged follow-up** (window copy: "photo with the details
+   (metal, weight, size) and the price"; the two opt-in proof screenshots at
+   `/assets/images/compliance/sms-optin-{phone,desktop}.png`). No SQL, no env
+   vars. Say "pushed" and I confirm the two PNG URLs return 200, then **click
+   Submit on the Twilio review screen** (it is sitting open in your Chrome;
+   don't close that tab, or I re-fill it — ~5 minutes).
+2. ◻ Wait for Twilio's toll-free verification (email to info@; days to ~2
+   weeks). "Messaging disabled" on the number flips to enabled when approved.
+3. ◻ Tell me "verified" → I build **Step 2** (reply-YES confirmation text,
+   STOP / HELP, the Text Deals composer with the server-drawn price overlay,
+   replies forwarded to (239) 404-8505 + the replies page with "Mark sold"
+   auto-reply, "Resend confirmation" for pending rows, status-callback +
+   inbound webhooks set on the number). Env vars then: Twilio Account SID,
+   Auth Token (Netlify, write-only), the number.
 
-**Claude, after the push (on "verify it live"):** `/`, `/es` show the button;
-the window's three states; `/terms#text-messages` EN + ES; a real Text
-sign-up round-trips to Admin as Pending YES; IndexNow not needed (no new
-URLs).
+**Until Step 2 is live nobody is texted.** Sign-ups (including the owner's
+test row) sit at *Pending YES*; the window tells them one confirmation text
+comes before any deal.
+
+Registration volume was set to **100/month** at the owner's request ("probably
+50 to start"; the choices are 10 / 100 / 1,000). Keywords YES / START; Twilio
+matches keywords case-insensitively and Step 2's YES check will too (trimmed,
+any case, so "yes" and "Yes!" count).
+
+**Staging (follow-up: window copy + opt-in PNGs):** ✅ synced 2026-09-15
+evening — dry run listed exactly the 6 touched files (2 NEW PNGs under
+`public/assets/images/compliance/`, HomeSubscribeModal.tsx, CHANGELOG,
+CURRENT_STATUS, TASKS), 0 Extras, 1096 total; real run copied 6 / 0 FAILED;
+follow-up dry run 0 / 0 / 0, exit 0; SHA-256 MATCH on the modal, both PNGs and
+CHANGELOG; leak check 0; positive control 208 = 208 `.tsx`. Docs-only re-sync
+after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+Re-synced the same evening after the owner's second copy ask (the "often at
+scrap price or just above, never full price" sentence): dry run 2
+(HomeSubscribeModal.tsx, CHANGELOG) → copied 2 → follow-up 0 → SHA-256 MATCH
+×2; gate re-run eslint 0 · tsc 0 · 9/9 · build 0. Docs-only re-sync after
+this line: dry run 1 (TASKS.md) → copied → follow-up 0.
 
 **Staging (Join the List batch):** ✅ synced 2026-09-15 — dry run listed
 exactly the 26 touched files (5 NEW: HomeSubscribeModal.tsx,

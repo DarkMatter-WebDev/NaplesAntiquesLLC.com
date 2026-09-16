@@ -8,7 +8,17 @@
 
 **Read this, then `TASKS.md`.**
 
-🟡 **09-15 — BUILT + STAGED, NOT deployed: the hero's email form is now ONE
+🟢 **09-15 evening — DEPLOYED + live-verified** (owner ran the SQL + pushed;
+real Text sign-up round-tripped to Admin as *Pending YES*). **Twilio:**
+account + approved compliance profile + **+1 (888) 423-7522** bought;
+toll-free registration filled to the review screen, **submitted only after
+the small STAGED follow-up is pushed** (window copy "photo with the details
+(metal, weight, size) and the price" + the two opt-in proof PNGs under
+`public/assets/images/compliance/` that the registration links to). Then
+wait for verification → Step 2. Details `CHANGELOG.md` 2026-09-15 (evening),
+steps `TASKS.md` top. The block below is the build record.
+
+🟡 **09-15 — BUILT + STAGED (now deployed, see above): the hero's email form is now ONE
 "Join the List" button that opens an Email / Text / Both window; text-alert
 phone list (Step 1).** Owner-approved mockup v2
 (https://claude.ai/artifact/Wnst13mirihcKMmoSgfT7B), answers recorded in

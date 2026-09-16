@@ -301,8 +301,8 @@ export default function HomeSubscribeModal({ locale, onClose }: { locale: string
                   </p>
                   <p className="text-sm">
                     {isEs
-                      ? 'Algunas piezas nunca llegan al sitio web. Enviamos una foto rápida con el precio, y la primera persona que responde se la lleva. Aquí las cosas se mueven rápido; el correo es demasiado lento para esto.'
-                      : 'Some pieces never make it to the website. We text a quick photo with the price, and the first person to reply takes it. Things move quickly here; email is too slow for these.'}
+                      ? 'Algunas piezas nunca llegan al sitio web. Enviamos una foto rápida con los detalles (metal, peso, medida) y el precio. Suelen ir a precio de metal o apenas por encima, nunca a precio completo, y la primera persona que responde se la lleva. Aquí las cosas se mueven rápido; el correo es demasiado lento para esto.'
+                      : 'Some pieces never make it to the website. We text a quick photo with the details (metal, weight, size) and the price. These often go at scrap price or just above, never full price, and the first person to reply takes it. Things move quickly here; email is too slow for these.'}
                   </p>
                   <label className="grid grid-cols-[18px_1fr] items-start gap-2.5 text-sm">
                     <input
