@@ -32,6 +32,12 @@ describe('the window', () => {
     }
   });
 
+  it('describes email as monthly-ish and text as the fastest (owner, 2026-09-15)', () => {
+    expect(modal).toContain("'mensual, más o menos' : 'monthly-ish'");
+    expect(modal).toContain("'lo más rápido' : 'the fastest'");
+    expect(modal).not.toMatch(/weekly-ish|semanal/);
+  });
+
   it('never pre-ticks the text consent box', () => {
     // Carriers reject an opt-in that starts ticked; the visitor must tick it.
     expect(modal).toContain('useState(false)');

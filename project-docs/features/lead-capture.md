@@ -11,6 +11,12 @@ imports and guard test). The button opens `HomeSubscribeModal.tsx`, loaded on
 the tap (`next/dynamic`, `ssr: false`, portalled into `<body>`), so it never
 joins the homepage's first paint.
 
+**Second entry point — the business card (2026-09-15, staged):** `/card`
+has a full-width tinted "Join the List · email or text deals" tile under its
+grid (`components/card/CardJoinListButton.tsx`) that opens the same window,
+so a card scanned at the counter feeds the same list with the same consent
+record. Rules in `DECISIONS.md` → *"The /card page"*.
+
 - **Choice at the top:** Email / Text / Both — **Text preselected** (owner).
   Fields change to match: Name (optional) · Email (email/both) · Cell number
   (text/both) with the "Text-only deals" box: the pitch, the consent checkbox

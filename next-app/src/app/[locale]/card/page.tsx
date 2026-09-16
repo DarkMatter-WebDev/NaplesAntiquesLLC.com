@@ -7,6 +7,7 @@ import { AppIcon } from '@/components/AppIcon';
 import ShowroomAddress from '@/components/ShowroomAddress';
 import CopyAddressButton from '@/components/CopyAddressButton';
 import CardTodayHours from '@/components/card/CardTodayHours';
+import CardJoinListButton from '@/components/card/CardJoinListButton';
 import StorefrontPhoto from '@/components/StorefrontPhoto';
 import {
   FACEBOOK_URL,
@@ -42,6 +43,13 @@ import { getStoreHours } from '@/lib/store-hours';
  *   one filled button. A paired half-width row was measured and rejected —
  *   "Leave a Review" was already 3px too wide for its half at 375px, and the
  *   Spanish label 25px too wide.
+ * - **Join the List is a full-width tile under the grid** (owner, 2026-09-15,
+ *   mockup Option C): tinted like the sign-up window's "Text-only deals"
+ *   box, it opens the homepage's Email / Text / Both window
+ *   (`CardJoinListButton`, the page's only client piece). To pay for the
+ *   extra row the page was tightened the same night (owner ask): language
+ *   bar 39 → 31px, pills 46 → 42px with 6px gaps, logo 44 → 40px, tiles 4px
+ *   shorter. Measurements in `CHANGELOG.md` 2026-09-15 (late night, 3).
  * - **The bottom button says where it goes** ("View Full Website & Shop",
  *   owner, 2026-09-08). Spanish drops "Completo" in place: the full phrase
  *   measured 252 of the 256px available at 375px.
@@ -83,7 +91,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 /** The primary pills: full width, thumb-height, a step larger than the site's default pill. */
 const BIG_BUTTON: CSSProperties = {
   width: '100%',
-  minHeight: '2.9rem',
+  minHeight: '2.6rem',
   fontSize: '0.74rem',
   gap: '0.6rem',
 };
@@ -121,7 +129,7 @@ export default async function CardPage({ params }: Props) {
 
   const prefix = isEs ? '/es' : '';
   const tileClass =
-    'flex items-center justify-center gap-2 rounded-xl border px-2 py-3 text-[0.7rem] font-semibold uppercase tracking-[0.08em] no-underline';
+    'flex items-center justify-center gap-2 rounded-xl border px-2 py-2.5 text-[0.7rem] font-semibold uppercase tracking-[0.08em] no-underline';
   const tileStyle: CSSProperties = {
     background: 'var(--color-surface-container-lowest)',
     borderColor: 'var(--color-outline-variant)',
@@ -157,7 +165,7 @@ export default async function CardPage({ params }: Props) {
               hrefLang={lang}
               lang={lang}
               aria-current={current ? 'page' : undefined}
-              className="px-6 py-2.5 text-[0.7rem] font-bold uppercase tracking-[0.16em] no-underline"
+              className="px-6 py-1.5 text-[0.7rem] font-bold uppercase tracking-[0.16em] no-underline"
               style={{
                 fontFamily: 'var(--font-label)',
                 color: current ? 'var(--color-primary)' : 'var(--color-on-surface-variant)',
@@ -189,7 +197,7 @@ export default async function CardPage({ params }: Props) {
             width={157}
             height={120}
             priority
-            className="mt-2 h-11 w-auto"
+            className="mt-1.5 h-10 w-auto"
           />
           </Link>
           {/* Two deliberate lines: the full phrase cannot fit one line at
@@ -256,7 +264,7 @@ export default async function CardPage({ params }: Props) {
         </div>
 
         {/* The primary taps */}
-        <div className="mt-4 flex flex-col gap-2">
+        <div className="mt-3 flex flex-col gap-1.5">
           <a href={PHONE_TEL} className="dark-button" style={BIG_BUTTON}>
             <AppIcon name="call" className="text-[1.15rem]" />
             {isEs ? `Llamar ${PHONE_DISPLAY}` : `Call ${PHONE_DISPLAY}`}
@@ -296,6 +304,13 @@ export default async function CardPage({ params }: Props) {
             <span style={tileIconStyle}><FacebookGlyph /></span>
             Facebook
           </a>
+          {/* Join the List — full-width, tinted like the sign-up window's
+              "Text-only deals" box; opens that window (Email / Text / Both). */}
+          <CardJoinListButton
+            locale={locale}
+            className={`${tileClass} col-span-2`}
+            style={{ ...tileStyle, background: '#fffbe8', borderColor: '#e9c349' }}
+          />
         </div>
 
         {/* Address — pinned to the bottom of the screen on a tall phone. The
@@ -317,7 +332,7 @@ export default async function CardPage({ params }: Props) {
             target="_blank"
             rel="noopener noreferrer"
             className="outline-button mt-3"
-            style={{ width: '100%', minHeight: '2.75rem', fontSize: '0.72rem', gap: '0.5rem' }}
+            style={{ width: '100%', minHeight: '2.6rem', fontSize: '0.72rem', gap: '0.5rem' }}
           >
             <AppIcon name="location_on" className="text-[1.05rem]" />
             {isEs ? 'Cómo Llegar' : 'Get Directions'}
@@ -332,7 +347,7 @@ export default async function CardPage({ params }: Props) {
           href={prefix || '/'}
           prefetch={false}
           className="outline-button mt-2.5"
-          style={{ width: '100%', minHeight: '2.75rem', fontSize: '0.72rem', gap: '0.5rem' }}
+          style={{ width: '100%', minHeight: '2.6rem', fontSize: '0.72rem', gap: '0.5rem' }}
         >
           {isEs ? 'Ver Sitio Web y Tienda' : 'View Full Website & Shop'}
           <AppIcon name="trending_flat" className="text-[1rem]" />

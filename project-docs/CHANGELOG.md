@@ -1,6 +1,44 @@
 
 # Changelog
 
+## 2026-09-15 (late night, 3) — /card: "Join the List" tile + a tighter card page — STAGED (no SQL, no env vars)
+
+Owner: mockup of three placements
+(https://claude.ai/artifact/ApjXkZzv87eLAcwUVeaZoM) → **Option C**, a
+full-width tile under the What We Buy / Shop / Instagram / Facebook grid,
+tinted like the window's "Text-only deals" box (`#fffbe8` / `#e9c349`), bell
+icon, "Join the List · email or text deals" / "Unirse a la Lista · correo o
+texto". New `components/card/CardJoinListButton.tsx` (the page's only client
+piece; loads `HomeSubscribeModal` on the first tap exactly like the homepage
+launcher) — the card and the site grow ONE list with one consent record.
+Not gold: the review ask stays the card's one filled button.
+
+**Compacting (owner ask, kept when the option changed A → C):** language bar
+`py-2.5` → `py-1.5` (39 → 31px), pills `minHeight` 2.9 → 2.6rem (46 → 42px)
+with `gap-1.5`, stack `mt-3`, logo `h-11` → `h-10`, tiles `py-3` → `py-2.5`,
+the two bottom outline buttons 2.75 → 2.6rem. Measured at 375×812: tiles +
+the new Join tile end at **625px, the same line the four-tile grid ended on
+before** (624.5). The Join tile is one line in both languages: Spanish
+content is 231px in a 296px tile at 360 wide; the hint `truncate`s rather
+than wrapping on anything narrower (owner, 2026-09-15: never two lines).
+Preview-verified EN + ES at 320 / 360 / 375: tap → the window opens with
+Text preselected, Escape closes it. Guard in `card-page.test.ts` (8/8). tsc
+0 · lint 0 errors · 1415/1415 · build 0.
+
+## 2026-09-15 (late night, 2) — Join the List window: "monthly-ish" + roomier on desktop — STAGED (no SQL, no env vars)
+
+Owner asks, same night: the Email option's hint "weekly-ish" → **"monthly-ish"**
+("mensual, más o menos"); on desktop, bigger option subtext and a window that
+"spreads out a bit more"; **phones unchanged**. `HomeSubscribeModal.tsx`, all
+desktop changes behind Tailwind `md:` (≥768px): panel 480 → 580px, header /
+form / success padding 20 → 32px sides, form gap 14 → 20px, option row py 8 →
+12px, option labels 9.9 → 12.2px and hints 8.8 → 11.5px, title 24 → 28px,
+intro 14 → 15.2px, yellow box padding + consent statement 10.6 → 11.5px.
+Measured in the preview: desktop 1280 = the numbers above; phone 375 = width
+351, labels 9.92 / hints 8.8, gap 14px, padding 20px, fields 16px — identical
+to before. Guard test now pins the two hints (11/11). Lint 0 errors (3
+pre-existing `<img>` warnings in TextDealsManager), build 0.
+
 ## 2026-09-15 (late night) — Join the List window: no iOS focus zoom — STAGED (one CSS rule, no SQL, no env vars)
 
 Owner, on the phone: tapping a field in the window "zooms in a bit" and the

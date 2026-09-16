@@ -943,6 +943,19 @@ editable. Rules that follow from that:
   (owner, 2026-09-04: a full reload on the switch read as a "blip / flash").
   Internal links on the page are `<Link prefetch={false}>`; `tel:`, `sms:`
   and external links stay `<a>`.
+- **"Join the List" is a full-width tinted tile under the grid, never a
+  fifth pill and never gold** (owner, 2026-09-15, mockup Option C of three:
+  https://claude.ai/artifact/ApjXkZzv87eLAcwUVeaZoM). It opens the SAME
+  Email / Text / Both window as the homepage (`CardJoinListButton.tsx`, the
+  page's only client piece, lazy like the homepage launcher), so the card and
+  the site grow one list with one consent record. The tint is the window's
+  "Text-only deals" box, so it reads as different from Shop / Instagram
+  without competing with the review ask. The tile is ONE line in both
+  languages: the hint is short on purpose ("email or text deals" / "correo o
+  texto") and truncates rather than wrapping. To pay for the extra row the
+  page was tightened the same night (language bar 39 → 31px, pills 46 →
+  42px with 6px gaps, logo 44 → 40px, tiles 4px shorter): at 375×812 the
+  grid ends on the same 625px line it did with four tiles.
 - **No cookie notice on `/card`** (owner, 2026-09-03): the banner covered
   the address and bottom buttons for every first-time scanner, and the
   page sets nothing of its own. The PAGE declares it (`data-no-cookie-notice`

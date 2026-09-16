@@ -8,6 +8,13 @@
 
 **Read this, then `TASKS.md`.**
 
+🟡 **09-15 late night — STAGED, one push (no SQL, no env vars):** Join the
+List window fields 16px on touch (no iOS focus zoom), "monthly-ish" + a
+roomier desktop window, and `/card` gets a tinted "Join the List" tile under
+its grid (opens the same window) with the card page tightened so the grid
+ends on the same line as before. `TASKS.md` top; `CHANGELOG.md` 09-15
+(late night, 1–3).
+
 🟢 **09-15 night, later — STEP 2 DEPLOYED** (SQL run + Vault secret + all
 five Netlify variables + push; live: both webhooks 403 unsigned, sweep 401,
 admin 401; the number's inbound webhook saved — primary + backup — and

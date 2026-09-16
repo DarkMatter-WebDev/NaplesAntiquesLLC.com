@@ -48,6 +48,15 @@ describe('/card page — search and chrome rules', () => {
     expect(GLOBALS).toContain('body:has(main[data-no-cookie-notice]) [data-cookie-notice]');
   });
 
+  it('offers Join the List as a full-width tinted tile that opens the homepage window (owner, 2026-09-15, Option C)', () => {
+    expect(PAGE).toContain('className={`${tileClass} col-span-2`}');
+    // Never gold: the review ask stays the one filled button on the card.
+    expect(PAGE).not.toMatch(/CardJoinListButton[^/]*gold-button/);
+    const button = readFileSync(join(process.cwd(), 'src/components/card/CardJoinListButton.tsx'), 'utf8');
+    expect(button).toContain("import('@/components/home/HomeSubscribeModal')");
+    expect(button).toContain("'Unirse a la Lista' : 'Join the List'");
+  });
+
   it('uses the cross-platform sms body form and the shared social URLs', () => {
     expect(PAGE).toContain('?&body=');
     expect(PAGE).toContain('INSTAGRAM_URL');

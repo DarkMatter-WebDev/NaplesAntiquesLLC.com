@@ -5,12 +5,28 @@
 
 ## ◻ OPEN — needs a human
 
-### 🟡 STAGED 2026-09-15 late night — window fields 16px on touch screens (stops the iOS focus zoom the owner saw) — push whenever convenient, check on the phone
+### 🟡 STAGED 2026-09-15 late night — Join the List: iOS focus zoom fix + "monthly-ish" + roomier desktop window + /card tile with a tighter card page — one push, check on the phone
 
-One CSS rule in `globals.css` (`.home-subscribe-modal` inputs at 1rem under
-`@media (hover: none)`), guard test, build 0. No SQL, no env vars. After the
-push: open the window on the phone, tap Name / Cell number — the page should
-not zoom. `CHANGELOG.md` 2026-09-15 (late night).
+Three small follow-ups, all in staging, no SQL, no env vars:
+3. `/card`: full-width tinted "Join the List · email or text deals" tile
+   under the grid (new `components/card/CardJoinListButton.tsx`, opens the
+   homepage window) + the page tightened so the grid still ends on the same
+   line at 375×812 (language bar, pills, gaps, logo, tiles). One line in
+   Spanish, verified at 320 / 360 / 375. After the push: scan the card or
+   open `/card` on the phone, tap the tile, the window should open with Text
+   preselected. `CHANGELOG.md` 2026-09-15 (late night, 3).
+
+**Staging (/card tile + compacting):** ✅ synced 2026-09-15 (late night, 3) — dry run listed exactly the 9 touched files (card/page.tsx, CardJoinListButton.tsx NEW, card-page.test.ts + CHANGELOG, CURRENT_STATUS, DECISIONS, STRUCTURE, TASKS, features/lead-capture), 0 Extras, 1120 total (= 1119 + the new component); real run copied 9 / 0 FAILED (exit 1 = copied only); follow-up dry run 0/0/0, exit 0; leak check 0 `.env*` / `.log`, 0 `.git`, no node_modules / .next / worktrees, launch.json present; positive control 211 = 211 `.tsx`; SHA-256 MATCH on all 9. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+1. `globals.css`: `.home-subscribe-modal` inputs at 1rem under
+   `@media (hover: none)` — stops iOS Safari zooming when a field is tapped.
+   After the push: open the window on the phone, tap Name / Cell number — the
+   page should not zoom (Chromium cannot verify this).
+2. `HomeSubscribeModal.tsx`: Email hint "weekly-ish" → "monthly-ish" (EN+ES);
+   desktop (`md:` ≥768px) window 580px wide with bigger option labels/hints,
+   more padding and gap; phone measured identical to before. Preview-verified
+   at 1280 and 375. `CHANGELOG.md` 2026-09-15 (late night, 2).
+
+**Staging (monthly-ish + desktop room):** ✅ synced 2026-09-15 (late night, 2) — dry run listed exactly the 4 touched files (HomeSubscribeModal.tsx, home-subscribe-modal.test.ts, CHANGELOG, TASKS), 0 Extras, 1119 total; real run copied 4 / 0 FAILED (exit 1 = copied only); follow-up dry run 0/0/0, exit 0; leak check 0 `.env*` / `.log`, 0 `.git`, no node_modules / .next / worktrees, launch.json present; positive control 210 = 210 `.tsx`; SHA-256 MATCH on all 4. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
 
 **Staging (iOS zoom):** ✅ synced 2026-09-15 (late night) — dry run listed exactly the 4 touched files (globals.css, home-subscribe-modal.test.ts, CHANGELOG, TASKS), 0 Extras, 1119 total; real run copied 4 / 0 FAILED (robocopy exit 1 = copied only); follow-up dry run 0/0/0, exit 0; leak check 0 `.env*` / `.log`, 0 `.git`, no node_modules / .next / worktrees, launch.json present; positive control 210 = 210 `.tsx`; SHA-256 MATCH on all 4. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
 

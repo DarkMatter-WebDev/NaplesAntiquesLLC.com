@@ -132,7 +132,7 @@ export default function HomeSubscribeModal({ locale, onClose }: { locale: string
   }
 
   const choices: { value: SubscribeChannel; label: string; hint: string | null }[] = [
-    { value: 'email', label: isEs ? 'Correo' : 'Email', hint: isEs ? 'semanal, más o menos' : 'weekly-ish' },
+    { value: 'email', label: isEs ? 'Correo' : 'Email', hint: isEs ? 'mensual, más o menos' : 'monthly-ish' },
     { value: 'text', label: isEs ? 'Texto' : 'Text', hint: isEs ? 'lo más rápido' : 'the fastest' },
     { value: 'both', label: isEs ? 'Ambos' : 'Both', hint: null },
   ];
@@ -160,16 +160,16 @@ export default function HomeSubscribeModal({ locale, onClose }: { locale: string
         aria-modal="true"
         aria-labelledby={titleId}
         onKeyDown={trapTab}
-        className="home-subscribe-modal w-full max-w-[480px] border bg-white outline-none"
+        className="home-subscribe-modal w-full max-w-[480px] border bg-white outline-none md:max-w-[580px]"
         style={{ borderColor: 'var(--color-outline-variant)', boxShadow: '0 24px 60px rgba(0,0,0,0.35)', color: 'var(--color-on-surface)' }}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-1">
+        <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-1 md:px-8 md:pt-7 md:pb-2">
           <div>
-            <p className="mb-2 text-[0.6rem] font-bold uppercase tracking-[0.3em]" style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
+            <p className="mb-2 text-[0.6rem] font-bold uppercase tracking-[0.3em] md:text-[0.66rem]" style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
               Naples Estate Jewelry
             </p>
-            <h2 id={titleId} className="text-2xl leading-tight" style={{ fontFamily: 'var(--font-headline)' }}>
+            <h2 id={titleId} className="text-2xl leading-tight md:text-[1.75rem]" style={{ fontFamily: 'var(--font-headline)' }}>
               {status === 'success'
                 ? (isEs ? 'Ya está en la lista.' : "You're on the list.")
                 : (isEs ? 'Reciba nuevas piezas primero' : 'Get First Look at New Pieces')}
@@ -187,7 +187,7 @@ export default function HomeSubscribeModal({ locale, onClose }: { locale: string
         </div>
 
         {status === 'success' ? (
-          <div className="grid gap-3 px-5 pt-2 pb-5">
+          <div className="grid gap-3 px-5 pt-2 pb-5 md:gap-4 md:px-8 md:pt-3 md:pb-8">
             {smsStatus ? (
               <div className="grid gap-1.5 rounded-xl border px-4 py-3" style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-background)' }}>
                 <p className="text-lg" style={{ fontFamily: 'var(--font-headline)' }}>
@@ -213,8 +213,8 @@ export default function HomeSubscribeModal({ locale, onClose }: { locale: string
             </button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="grid gap-3.5 px-5 pt-2 pb-5" noValidate>
-            <p className="text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
+          <form onSubmit={handleSubmit} className="grid gap-3.5 px-5 pt-2 pb-5 md:gap-5 md:px-8 md:pt-3 md:pb-8" noValidate>
+            <p className="text-sm md:text-[0.95rem]" style={{ color: 'var(--color-on-surface-variant)' }}>
               {isEs ? 'Las buenas piezas no duran. Elija cómo quiere enterarse.' : "Good pieces don't last. Choose how you want to hear about them."}
             </p>
 
@@ -233,7 +233,7 @@ export default function HomeSubscribeModal({ locale, onClose }: { locale: string
                     role="radio"
                     aria-checked={on}
                     onClick={() => setChannel(choice.value)}
-                    className="px-1 py-2 text-center text-[0.62rem] font-bold uppercase tracking-[0.14em] outline-none focus-visible:ring-2 focus-visible:ring-inset"
+                    className="px-1 py-2 text-center text-[0.62rem] font-bold uppercase tracking-[0.14em] outline-none focus-visible:ring-2 focus-visible:ring-inset md:py-3 md:text-[0.76rem]"
                     style={{
                       fontFamily: 'var(--font-label)',
                       background: on ? 'var(--color-on-surface)' : 'transparent',
@@ -242,7 +242,7 @@ export default function HomeSubscribeModal({ locale, onClose }: { locale: string
                   >
                     {choice.label}
                     {choice.hint && (
-                      <span className="block text-[0.55rem] font-semibold normal-case tracking-[0.06em] opacity-80">{choice.hint}</span>
+                      <span className="block text-[0.55rem] font-semibold normal-case tracking-[0.06em] opacity-80 md:mt-0.5 md:text-[0.72rem]">{choice.hint}</span>
                     )}
                   </button>
                 );
@@ -295,7 +295,7 @@ export default function HomeSubscribeModal({ locale, onClose }: { locale: string
                   </div>
                 </label>
 
-                <div className="grid gap-2.5 rounded-xl border px-3.5 py-3" style={{ borderColor: '#e9c349', background: '#fffbe8' }}>
+                <div className="grid gap-2.5 rounded-xl border px-3.5 py-3 md:gap-3 md:px-5 md:py-4" style={{ borderColor: '#e9c349', background: '#fffbe8' }}>
                   <p className="text-[0.58rem] font-extrabold uppercase tracking-[0.24em]" style={{ color: '#8f6c06', fontFamily: 'var(--font-label)' }}>
                     {isEs ? 'Ofertas solo por texto' : 'Text-only deals'}
                   </p>
@@ -317,7 +317,7 @@ export default function HomeSubscribeModal({ locale, onClose }: { locale: string
                       {isEs ? 'Las piezas se mueven rápido; la primera respuesta se la lleva.' : 'Pieces move fast; first reply takes it.'}
                     </span>
                   </label>
-                  <p className="text-[0.66rem] leading-snug" style={{ color: 'var(--color-on-surface-variant)' }}>
+                  <p className="text-[0.66rem] leading-snug md:text-[0.72rem]" style={{ color: 'var(--color-on-surface-variant)' }}>
                     {statementBody}
                     <Link href={`${prefix}${SMS_CONSENT_LINKS.privacy.path}`} className="font-bold underline underline-offset-2" style={{ color: 'var(--color-primary)' }}>
                       {privacyLabel}
