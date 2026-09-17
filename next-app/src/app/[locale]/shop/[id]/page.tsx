@@ -31,7 +31,8 @@ import {
 import { fetchSpotData } from '@/lib/spot-price';
 import { fetchShopVisibilitySettings, fetchSpecialPriceDefault } from '@/lib/shop-settings';
 import { jsonLdHtml } from '@/lib/json-ld';
-import { calcSpotMeltValue, formatUsdPrice, getStorefrontDisplayPrice } from '@/lib/pricing';
+import { calcSpotMeltValue, formatUsdPrice, getProductPriceValue, getStorefrontDisplayPrice } from '@/lib/pricing';
+import { productOfferLd } from '@/lib/product-ld';
 import SiteHeader from '@/components/layout/SiteHeader';
 import { BreadcrumbTrailFromLd } from '@/components/BreadcrumbTrail';
 import SiteFooter from '@/components/layout/SiteFooter';
@@ -511,8 +512,6 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
   };
 
 
-  const priceNumeric = price.replace(/[$,]/g, '').trim();
-  const isNumericPrice = /^\d+(\.\d+)?$/.test(priceNumeric);
   const localePrefix = locale === 'es' ? '/es' : '';
   const canonicalProductUrl = `https://naplesestatejewelry.com${localePrefix}/shop/${p.id}`;
   const schemaImage = productImages[0]
@@ -522,7 +521,19 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
   // merchant-listing rich result doesn't warn about a missing priceValidUntil.
   // Derive from the spot fetch timestamp (avoids an impure Date.now() in render).
   const priceValidUntil = new Date(spotData.fetchedAt + 2 * 86_400_000).toISOString().slice(0, 10);
-  const jsonLd = {
+  // The schema price is the canonical VALUE, never the storefront label: with
+  // "hide sold item prices" on, the label reads "Sold" and Search Console
+  // flagged every sold page for a price-less Offer (2026-09-16). A sold item
+  // reports its recorded sale price (or last asking price) with SoldOut; the
+  // visible page still says "Sold". No numeric price at all → no Product
+  // schema (see lib/product-ld.ts).
+  const offerLd = productOfferLd({
+    priceValue: getProductPriceValue(p, spotData),
+    url: canonicalProductUrl,
+    isPurchasable,
+    priceValidUntil,
+  });
+  const jsonLd = offerLd ? {
     '@context': 'https://schema.org',
     '@type': 'Product',
     name: title,
@@ -530,16 +541,8 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
     ...(description ? { description } : {}),
     ...(schemaImage ? { image: schemaImage } : {}),
     brand: { '@type': 'Organization', name: 'Naples Estate Jewelry' },
-    offers: {
-      '@type': 'Offer',
-      url: canonicalProductUrl,
-      priceCurrency: 'USD',
-      ...(isNumericPrice ? { price: priceNumeric, priceValidUntil } : {}),
-      availability: isPurchasable ? 'https://schema.org/InStock' : 'https://schema.org/SoldOut',
-      itemCondition: 'https://schema.org/UsedCondition',
-      seller: { '@type': 'Organization', name: 'Naples Estate Jewelry' },
-    },
-  };
+    offers: offerLd,
+  } : null;
   const breadcrumbLd = {
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
@@ -563,7 +566,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(jsonLd) }} />
+      {jsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(jsonLd) }} />}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(breadcrumbLd) }} />
       {videoLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(videoLd) }} />}
       <SiteHeader />

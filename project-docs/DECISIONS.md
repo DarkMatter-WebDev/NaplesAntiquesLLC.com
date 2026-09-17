@@ -4,7 +4,75 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-09-15**.
+> compaction. Last reconciled: **2026-09-16**.
+
+## In-store sales: Zettle takes the card, the site only records the sale — and an unlisted piece is an order line, never a product (2026-09-16)
+
+**Owner decisions (2026-09-16):** "go ahead with the mockup, zettle, no need
+for paypal fallback, but we can use the simple sale recorder" → then "yes,
+build it" with both item modes. Mockup:
+https://claude.ai/artifact/5o6VdpQjChYp11JJPCqS8X.
+
+**Rules:**
+- **The card is taken on PayPal Zettle (Tap to Pay on the iPhone), never by
+  typing a customer's card into the site's PayPal button.** A keyed card is
+  card-not-present: ≈ 3.5% + 49¢ vs ≈ 2.3% + 9¢ card-present, no chip/tap
+  liability shift, and many different cards keyed from one device is the
+  pattern PayPal's risk system holds accounts for. Money stays in the same
+  PayPal business account either way. ⛔ Do not add a PayPal card button
+  to the in-store page.
+- **`/admin/in-store-sale` records, it does not charge.** One paid,
+  picked-up order per sale, `payment_method = in_store_<zettle|cash|zelle|check>`,
+  `payment_reference = "In store · …"`, no PayPal capture id. It reuses
+  `create_paypal_order` + `capture_paypal_order` so a LISTED item is sold
+  exactly as a web sale sells it (row lock, quantity, `sold_price` = the
+  price sold, eBay/Etsy end + Deep Field via `scheduleProductStatusHooks`,
+  invoice + receipt + owner email via `finalizePaidOrder`). The capture RPC
+  stamps `payment_method = 'paypal'`; the route restores the in-store
+  values in one update afterwards. No new SQL.
+- **An UNLISTED piece is an order line with `product_id null`** (title,
+  metal, purity, weight, price as snapshots). No hidden product row: nothing
+  can leak into the shop gallery (sold items show there by default), the
+  merchant feed, Deep Field or the marketplaces, and there is no fake
+  inventory number to explain later. The mockup's "hidden inventory record
+  with the next number" was dropped for this reason.
+- **Tax is always the 6% Florida rate**, the same rule local pickup uses
+  online (`calculateFlSalesTax`); no tax-exempt option until the owner asks.
+- **Cell required, email optional.** No email → no receipt (the order page
+  can send one later); the owner's new-order email still goes out.
+- **The page never signs the customer up** for email or text deals.
+- Unlisted "Metal" is Gold / Silver / Other because `products.category` is
+  Gold | Silver and an order line only needs a metal snapshot; the mockup's
+  Diamonds / Watches / Coins choices were not a product field.
+
+## Product schema: the Offer price is the canonical value, never the storefront label — and a page with no numeric price emits no Product schema (2026-09-16)
+
+**Rule:** `shop/[id]/page.tsx` builds `offers` with `productOfferLd()`
+(`src/lib/product-ld.ts`) from `getProductPriceValue(product, spot)` — the
+same number checkout, PayPal, eBay, Etsy and the merchant feed use. A SOLD
+item therefore reports its recorded `sold_price` (or, before one is
+recorded, its last asking price) with `availability: SoldOut` and no
+`priceValidUntil`; an in-stock item reports its live price with `InStock`
+and a two-day `priceValidUntil`. The visible page is untouched: the admin
+"hide sold item prices" setting still renders "Sold" / "Vendido".
+
+**Why:** Google requires `price` on every Offer, sold out or not. The schema
+used to copy the storefront LABEL and dropped `price` whenever that label
+was not a number — which, with sold prices hidden, was every sold page. Two
+sold items were flagged in Product snippets and Merchant listings ("Missing
+field price", first detected 2026-08-30) and every future sale would have
+added one. Owner (2026-09-16): fix it for good; no selling through Merchant
+Center, but keep whatever helps visibility.
+
+**Corollary — no numeric price → no Product schema.** A manual "Contact
+for price" listing has nothing valid to emit: Google rejects an Offer without
+a price AND a Product with none of offers/review/aggregateRating. Such a
+page keeps its BreadcrumbList and store schema and is simply an indexed page
+with no rich result. Do not "fix" that by inventing a price or a rating.
+
+**Audit rule unchanged:** sold vs in-stock is still judged by
+`"availability"` in the page's JSON-LD (the 2026-08-27 rule below) — a sold
+page still has it, now with a price beside it.
 
 ## The hero sign-up is one button; the window offers Email, Text or Both, and text deals are pieces that never reach the site (2026-09-15)
 

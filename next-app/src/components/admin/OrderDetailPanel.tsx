@@ -13,6 +13,7 @@ import { buildInvoiceEmailContent, invoiceNumberForOrder, isOrderPaid, withInvoi
 import { buildFulfillmentUpdateEmailContent } from '@/lib/order-fulfillment-email';
 import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
 import { formatUsdPrice } from '@/lib/pricing';
+import { paymentMethodLabel } from '@/lib/in-store-sale';
 import { adminUpdateProductsStatus } from '@/app/actions/admin-products';
 import { AppIcon } from '@/components/AppIcon';
 
@@ -1127,7 +1128,7 @@ export default function OrderDetailPanel({
               )}
             </div>
             <div className="border-t mt-4 pt-4 text-sm" style={{ borderColor: BORDER, color: 'var(--color-on-surface-variant)' }}>
-              <div>Payment method: {order.payment_method || '-'}</div>
+              <div>Payment method: {paymentMethodLabel(order.payment_method)}</div>
               <div>Reference: {order.payment_reference || '-'}</div>
               <div>Shipping: {orderStatusLabel(order.shipping_method)}</div>
             </div>

@@ -11,7 +11,7 @@ imports and guard test). The button opens `HomeSubscribeModal.tsx`, loaded on
 the tap (`next/dynamic`, `ssr: false`, portalled into `<body>`), so it never
 joins the homepage's first paint.
 
-**Second entry point — the business card (2026-09-15, staged):** `/card`
+**Second entry point — the business card (2026-09-15, live):** `/card`
 has a full-width tinted "Join the List · email or text deals" tile under its
 grid (`components/card/CardJoinListButton.tsx`) that opens the same window,
 so a card scanned at the counter feeds the same list with the same consent

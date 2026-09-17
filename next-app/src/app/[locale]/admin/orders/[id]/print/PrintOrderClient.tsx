@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 import type { Order, OrderItem } from '@/types/sales';
 import { formatCurrency, formatOrderDate, formatPublicPurity, orderStatusLabel } from '@/types/sales';
 import { formatProductItemYear } from '@/types/product';
+import { paymentMethodLabel } from '@/lib/in-store-sale';
 
 type PrintableOrder = Order & { order_items: OrderItem[] };
 
@@ -96,7 +97,7 @@ export default function PrintOrderClient({
           </InfoBlock>
           <InfoBlock label="Payment / Shipping">
             <p>
-              Method: {order.payment_method || '-'}<br />
+              Method: {paymentMethodLabel(order.payment_method)}<br />
               Reference: {order.payment_reference || '-'}<br />
               Shipping: {orderStatusLabel(order.shipping_method)}
             </p>

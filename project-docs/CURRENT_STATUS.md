@@ -2,18 +2,50 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-09-15**.
+> in `DECISIONS.md`. Last reconciled: **2026-09-16**.
 
 ## Start Here (2026-09-15 — SUPERSEDES the blocks below)
 
 **Read this, then `TASKS.md`.**
 
-🟡 **09-15 late night — STAGED, one push (no SQL, no env vars):** Join the
-List window fields 16px on touch (no iOS focus zoom), "monthly-ish" + a
-roomier desktop window, and `/card` gets a tinted "Join the List" tile under
-its grid (opens the same window) with the card page tightened so the grid
-ends on the same line as before. `TASKS.md` top; `CHANGELOG.md` 09-15
-(late night, 1–3).
+🟡 **09-16 — Twilio toll-free verification still *In review*** (checked in
+the console; submitted 09-15 late evening = one business day; Twilio says
+allow ~3–5 business days → expect a decision ~09-18 to 09-22). Nothing is
+pending on our side, no rejection, no console notification; the email will
+land at **info@** (check spam). Details `CHANGELOG.md` 2026-09-16. Still
+the only open item.
+
+🟡 **09-16 night — BUILT + STAGED, ready to push (same push as the schema
+fix below): Admin → In-Store Sale**, a one-screen recorder for showroom
+sales — the card is taken on PayPal Zettle (owner decision), the page
+records the sale as a paid, picked-up order (listed item by inventory # or
+an unlisted piece by description), marks a listed item sold through the
+same RPC a web sale uses, and emails the receipt. No SQL, no env vars.
+Unlisted items create no product row. Gate tsc 0 · lint 0 · 1428/1428 ·
+build 0; auth gates checked on dev; the admin screen itself is unverified
+until the owner's first test (`TASKS.md`). `CHANGELOG.md` 2026-09-16 (night).
+
+🟡 **09-16 evening — BUILT + STAGED, ready to push: the Product schema now
+reads the canonical price value, so SOLD product pages carry `price` +
+`SoldOut` and the 2 Search Console "Missing field price" errors (Product
+snippets + Merchant listings) are fixed for good** — the visible page still
+says "Sold"; a page with no numeric price at all emits no Product schema.
+New `src/lib/product-ld.ts` + test. Gate tsc 0 · lint 0 · 1421/1421 · build
+0; verified on `next start` (#77 → 237, #53 → 1026, /es, in-stock page
+unchanged). After the push: I click Validate fix on both GSC reports.
+`CHANGELOG.md` 2026-09-16 (evening).
+
+🟢 **09-16 — GSC "Some fixes failed" email = the *Page with redirect*
+validation (Failed 9/15). Noise:** every URL is a correct 308 (curl-verified);
+a redirect can never validate as "indexed". Never re-validate that reason.
+Discovered-not-indexed is now 0. `CHANGELOG.md` 2026-09-16 (GSC).
+
+🟢 **09-15 late night — DEPLOYED (owner pushed + checked production
+manually):** Join the List window fields 16px on touch (no iOS focus zoom),
+"monthly-ish" + a roomier desktop window, and `/card` has a tinted "Join the
+List" tile under its grid (opens the same window) with the card page
+tightened so the grid ends on the same line as before. `CHANGELOG.md` 09-15
+(late night, 1–3). Only Twilio's toll-free verification is still open.
 
 🟢 **09-15 night, later — STEP 2 DEPLOYED** (SQL run + Vault secret + all
 five Netlify variables + push; live: both webhooks 403 unsigned, sweep 401,

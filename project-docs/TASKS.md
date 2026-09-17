@@ -1,13 +1,15 @@
 # Tasks
 
 > Actionable open work plus a short recent-completions summary. Full history is
-> in `CHANGELOG.md`. Last reconciled: **2026-09-15**.
+> in `CHANGELOG.md`. Last reconciled: **2026-09-16**.
 
 ## ◻ OPEN — needs a human
 
-### 🟡 STAGED 2026-09-15 late night — Join the List: iOS focus zoom fix + "monthly-ish" + roomier desktop window + /card tile with a tighter card page — one push, check on the phone
+### ✅ DEPLOYED 2026-09-15 late night (owner pushed + checked production manually) — Join the List: iOS focus zoom fix + "monthly-ish" + roomier desktop window + /card tile with a tighter card page
 
-Three small follow-ups, all in staging, no SQL, no env vars:
+Three small follow-ups, all live, no SQL, no env vars. Nothing left to do
+here; the only open item on the text list is Twilio's toll-free
+verification (the 🟢 Step 2 block below, step 5).
 3. `/card`: full-width tinted "Join the List · email or text deals" tile
    under the grid (new `components/card/CardJoinListButton.tsx`, opens the
    homepage window) + the page tightened so the grid still ends on the same
@@ -29,6 +31,105 @@ Three small follow-ups, all in staging, no SQL, no env vars:
 **Staging (monthly-ish + desktop room):** ✅ synced 2026-09-15 (late night, 2) — dry run listed exactly the 4 touched files (HomeSubscribeModal.tsx, home-subscribe-modal.test.ts, CHANGELOG, TASKS), 0 Extras, 1119 total; real run copied 4 / 0 FAILED (exit 1 = copied only); follow-up dry run 0/0/0, exit 0; leak check 0 `.env*` / `.log`, 0 `.git`, no node_modules / .next / worktrees, launch.json present; positive control 210 = 210 `.tsx`; SHA-256 MATCH on all 4. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
 
 **Staging (iOS zoom):** ✅ synced 2026-09-15 (late night) — dry run listed exactly the 4 touched files (globals.css, home-subscribe-modal.test.ts, CHANGELOG, TASKS), 0 Extras, 1119 total; real run copied 4 / 0 FAILED (robocopy exit 1 = copied only); follow-up dry run 0/0/0, exit 0; leak check 0 `.env*` / `.log`, 0 `.git`, no node_modules / .next / worktrees, launch.json present; positive control 210 = 210 `.tsx`; SHA-256 MATCH on all 4. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+### 🟡 2026-09-16 night — DEPLOY (with the schema fix below): Admin → In-Store Sale recorder (no SQL, no env vars)
+
+Built per `CHANGELOG.md` 2026-09-16 (night); rules `DECISIONS.md` →
+*"In-store sales: Zettle takes the card…"*. Mockup approved:
+https://claude.ai/artifact/5o6VdpQjChYp11JJPCqS8X.
+
+**Gate:** tsc 0 · lint 0 (3 known `<img>` warnings) · vitest **1428/1428
+(144 files)** · build exit 0 from a deleted `.next` · dev auth gates:
+page 307 → sign-in, API 401 when signed out. ⚠️ The admin screen is
+**unverified in a browser** (needs the owner's login).
+
+**Owner, in this order:**
+1. ◻ **PayPal Zettle:** install the PayPal Zettle app on the iPhone, sign
+   in with the business PayPal account, turn on **Tap to Pay on iPhone**
+   (Settings → Payment methods). Run one $1 tap on your own card and refund
+   it in the app to see the flow. (Owner-only; nothing on the site depends
+   on it.)
+2. ◻ Push (this batch + the sold-page schema fix below).
+3. ◻ **First test on production, ~2 minutes:** Admin → In-Store Sale →
+   *Not listed* → "Test sale" · Other · price 1 → your own name, cell and
+   email → Paid by Cash → Record sale. Expect: "Sale recorded" with an
+   order number, "Receipt: Emailed", the receipt in your inbox and the
+   owner new-order email at info@, and the order under Admin → Orders as
+   paid / picked up with payment method "In store · Cash". Then Admin →
+   Orders → that order → Delete (it holds no product, so nothing returns
+   to stock).
+4. ◻ Optional second test with a real LISTED item you are about to sell
+   anyway: pick it by inventory number, adjust the price sold, record —
+   the item flips to Sold on the site within a minute and its eBay/Etsy
+   listings end on the next 30-minute sweep.
+
+**Claude, after the push (on your word):** curl the page (307) and the API
+(401) live; after the owner's test, read the order row, `order_items`
+(`product_id null` for the unlisted test) and the `order_emails` receipt
+row; confirm `payment_method = in_store_cash`, `fulfillment_status =
+picked_up`, no `paypal_capture_id`.
+
+**Staging (in-store sale recorder):** ✅ synced 2026-09-16 night — dry run
+listed exactly the 15 touched files (5 NEW: `lib/in-store-sale.ts`,
+`__tests__/in-store-sale.test.ts`, `api/admin/in-store-sales/route.ts`,
+`[locale]/admin/in-store-sale/page.tsx`, `components/admin/InStoreSaleForm.tsx`;
+10 modified: AdminHeader, OrderDetailPanel, PrintOrderClient, ARCHITECTURE,
+CHANGELOG, CURRENT_STATUS, DECISIONS, STRUCTURE, TASKS,
+features/paypal-checkout) + 2 new dirs, 0 Extras, 1127 total (= 1122 + 5);
+real run copied 15 / 0 FAILED (exit 1 = copied only); follow-up dry run
+0/0/0, exit 0; leak check 0 `.env*` / `.log`, 0 `.git`, no node_modules /
+.next / worktrees, launch.json present; positive control 213 = 213 `.tsx`;
+SHA-256 MATCH on all 6 code files + CHANGELOG, DECISIONS, TASKS. Docs-only
+re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+### 🟡 2026-09-16 evening — DEPLOY: sold product pages now carry a schema price (fixes the 2 GSC "Missing field price" errors for good; no SQL, no env vars)
+
+Owner chose option 1 + "fix it for good". Built per `CHANGELOG.md`
+2026-09-16 (evening): the Product JSON-LD Offer reads the canonical price
+value (`getProductPriceValue` via new `src/lib/product-ld.ts`), never the
+storefront label; sold pages emit `price` + `SoldOut`, visible page still
+"Sold"; no numeric price → no Product schema. Rule in `DECISIONS.md` →
+*"Product schema: the Offer price is the canonical value…"*.
+
+**Gate:** tsc 0 · lint 0 (3 known `<img>` warnings) · vitest **1421/1421
+(143 files)** · build exit 0 from a deleted `.next`, no Turbopack build
+cache · `next start` check: #77 → `price "237"` SoldOut, #53 → `"1026"`,
+`/es/shop/…-53` same + "Vendido", in-stock cuban chain unchanged
+(`"1009"`, priceValidUntil, InStock).
+
+**Owner:** push. Files: `src/app/[locale]/shop/[id]/page.tsx`,
+`src/lib/product-ld.ts` (NEW), `src/lib/__tests__/product-ld.test.ts` (NEW)
++ docs.
+
+**Claude, after the push (on your word):** curl the two sold pages live for
+`"price"` + `SoldOut`; then Search Console → Product snippets → the
+"Either price or priceSpecification.price…" row → **Validate fix**, and
+Merchant listings → "Missing field price" → **Validate fix** (both read the
+same two pages; Google re-crawls over ~1–2 weeks and emails the result to
+the GSC users). ⛔ Do NOT touch the "Page with redirect" validation.
+
+The Sep 16 email itself ("Some fixes failed for Page indexing issues") was
+the *Page with redirect* validation started 09-06 — Failed 9/15 because the
+53 URLs still redirect (correctly, all 308, curl-verified 09-16). No action;
+never re-validate that reason.
+
+**Staging (sold-page schema price):** ✅ synced 2026-09-16 evening — dry run
+listed exactly the 9 touched files (`shop/[id]/page.tsx`, `lib/product-ld.ts`
+NEW, `__tests__/product-ld.test.ts` NEW, CHANGELOG, CURRENT_STATUS,
+DECISIONS, STRUCTURE, TASKS, features/online-shop), 0 Extras, 1122 total (=
+1120 + the 2 new files); real run copied 9 / 0 FAILED (exit 1 = copied only);
+follow-up dry run 0/0/0, exit 0; leak check 0 `.env*` / `.log`, 0 `.git`,
+no node_modules / .next / worktrees, launch.json present; positive control
+211 = 211 `.tsx`; SHA-256 MATCH on page.tsx, product-ld.ts, the test,
+CHANGELOG, DECISIONS, TASKS. Docs-only re-sync after this line: dry run 1
+(TASKS.md) → copied → follow-up 0.
+
+**Staging (09-16 GSC check, docs only):** ✅ synced 2026-09-16 — dry run
+listed exactly the 3 touched files (CHANGELOG, CURRENT_STATUS, TASKS), 0
+Extras, 1120 total; real run copied 3 / 0 FAILED (exit 1 = copied only);
+follow-up dry run 0/0/0, exit 0; leak check 0 `.env*` / `.log`, 0 `.git`;
+positive control 211 = 211 `.tsx`; SHA-256 MATCH on all 3. Docs-only
+re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
 
 ### 🟢 2026-09-15 night — STEP 2 DEPLOYED (Twilio sending, YES confirmation, Text Deals, replies) — waiting on Twilio's toll-free verification, then the first real test
 
@@ -56,6 +157,19 @@ nothing sends until the number is verified AND the variables are set.
    silently refuses to save while the BACKUP webhook URL is empty (the only
    hint is "Provide webhook URL." under that field) — that is why the first
    two attempts showed "-". Same URL in both slots is deliberate.
+   **Status check 09-16 (Chrome, Trust Hub → Registrations → Toll-free):
+   still *In review*, last updated Sep 15; no rejection, no notification,
+   every field re-read as submitted. Twilio: allow ~3–5 business days →
+   expect the email at info@ (check spam) around 09-18 to 09-22. If it is
+   still *In review* after 09-23, open a Twilio support ticket quoting HH
+   `eab4c178…` — nothing else to do until then.**
+   **Staging (09-16 Twilio check, docs only):** ✅ synced 2026-09-16 — dry
+   run listed exactly the 3 touched files (CHANGELOG, CURRENT_STATUS,
+   TASKS), 0 Extras, 1120 total; real run copied 3 / 0 FAILED (exit 1 =
+   copied only); follow-up dry run 0/0/0, exit 0; leak check 0 `.env*` /
+   `.log`, 0 `.git`, no node_modules / .next / worktrees; positive control
+   211 = 211 `.tsx`; SHA-256 MATCH on all 3. Docs-only re-sync after this
+   line: dry run 1 (TASKS.md) → copied → follow-up 0.
 5. ◻ **Test plan (owner, 2026-09-15 night): the personal cell (239)
    304-6229 plays the customer; the business cell (239) 404-8505 stays the
    owner's side (forward target + "Send a test").** Twilio shows the

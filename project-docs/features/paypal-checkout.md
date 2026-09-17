@@ -168,6 +168,21 @@ the remaining owner-run live recovery/refund/race test matrix in `TASKS.md`.
   resolve the order from the capture resource, supplementary related IDs,
   refund `up` link, or disputed seller transaction ID.
 
+## In-store sales (2026-09-16)
+
+A sale made in the showroom is paid on **PayPal Zettle** (Tap to Pay on the
+iPhone), not through the site. `/admin/in-store-sale` then records it:
+`POST /api/admin/in-store-sales` calls `create_paypal_order` and
+`capture_paypal_order` in the same order checkout does — so a listed item is
+sold with the same row lock, `sold_price`, marketplace/Deep Field hooks and
+`finalizePaidOrder` receipt — and then stamps the in-store values back
+(`payment_method in_store_<method>`, no PayPal capture id, reference
+"In store · …", `fulfillment_status picked_up`). An unlisted piece is an order
+line with `product_id null`; no product row is created. The refund route
+ignores these orders (`payment_method !== 'paypal'`); refund by hand in the
+Zettle app. Pure helpers + tests: `src/lib/in-store-sale.ts`. Rules:
+`DECISIONS.md` → *"In-store sales: Zettle takes the card…"*.
+
 ## Admin refunds
 
 `POST /api/admin/orders/[id]/refund` is the only path that moves money for an

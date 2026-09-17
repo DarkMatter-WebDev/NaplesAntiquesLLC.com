@@ -168,6 +168,21 @@ checkout, and order snapshots. New Item's **Quick add** mode sets manual fixed
 pricing and skips spot-pricing requirements, supporting a basic title + price
 listing without purity/weight/multiplier inputs.
 
+## Structured Data (Product JSON-LD)
+
+- Every product page emits `Product` + `Offer` JSON-LD built by
+  `src/lib/product-ld.ts` (`productOfferLd`) from the canonical price value
+  (`getProductPriceValue`) — never from the storefront label.
+- Sold items: `price` = the recorded `sold_price` (else the last asking
+  price) + `availability: SoldOut`, no `priceValidUntil`. The visible page
+  still shows "Sold" / "Vendido" when "hide sold item prices" is on.
+- In stock: live price + `InStock` + a two-day `priceValidUntil`.
+- No numeric price at all (a manual "Contact for price" label): the page
+  emits no Product schema (breadcrumb + store schema remain).
+- Why (2026-09-16): Google requires `price` on every Offer; sold pages used
+  to drop it and were flagged in Search Console. `DECISIONS.md` → *"Product
+  schema: the Offer price is the canonical value…"*.
+
 ## Public Browse Behavior
 
 - `/shop` is the single storefront entry route.

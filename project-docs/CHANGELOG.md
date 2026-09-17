@@ -1,7 +1,175 @@
 
 # Changelog
 
-## 2026-09-15 (late night, 3) — /card: "Join the List" tile + a tighter card page — STAGED (no SQL, no env vars)
+## 2026-09-16 (night) — Admin → In-Store Sale: a one-screen sale recorder for showroom sales (card taken on PayPal Zettle) — BUILT + STAGED (no SQL, no env vars)
+
+Owner: "best way to take a credit card in the store while we're standing
+together … currently the best way is to create an item quickly and then
+checkout and it's time consuming." Recommendation given and accepted: take
+the card on **PayPal Zettle** (Tap to Pay on the iPhone; card-present ≈ 2.3%
++ 9¢ vs ≈ 3.5% + 49¢ for a card typed into the PayPal button, chip/tap fraud
+liability shifts to the issuer, no PayPal risk flags from many cards keyed on
+one device), and let the site only RECORD the sale. Owner: "go ahead with
+the mockup, zettle, no need for paypal fallback"; mockup approved
+(https://claude.ai/artifact/5o6VdpQjChYp11JJPCqS8X — after a brief "scrap
+the listed-item screen … actually wait … yes, build it"; both item modes
+built).
+
+**What it is:** `/admin/in-store-sale` (nav entry "In-Store Sale" after
+Orders). One form: (1) Item — *Listed item* (search by inventory # or title
+among available products, the match highlighted with its live price, "Price
+sold" editable) or *Not listed* (what sold, Gold/Silver/Other, price,
+optional weight + purity); (2) Customer — first/last name, cell, email
+optional; (3) Paid by — Card · Zettle / Cash / Zelle / Check + a note. The
+Total card shows item, 6% FL tax, total and "Collect $X on Zettle before
+recording"; **Record sale** → a "Sale recorded" panel (order number, item,
+customer, paid by, total, receipt emailed / not) with New sale + Open order.
+
+**How it records (no new SQL):** `POST /api/admin/in-store-sales`
+(`requireAdmin`) → `create_paypal_order` (order + line, `payment_method
+in_store_<method>`, shipping `pickup`) → `capture_paypal_order` (marks paid,
+flips a listed product to sold with `sold_price` = price sold, row-locked
+like a web sale; `item_conflict` = "just sold online", nothing recorded) →
+one stamp update (payment_method back to in-store — the capture RPC writes
+`paypal` — no PayPal capture id, reference "In store · …",
+`fulfillment_status picked_up`) → `revalidateTag('shop-catalog')` +
+`scheduleProductStatusHooks` for a listed item (eBay/Etsy end, Deep Field)
+→ `finalizePaidOrder` (invoice row, customer receipt when an email was
+given, owner new-order email). **Unlisted items create NO product row**
+(order line with `product_id null`, `inventory_number null`, the metal /
+purity / weight as snapshots) — nothing can leak into the shop, the feed or
+the marketplaces. Deviation from the mockup, recorded in `DECISIONS.md` →
+*"In-store sales: Zettle takes the card…"*; the mockup's "hidden inventory
+record with the next number" was dropped for that reason. The mockup's
+Gold/Silver/Diamonds/Watches "Category" became **Metal: Gold / Silver /
+Other** because `products.category` is Gold | Silver and an unlisted line
+only needs a metal snapshot.
+
+**Files:** `src/lib/in-store-sale.ts` (pure: price parsing, totals via
+`calculateFlSalesTax`, `normalizeInStoreSaleInput`, payment-method values +
+`paymentMethodLabel`), `src/lib/__tests__/in-store-sale.test.ts` (7),
+`src/app/api/admin/in-store-sales/route.ts`,
+`src/app/[locale]/admin/in-store-sale/page.tsx`,
+`src/components/admin/InStoreSaleForm.tsx`; `AdminHeader.tsx` (section +
+nav); `OrderDetailPanel.tsx` + `PrintOrderClient.tsx` now print the payment
+method through `paymentMethodLabel` ("In store · Card · Zettle", "PayPal",
+"Manual") instead of the raw value.
+
+**Gate:** `npx tsc --noEmit` 0 · `npm run lint` 0 (3 known `<img>`
+warnings) · `npx vitest run` **1428/1428 (144 files)** · `npm run build`
+exit 0 from a deleted `.next` (both new routes listed), no Turbopack build
+cache · dev: `/admin/in-store-sale` and `/es/admin/in-store-sale` 307 →
+sign-in signed out, `POST /api/admin/in-store-sales` → 401 signed out.
+**Not verified in a browser** (admin needs the owner's login) — first real
+use is the test in `TASKS.md`.
+
+## 2026-09-16 (evening) — Product schema reads the canonical price, so SOLD pages carry a price: the 2 Search Console "Missing field price" errors fixed for good — BUILT + STAGED (no SQL, no env vars)
+
+Owner: "go with option 1, and is there a way to fix this for good? I don't
+want issues every time an item sells." Root cause and the durable rule:
+- The Product JSON-LD on `shop/[id]/page.tsx` copied the STOREFRONT LABEL
+  into `offers.price` and only when it was numeric. With the admin "hide
+  sold item prices" setting on, a sold item's label is "Sold", so every sold
+  page emitted an Offer with `availability: SoldOut` and no `price` — which
+  Google rejects ("Missing field price"), and which would recur on every
+  future sale.
+- **Now the schema reads the canonical price VALUE** (`getProductPriceValue`:
+  the recorded `sold_price` lock → manual amount → spot price) through a new
+  pure helper `src/lib/product-ld.ts` (`productOfferLd`). A sold page emits
+  `price` + `SoldOut` and drops `priceValidUntil` (a sale is history, not an
+  offer with a shelf life); an in-stock page is byte-for-byte what it was.
+  The visible page still says "Sold" / "Vendido" — only the machine-readable
+  schema carries the number.
+- **No numeric price at all** (a manual "Contact for price" label) → the page
+  emits NO Product schema (breadcrumb + store schema stay). Google rejects
+  both an Offer without a price and a Product without offers/review/rating,
+  so an honest plain page beats an invalid rich result. `DECISIONS.md` →
+  *"Product schema: the Offer price is the canonical value…"*.
+- Tests: `src/lib/__tests__/product-ld.test.ts` (sold → price + SoldOut, no
+  validity window; in-stock → price + InStock + priceValidUntil; null/NaN/
+  negative → null; the recorded sale price wins, else the last asking price).
+
+**Gate:** `npx tsc --noEmit` 0 · `npm run lint` 0 (the 3 known `<img>`
+warnings in the Text Deals composer) · `npx vitest run` **1421/1421 (143
+files)** · `npm run build` exit 0 from a deleted `.next`, no Turbopack build
+cache. **Verified on `next start` (port 3003):** `/shop/…-crossed-keys-77`
+→ `price: "237"` + SoldOut, visible "Sold"; `/shop/tiffany-co-…-1895-53` →
+`price: "1026"` + SoldOut; `/es/shop/…-53` → same with "Vendido";
+`/shop/14k-gold-semi-solid-cuban-link-chain-necklace` (in stock) unchanged:
+`price: "1009"`, `priceValidUntil`, InStock.
+
+**After the owner pushes:** I click **Validate fix** on BOTH Search Console
+reports (Product snippets and Merchant listings read the same two pages),
+then confirm the live JSON-LD with curl. Merchant Center context (owner
+asked): nothing is sold through Merchant Center; the feed lists AVAILABLE
+items only and this schema is what Google reads for free product listings
+and "automatic item updates" — keeping it valid on sold pages just stops
+the errors, it does not list sold items anywhere.
+
+## 2026-09-16 — Search Console "Some fixes failed" email decoded: the redirect validation was doomed by design (noise); the one real item is 2 SOLD product pages with a price-less Offer (no code change yet)
+
+Owner: "I got an email from Google Search Console today saying some of my
+pages had issues." Read in the owner's Chrome (URL-prefix `.com` property,
+data stamped 9/13–9/15):
+- **The email (GSC Messages, Sep 16: "Some fixes failed for Page indexing
+  issues") is the 09-06 *Page with redirect* validation — Failed 9/15, 18
+  failed / 35 pending of 53 URLs.** Every listed URL re-checked live with
+  curl and every one is a correct 308 to its real page (`/en/...` → `/...`,
+  `/es/` → `/es`, `/index.html` → `/`, `/auctions` → `/shop`,
+  `/shop/new-listing-06` → the slug). GSC only counts a URL as "fixed" once
+  it is indexed, and a redirect never is, so that validation could never
+  pass. Nothing to fix; ⛔ do not "Start new validation" on the redirect
+  reason again (`memory: gsc-page-indexing-2026-09-07`).
+- Page indexing otherwise: *Discovered – currently not indexed* **0** (was 5),
+  canonical `/contact?item=` rows 146 (by design), noindex 12 (legal pages),
+  404s 9, crawled-not-indexed 5, robots.txt validation still *Started*.
+  Indexed count ~7 more than 09-07.
+- **Real item — Product snippets AND Merchant listings: 13 valid / 2 invalid,
+  "Missing field price (in offers)", first detected 8/30.** The two items are
+  the two SOLD product pages: `/shop/…-crossed-keys-77` (charm bracelet) and
+  `/shop/tiffany-co-…-1895-53` (ladle). Live JSON-LD confirms: the Offer
+  carries `availability: SoldOut`, `priceCurrency: USD` and no `price`,
+  because the admin "hide sold item prices" setting turns the label into
+  "Sold" and `shop/[id]/page.tsx` only emits `price` when the label is
+  numeric (`isNumericPrice`). Google requires a price on every Offer, sold
+  out or not. Effect: those two pages lose rich-result eligibility (the
+  other 13 are fine). Options for the owner, recorded in `TASKS.md`:
+  emit the recorded `sold_price` as the Offer price (keeps `SoldOut`, keeps
+  the availability audit rule in `DECISIONS.md`), or leave it — sold pages
+  do not need a merchant listing. Warnings (aggregateRating / review /
+  shippingDetails / hasMerchantReturnPolicy / brand type / validFrom) are
+  "improve appearance" only, unchanged since August.
+- Breadcrumbs 37 valid / 0 invalid; HTTPS 41/0; Core Web Vitals "no data".
+No app files touched.
+
+## 2026-09-16 — Twilio toll-free verification: checked in the console, still *In review*, nothing pending on our side (no code change)
+
+Owner: "I still haven't gotten the email we were waiting for." Checked in
+the owner's Chrome (Twilio One Console → Trust Hub → Registrations →
+Toll-free → `HHeab4c17886ac478baebb3b5177140102`):
+- Status **In review**, last updated Sep 15, 2026 (submitted 09-15 late
+  evening, so one business day so far). Twilio's own help article ("Toll-Free
+  Message Verification for US/Canada") says to **allow approximately 3–5
+  business days** — that puts a decision around **Thu 09-18 to Tue 09-22**.
+- *In review* is the API's `IN_REVIEW` state = received and being processed.
+  A problem would show as **Rejected** with a reason code; there is no
+  "action required" state, no notification in the console bell, and every
+  submitted field re-read as intended (Marketing, 100/mo, web-form opt-in,
+  both proof PNG URLs, terms + privacy URLs, notification email
+  `info@naplesestatejewelry.com`, compliance profile Naples antiques llc at
+  6240 Shirley Street ste 104).
+- Nothing to fix or resubmit. Until approval every send from the number
+  returns Twilio error 30032 (blocked, unverified) — Step 2 already treats
+  30032/30034 as "not yet", so pending sign-ups are safe.
+- ⚠️ The decision email goes to **info@** (Google Workspace, the .com
+  mailbox) — check that inbox (and its spam folder), not the Gmail account.
+- Unrelated notice seen on the number's Voice tab: "assigned emergency
+  address but the terms and conditions have not been accepted" — voice
+  only, irrelevant to messaging, left alone.
+Dev preview started on port 3007 at the owner's request; no app files
+touched.
+
+## 2026-09-15 (late night, 3) — /card: "Join the List" tile + a tighter card page — DEPLOYED (owner pushed + checked production; no SQL, no env vars)
 
 Owner: mockup of three placements
 (https://claude.ai/artifact/ApjXkZzv87eLAcwUVeaZoM) → **Option C**, a
@@ -25,7 +193,7 @@ Preview-verified EN + ES at 320 / 360 / 375: tap → the window opens with
 Text preselected, Escape closes it. Guard in `card-page.test.ts` (8/8). tsc
 0 · lint 0 errors · 1415/1415 · build 0.
 
-## 2026-09-15 (late night, 2) — Join the List window: "monthly-ish" + roomier on desktop — STAGED (no SQL, no env vars)
+## 2026-09-15 (late night, 2) — Join the List window: "monthly-ish" + roomier on desktop — DEPLOYED with (3) (no SQL, no env vars)
 
 Owner asks, same night: the Email option's hint "weekly-ish" → **"monthly-ish"**
 ("mensual, más o menos"); on desktop, bigger option subtext and a window that
@@ -39,7 +207,7 @@ Measured in the preview: desktop 1280 = the numbers above; phone 375 = width
 to before. Guard test now pins the two hints (11/11). Lint 0 errors (3
 pre-existing `<img>` warnings in TextDealsManager), build 0.
 
-## 2026-09-15 (late night) — Join the List window: no iOS focus zoom — STAGED (one CSS rule, no SQL, no env vars)
+## 2026-09-15 (late night) — Join the List window: no iOS focus zoom — DEPLOYED with (3) (one CSS rule, no SQL, no env vars)
 
 Owner, on the phone: tapping a field in the window "zooms in a bit" and the
 page has to be zoomed back out afterwards. Cause: iOS Safari zooms the page
