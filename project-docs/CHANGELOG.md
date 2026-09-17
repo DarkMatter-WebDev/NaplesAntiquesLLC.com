@@ -1,7 +1,84 @@
 
 # Changelog
 
-## 2026-09-16 (night) — Admin → In-Store Sale: a one-screen sale recorder for showroom sales (card taken on PayPal Zettle) — BUILT + STAGED (no SQL, no env vars)
+## 2026-09-16 (late night, 2) — `/kittcard`: a second business-card landing page for the new employee, identical to `/card` today — ONE shared component, per-person values in one file — BUILT + STAGED (no SQL, no env vars)
+
+Owner: a second employee (Kitt) is getting business cards; his QR should
+land on the same page customers see today, but be switchable to his own
+name and number later "without re-printing the cards". Plan repeated back
+and confirmed ("go, build it"); no mockup — the page is `/card` pixel for
+pixel.
+
+**Built:**
+- `src/components/card/CardLanding.tsx` — the whole card page (moved
+  verbatim from `[locale]/card/page.tsx`, only the three person-specific
+  values became props: the Call label, the `tel:`/`sms:` number and the
+  "Hi <name>, I have your card…" prefill; the language toggle links to the
+  holder's own path). Exports `cardMetadata(holder, locale)`.
+- `src/lib/card-holders.ts` — `CARD_HOLDERS`: `card` (Chris, (239)
+  404-8505) and `kittcard` (**deliberately Chris's name and number for
+  now**). Switching Kitt over later = editing that one entry.
+- `[locale]/card/page.tsx` and NEW `[locale]/kittcard/page.tsx` — two-line
+  wrappers (`generateMetadata` → `cardMetadata`, page → `<CardLanding
+  holder=…>`). `/es/kittcard` comes with the locale segment.
+- Guards: `card-page.test.ts` now checks EVERY holder path is absent from
+  the sitemap, both routes are thin wrappers over the shared component, the
+  component carries no name/number of its own, and Kitt's entry equals
+  Chris's until changed. `phone-hours`, `reviews-page`, `storefront-photo`
+  tests read the component instead of the route file.
+
+**Verified on dev:** `/card`, `/kittcard`, `/es/card`, `/es/kittcard` all
+200; a markup diff of `/card` vs `/kittcard` shows ONLY the page's own URL
+(canonical, hreflang alternates, og:url) and the two language-toggle links —
+same buttons, same number, same "Hi Chris" prefill; both `robots: noindex,
+nofollow`; neither in the sitemap. **Search Console impact: none** — both
+pages are noindex/nofollow and off the sitemap, so nothing changes in any
+GSC report; no redirects, no proxy-matcher change, no SQL, no env vars.
+
+**Gate:** `npx tsc --noEmit` 0 · `npm run lint` 0 (3 known `<img>`
+warnings) · `npx vitest run` **1430/1430 (144 files)** · `npm run build`
+exit 0 from a deleted `.next` (both card routes listed), no Turbopack
+build cache.
+
+## 2026-09-16 (late night) — In-Store Sale: first live test PASSED (order recorded, receipt sent, order recycled); one label fix STAGED; a pre-existing gap found — automatic invoices have never been written (service_role has no grant on `invoices`) → `supabase/invoices-service-role-grant-2026-09.sql`
+
+Owner: "do the test sale for me and then delete it once confirmed." Run in
+the owner's signed-in Chrome on production:
+- **Recorded:** Not listed · "Test sale" · Other · $1 · Chris Surette ·
+  (239) 404-8505 · info@naplesestatejewelry.com · Cash → "Sale recorded ·
+  Order NEJ-20260917-MFK96 · $1.06". Database (service read): `payment_status
+  paid`, `order_status completed`, `fulfillment_status picked_up`,
+  `payment_method in_store_cash`, `payment_reference "In store · Cash"`,
+  `paypal_capture_id null`, subtotal 1.00 / tax 0.06 / total 1.06, the line
+  `product_id null`, `inventory_number null`, `title_snapshot "Test sale"`;
+  `order_emails` has the automatic receipt row (to info@, "Receipt for order
+  NEJ-20260917-MFK96…", sent_by null). The order page showed "Payment
+  method: In store · Cash" and the receipt under Email History.
+- **Deleted:** Delete order → "Yes, move to Recycle Bin" (no inventory
+  choice — nothing to return); `deleted_at` set 01:36Z, gone from the
+  active list. The owner may empty the Recycle Bin whenever.
+- **Bug found + fixed (STAGED):** the panel said "Receipt: Not emailed"
+  although the receipt HAD gone out. `receiptEmailed` was derived from
+  `finalizePaidOrder`'s overall flag, which also covers the invoice upsert —
+  and that upsert fails. The route now reports the actual `order_emails`
+  receipt row. Gate: tsc 0 · lint 0 (3 known warnings) · 1428/1428 · build
+  exit 0, no Turbopack build cache.
+- **Pre-existing gap, not new:** `public.invoices` is granted to
+  `authenticated` only (`sales-workflow.sql:308`), so every AUTOMATIC
+  invoice upsert made with the service role — after every PayPal capture
+  (capture-order + webhook via `lib/order-finalize.ts`) and at PayPal order
+  creation (`create-order` line ~405) — has failed with "permission denied
+  for table invoices" and was only logged. Receipts still went out (the
+  `order_emails` grant exists), so it was invisible; the order page just
+  reads "No invoice generated yet" until an admin clicks Generate invoice.
+  Fix = **`supabase/invoices-service-role-grant-2026-09.sql`** (grant
+  select/insert/update to service_role + any owned sequence; owner runs it
+  once). Recorded as the standing gotcha "service_role bypasses RLS, not
+  privileges".
+
+## 2026-09-16 (night) — Admin → In-Store Sale: a one-screen sale recorder for showroom sales (card taken on PayPal Zettle) — DEPLOYED (no SQL, no env vars)
+
+**Later the same night — DEPLOYED + live-verified** (owner set up Zettle, pushed, "verify it live"): `/admin/in-store-sale` 307 → sign-in and `POST /api/admin/in-store-sales` → 401 signed out on production. The owner's $1 test (TASKS step 3) is still to come.
 
 Owner: "best way to take a credit card in the store while we're standing
 together … currently the best way is to create an item quickly and then
@@ -63,7 +140,9 @@ sign-in signed out, `POST /api/admin/in-store-sales` → 401 signed out.
 **Not verified in a browser** (admin needs the owner's login) — first real
 use is the test in `TASKS.md`.
 
-## 2026-09-16 (evening) — Product schema reads the canonical price, so SOLD pages carry a price: the 2 Search Console "Missing field price" errors fixed for good — BUILT + STAGED (no SQL, no env vars)
+## 2026-09-16 (evening) — Product schema reads the canonical price, so SOLD pages carry a price: the 2 Search Console "Missing field price" errors fixed for good — DEPLOYED + validations started (no SQL, no env vars)
+
+**Later the same night — DEPLOYED + live-verified:** #77 → `price "237"` SoldOut, #53 → `"1026"` SoldOut (EN + ES), the in-stock cuban chain unchanged (`"1018"`, priceValidUntil 2026-09-19, InStock — live spot moved it from 1009). **Validate fix clicked on BOTH reports** in the owner's Chrome: Product snippets → "Validation started · 9/16/26" (quick initial validation passed), Merchant listings → "Validation started · 9/16/26". Google's full pass takes days to ~2 weeks and emails the result. ⚠️ GSC ref clicks on VALIDATE FIX do nothing — click by coordinate (`memory: gsc-page-indexing-2026-09-07`).
 
 Owner: "go with option 1, and is there a way to fix this for good? I don't
 want issues every time an item sells." Root cause and the durable rule:

@@ -6,6 +6,28 @@
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
 > compaction. Last reconciled: **2026-09-16**.
 
+## Business-card pages: one component, per-holder values — a card URL is printed once and never moves (2026-09-16)
+
+**Owner (2026-09-16):** a second employee's cards must land on the same
+page customers see today, and be switchable to his own name and number
+later without reprinting.
+
+**Rules:**
+- **Every card holder gets their own URL** (`/card` = Chris, `/kittcard` =
+  Kitt) and the URL is what is printed. Nothing about a person is encoded
+  in the URL that could later be wrong.
+- **One page component, `components/card/CardLanding.tsx`.** Layout, copy,
+  buttons, links and every rule in its header comment apply to all cards
+  at once. The routes are two-line wrappers. ⛔ Never copy the page to make
+  a new card — add a holder.
+- **Only three things may differ between cards** and they live in
+  `lib/card-holders.ts`: first name (the "Text <name>" button and the
+  prefilled message), display phone, and the digits behind `tel:`/`sms:`.
+  Kitt's entry carries Chris's values until his own line exists.
+- **Every card page is noindex/nofollow and off the sitemap** (guarded for
+  every holder by `card-page.test.ts`), so adding a card can never touch
+  Search Console.
+
 ## In-store sales: Zettle takes the card, the site only records the sale — and an unlisted piece is an order line, never a product (2026-09-16)
 
 **Owner decisions (2026-09-16):** "go ahead with the mockup, zettle, no need

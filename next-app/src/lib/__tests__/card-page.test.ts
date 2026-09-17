@@ -11,12 +11,20 @@ import {
   type StoreHoursSchedule,
 } from '@/lib/business-location';
 
-// `/card` is the URL printed on the business cards (2026-09-03). Two things
-// about it must not regress silently: it is a noindex utility page that stays
-// OUT of the sitemap, and it carries no site chrome by design.
+// `/card` is the URL printed on the business cards (2026-09-03); `/kittcard`
+// is the second employee's (2026-09-16). Both are two-line routes over ONE
+// component, `CardLanding`. Two things must not regress silently: they are
+// noindex utility pages that stay OUT of the sitemap, and they carry no site
+// chrome by design.
+
+import { CARD_HOLDERS, CARD_HOLDER_PATHS } from '@/lib/card-holders';
 
 const APP = join(process.cwd(), 'src', 'app');
-const PAGE = readFileSync(join(APP, '[locale]', 'card', 'page.tsx'), 'utf8');
+const PAGE = readFileSync(join(process.cwd(), 'src', 'components', 'card', 'CardLanding.tsx'), 'utf8');
+const ROUTES = {
+  card: readFileSync(join(APP, '[locale]', 'card', 'page.tsx'), 'utf8'),
+  kittcard: readFileSync(join(APP, '[locale]', 'kittcard', 'page.tsx'), 'utf8'),
+};
 const SITEMAP = readFileSync(join(APP, 'sitemap.ts'), 'utf8');
 
 function schedule(open: Partial<Record<(typeof WEEK_ORDER)[number], [string, string]>>): StoreHoursSchedule {
@@ -29,9 +37,35 @@ function schedule(open: Partial<Record<(typeof WEEK_ORDER)[number], [string, str
 }
 
 describe('/card page — search and chrome rules', () => {
-  it('is noindex and never listed in the sitemap', () => {
+  it('is noindex and never listed in the sitemap — every card holder', () => {
     expect(PAGE).toContain('robots: { index: false, follow: false }');
-    expect(SITEMAP).not.toContain("'/card'");
+    for (const path of CARD_HOLDER_PATHS) expect(SITEMAP).not.toContain(`'${path}'`);
+    expect(SITEMAP).not.toContain('kittcard');
+  });
+
+  it('every card route is a thin wrapper over the shared CardLanding with its own holder', () => {
+    for (const [key, source] of Object.entries(ROUTES)) {
+      expect(source).toContain("from '@/components/card/CardLanding'");
+      expect(source).toContain(`CARD_HOLDERS.${key}`);
+      expect(source).toContain('cardMetadata(HOLDER, locale)');
+      // No page-specific copy: the wrapper must not carry buttons of its own.
+      expect(source).not.toContain('dark-button');
+      expect(source).not.toContain('sms:');
+    }
+    // The person-specific values are the ONLY things that may differ.
+    expect(PAGE).not.toContain('404-8505');
+    expect(PAGE).not.toContain('Chris');
+    expect(PAGE).toContain('holder.phoneDigits');
+    expect(PAGE).toContain('holder.firstName');
+    expect(PAGE).toContain('`/es${holder.path}`');
+  });
+
+  it("Kitt's card shows Chris's details until his own number is ready (owner, 2026-09-16)", () => {
+    expect(CARD_HOLDERS.card.path).toBe('/card');
+    expect(CARD_HOLDERS.kittcard.path).toBe('/kittcard');
+    expect(CARD_HOLDERS.kittcard.phoneDigits).toBe(CARD_HOLDERS.card.phoneDigits);
+    expect(CARD_HOLDERS.kittcard.firstName).toBe(CARD_HOLDERS.card.firstName);
+    expect(CARD_HOLDERS.card.phoneDigits).toBe('2394048505');
   });
 
   it('renders no site header, footer or breadcrumb (the page is the buttons)', () => {

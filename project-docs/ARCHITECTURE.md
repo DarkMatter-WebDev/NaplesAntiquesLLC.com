@@ -142,6 +142,7 @@ Current route families include:
   `/silver-services`, `/bullion`
 - `/shop` and `/shop/[id]`
 - `/account`, `/account/sign-in`, `/account/sign-up`
+- `/card`, `/kittcard` (business-card QR landing pages; noindex, one shared component)
 - `/admin`, `/admin/orders`, `/admin/orders/[id]`, `/admin/in-store-sale`, `/admin/messages`,
   `/admin/inquiries`, `/admin/subscribers`, `/admin/marketing`,
   `/admin/discount-codes`, `/admin/settings`, `/admin/users`,

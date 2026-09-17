@@ -30,7 +30,7 @@ describe('phone hours — one constant, every surface', () => {
   });
 
   it('is rendered on /card, the homepage Visit Us block and /spot-prices, and in the site schema', () => {
-    expect(read('src', 'app', '[locale]', 'card', 'page.tsx')).toContain("phoneHours(isEs, 'compact')");
+    expect(read('src', 'components', 'card', 'CardLanding.tsx')).toContain("phoneHours(isEs, 'compact')");
     expect(read('src', 'app', '[locale]', '(home)', 'page.tsx')).toMatch(/phoneHours(Label)?\(/);
     expect(read('src', 'app', '[locale]', 'spot-prices', 'page.tsx')).toContain('phoneHoursLabel(isEs)');
     expect(read('src', 'app', '[locale]', 'layout.tsx')).toContain('phoneContactPointSchema()');

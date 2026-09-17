@@ -168,6 +168,16 @@ the remaining owner-run live recovery/refund/race test matrix in `TASKS.md`.
   resolve the order from the capture resource, supplementary related IDs,
   refund `up` link, or disputed seller transaction ID.
 
+## Automatic invoices need the service-role grant (found 2026-09-16)
+
+`public.invoices` was granted to `authenticated` only, so `upsertOrderInvoice`
+called with the SERVICE client (after every capture in `lib/order-finalize.ts`,
+at order creation in `create-order`, and after an in-store sale) failed with
+"permission denied for table invoices" — logged, never surfaced; receipts
+still sent. Run `supabase/invoices-service-role-grant-2026-09.sql` once.
+Until then the order page reads "No invoice generated yet" until an admin
+clicks Generate invoice (which uses the admin's own session and works).
+
 ## In-store sales (2026-09-16)
 
 A sale made in the showroom is paid on **PayPal Zettle** (Tap to Pay on the

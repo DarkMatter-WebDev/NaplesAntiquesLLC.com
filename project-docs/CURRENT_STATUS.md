@@ -15,8 +15,16 @@ pending on our side, no rejection, no console notification; the email will
 land at **info@** (check spam). Details `CHANGELOG.md` 2026-09-16. Still
 the only open item.
 
-🟡 **09-16 night — BUILT + STAGED, ready to push (same push as the schema
-fix below): Admin → In-Store Sale**, a one-screen recorder for showroom
+🟡 **09-16 late night (2) — BUILT + STAGED, in the pending push: `/kittcard`**,
+the second employee's business-card landing page — identical to `/card`
+(one shared `CardLanding` component; the name + number per card live in
+`lib/card-holders.ts`, Kitt's entry = Chris's values until his line is
+ready). Both pages noindex + off the sitemap → no GSC effect. Gate tsc 0 ·
+lint 0 · 1430/1430 · build 0; dev diff shows only the page URL differs.
+`CHANGELOG.md` 2026-09-16 (late night, 2). ✅ Owner ran the invoices grant
+SQL the same night.
+
+🟢 **09-16 late night — In-Store Sale LIVE and TESTED** (a $1 unlisted Cash sale recorded on production: order paid / picked up / `in_store_cash`, product-less line, automatic receipt row, then moved to the Recycle Bin). 🟡 **Two small follow-ups:** the "Receipt: Not emailed" label bug is fixed + STAGED (push when convenient), and a **pre-existing** gap surfaced — automatic invoices have NEVER been written because `service_role` has no grant on `invoices` → owner runs `supabase/invoices-service-role-grant-2026-09.sql` once (`TASKS.md` top). `CHANGELOG.md` 2026-09-16 (late night). Earlier: DEPLOYED + live-verified (gates 307/401 on production): Admin → In-Store Sale**, a one-screen recorder for showroom
 sales — the card is taken on PayPal Zettle (owner decision), the page
 records the sale as a paid, picked-up order (listed item by inventory # or
 an unlisted piece by description), marks a listed item sold through the
@@ -25,7 +33,7 @@ Unlisted items create no product row. Gate tsc 0 · lint 0 · 1428/1428 ·
 build 0; auth gates checked on dev; the admin screen itself is unverified
 until the owner's first test (`TASKS.md`). `CHANGELOG.md` 2026-09-16 (night).
 
-🟡 **09-16 evening — BUILT + STAGED, ready to push: the Product schema now
+🟢 **09-16 evening — DEPLOYED + live-verified (#77 → 237, #53 → 1026, SoldOut; in-stock unchanged) and Validate fix STARTED 9/16 on BOTH GSC reports (result email in days to ~2 weeks): the Product schema now
 reads the canonical price value, so SOLD product pages carry `price` +
 `SoldOut` and the 2 Search Console "Missing field price" errors (Product
 snippets + Merchant listings) are fixed for good** — the visible page still

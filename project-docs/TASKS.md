@@ -32,7 +32,82 @@ verification (the 🟢 Step 2 block below, step 5).
 
 **Staging (iOS zoom):** ✅ synced 2026-09-15 (late night) — dry run listed exactly the 4 touched files (globals.css, home-subscribe-modal.test.ts, CHANGELOG, TASKS), 0 Extras, 1119 total; real run copied 4 / 0 FAILED (robocopy exit 1 = copied only); follow-up dry run 0/0/0, exit 0; leak check 0 `.env*` / `.log`, 0 `.git`, no node_modules / .next / worktrees, launch.json present; positive control 210 = 210 `.tsx`; SHA-256 MATCH on all 4. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
 
-### 🟡 2026-09-16 night — DEPLOY (with the schema fix below): Admin → In-Store Sale recorder (no SQL, no env vars)
+### 🟡 2026-09-16 late night (2) — DEPLOY batch: `/kittcard` + the receipt-label fix (no SQL, no env vars)
+
+`/kittcard` built per `CHANGELOG.md` 2026-09-16 (late night, 2); rule
+`DECISIONS.md` → *"Business-card pages: one component, per-holder values…"*.
+
+**Owner:**
+1. ◻ Push. Files: `components/card/CardLanding.tsx` (NEW),
+   `lib/card-holders.ts` (NEW), `[locale]/card/page.tsx` (now a wrapper),
+   `[locale]/kittcard/page.tsx` (NEW), 4 test files, and the in-store
+   route's receipt-label fix from the block below.
+2. ◻ Print Kitt's cards with the QR pointing at
+   `https://naplesestatejewelry.com/kittcard`.
+3. ◻ Later, when Kitt has his own number: tell me the name + number and I
+   change the `kittcard` entry in `lib/card-holders.ts` (one push; the
+   printed cards keep working).
+
+**Claude, after the push (on your word):** curl `/kittcard`, `/es/kittcard`
+and `/card` live (200, `noindex, nofollow`, identical body, canonical =
+own URL); confirm `sitemap.xml` has neither.
+
+**Gate:** tsc 0 · lint 0 (3 known warnings) · vitest 1430/1430 (144 files)
+· build exit 0 from a deleted `.next`, no Turbopack build cache.
+
+**Staging (`/kittcard` batch):** ✅ synced 2026-09-16 late night — dry run
+listed exactly the 14 touched files (3 NEW: `components/card/CardLanding.tsx`,
+`lib/card-holders.ts`, `[locale]/kittcard/page.tsx`; 11 modified:
+`[locale]/card/page.tsx`, card-page / phone-hours / reviews-page /
+storefront-photo tests, ARCHITECTURE, CHANGELOG, CURRENT_STATUS, DECISIONS,
+STRUCTURE, TASKS) + 1 new dir, 0 Extras, 1131 total (= 1128 + 3); real run
+copied 14 / 0 FAILED (exit 1 = copied only); follow-up dry run 0/0/0, exit
+0; leak check 0 `.env*` / `.log`, 0 `.git`, no node_modules / .next /
+worktrees; positive control 215 = 215 `.tsx`; SHA-256 MATCH on the 5 code
+files + CHANGELOG, DECISIONS, TASKS. Docs-only re-sync after this line: dry
+run 1 (TASKS.md) → copied → follow-up 0.
+
+### 🟡 2026-09-16 late night — In-Store Sale TESTED LIVE ✅ · two follow-ups: push the receipt-label fix + run the invoices grant SQL
+
+**Owner, in this order:**
+1. ✅ **Run `supabase/invoices-service-role-grant-2026-09.sql`** — done by the owner 2026-09-16 late night ("ran the sql"). Original: in the
+   Supabase SQL Editor (once; safe to re-run). Why: `invoices` is granted to
+   `authenticated` only, so every automatic invoice — after every PayPal
+   capture since July, and after an in-store sale — has silently failed
+   ("permission denied for table invoices"); receipts were unaffected.
+   After running it, the next paid order (web or in-store) shows its invoice
+   on the order page without clicking Generate invoice. Verify:
+   `select privilege_type from information_schema.role_table_grants where
+   table_name = 'invoices' and grantee = 'service_role';` → SELECT, INSERT,
+   UPDATE.
+2. ◻ Push — folded into the `/kittcard` batch above (one file: `api/admin/in-store-sales/route.ts` — the "Receipt"
+   line on the Sale-recorded panel now reads from the real `order_emails`
+   row, so it says "Emailed" when it was). Gate below.
+3. ◻ Optional: Admin → Orders → Recycle Bin → empty it (the $1 test order
+   NEJ-20260917-MFK96 is there).
+
+**Gate (label fix):** tsc 0 · lint 0 (3 known `<img>` warnings) · vitest
+1428/1428 (144 files) · build exit 0 from a deleted `.next`, no Turbopack
+build cache.
+
+**Live test 2026-09-16 (by Claude in the owner's Chrome):** "Test sale" ·
+Other · $1 · Cash → NEJ-20260917-MFK96 recorded (paid / completed /
+picked_up / `in_store_cash` / reference "In store · Cash" / no capture id /
+line `product_id null` / receipt row to info@), order page correct, then
+moved to the Recycle Bin (`deleted_at` 01:36Z). Details `CHANGELOG.md`
+2026-09-16 (late night).
+
+**Staging (label fix + invoices grant SQL + docs):** ✅ synced 2026-09-16
+late night — dry run listed exactly the 7 touched files (route.ts, the NEW
+`supabase/invoices-service-role-grant-2026-09.sql`, CHANGELOG,
+CURRENT_STATUS, STRUCTURE, TASKS, features/paypal-checkout), 0 Extras, 1128
+total (= 1127 + 1); real run copied 7 / 0 FAILED (exit 1 = copied only);
+follow-up dry run 0/0/0, exit 0; leak check 0 `.env*` / `.log`, 0 `.git`;
+positive control 213 = 213 `.tsx`; SHA-256 MATCH on route.ts, the SQL,
+CHANGELOG, TASKS. Docs-only re-sync after this line: dry run 1 (TASKS.md) →
+copied → follow-up 0.
+
+### 🟢 2026-09-16 night — DEPLOYED + live-verified: Admin → In-Store Sale recorder — $1 test DONE (above)
 
 Built per `CHANGELOG.md` 2026-09-16 (night); rules `DECISIONS.md` →
 *"In-store sales: Zettle takes the card…"*. Mockup approved:
@@ -44,13 +119,13 @@ page 307 → sign-in, API 401 when signed out. ⚠️ The admin screen is
 **unverified in a browser** (needs the owner's login).
 
 **Owner, in this order:**
-1. ◻ **PayPal Zettle:** install the PayPal Zettle app on the iPhone, sign
+1. ✅ **PayPal Zettle:** done by the owner 09-16 ("did the zettle setup"). Original text: install the PayPal Zettle app on the iPhone, sign
    in with the business PayPal account, turn on **Tap to Pay on iPhone**
    (Settings → Payment methods). Run one $1 tap on your own card and refund
    it in the app to see the flow. (Owner-only; nothing on the site depends
    on it.)
-2. ◻ Push (this batch + the sold-page schema fix below).
-3. ◻ **First test on production, ~2 minutes:** Admin → In-Store Sale →
+2. ✅ Pushed + deployed 09-16 night; live: page 307 → sign-in, API 401.
+3. ✅ Done 09-16 late night by Claude in the owner's Chrome (block above). Original plan — **First test on production, ~2 minutes:** Admin → In-Store Sale →
    *Not listed* → "Test sale" · Other · price 1 → your own name, cell and
    email → Paid by Cash → Record sale. Expect: "Sale recorded" with an
    order number, "Receipt: Emailed", the receipt in your inbox and the
@@ -69,6 +144,14 @@ page 307 → sign-in, API 401 when signed out. ⚠️ The admin screen is
 row; confirm `payment_method = in_store_cash`, `fulfillment_status =
 picked_up`, no `paypal_capture_id`.
 
+**Staging (deploy + GSC validations, docs only):** ✅ synced 2026-09-16 late
+night — dry run listed exactly the 3 touched files (CHANGELOG,
+CURRENT_STATUS, TASKS), 0 Extras, 1127 total; real run copied 3 / 0 FAILED
+(exit 1 = copied only); follow-up dry run 0/0/0, exit 0; leak check 0
+`.env*` / `.log`, 0 `.git`; positive control 213 = 213 `.tsx`; SHA-256
+MATCH on all 3. Docs-only re-sync after this line: dry run 1 (TASKS.md) →
+copied → follow-up 0.
+
 **Staging (in-store sale recorder):** ✅ synced 2026-09-16 night — dry run
 listed exactly the 15 touched files (5 NEW: `lib/in-store-sale.ts`,
 `__tests__/in-store-sale.test.ts`, `api/admin/in-store-sales/route.ts`,
@@ -82,7 +165,7 @@ real run copied 15 / 0 FAILED (exit 1 = copied only); follow-up dry run
 SHA-256 MATCH on all 6 code files + CHANGELOG, DECISIONS, TASKS. Docs-only
 re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
 
-### 🟡 2026-09-16 evening — DEPLOY: sold product pages now carry a schema price (fixes the 2 GSC "Missing field price" errors for good; no SQL, no env vars)
+### 🟢 2026-09-16 evening — DEPLOYED + live-verified; Validate fix STARTED 9/16 on both GSC reports: sold product pages now carry a schema price
 
 Owner chose option 1 + "fix it for good". Built per `CHANGELOG.md`
 2026-09-16 (evening): the Product JSON-LD Offer reads the canonical price
@@ -97,7 +180,7 @@ cache · `next start` check: #77 → `price "237"` SoldOut, #53 → `"1026"`,
 `/es/shop/…-53` same + "Vendido", in-stock cuban chain unchanged
 (`"1009"`, priceValidUntil, InStock).
 
-**Owner:** push. Files: `src/app/[locale]/shop/[id]/page.tsx`,
+✅ Pushed 09-16 night; live #77 → 237, #53 → 1026 (EN + ES), in-stock page unchanged. ✅ Validate fix clicked on Product snippets AND Merchant listings → both "Validation started · 9/16/26". ◻ Read the result email / both reports ~09-30. Files: `src/app/[locale]/shop/[id]/page.tsx`,
 `src/lib/product-ld.ts` (NEW), `src/lib/__tests__/product-ld.test.ts` (NEW)
 + docs.
 

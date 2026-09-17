@@ -15,7 +15,8 @@ const read = (...p: string[]) => readFileSync(join(ROOT, ...p), 'utf8');
 
 const PAGE_PATH = join(ROOT, 'src', 'app', '[locale]', 'reviews', 'page.tsx');
 const PAGE = read('src', 'app', '[locale]', 'reviews', 'page.tsx');
-const CARD = read('src', 'app', '[locale]', 'card', 'page.tsx');
+// The card page body lives in the shared CardLanding component (2026-09-16).
+const CARD = read('src', 'components', 'card', 'CardLanding.tsx');
 const SECTION = read('src', 'components', 'home', 'TestimonialsSection.tsx');
 const PROXY = read('src', 'proxy.ts');
 

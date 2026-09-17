@@ -154,11 +154,19 @@ export async function POST(req: Request) {
 
   // Invoice row + the customer's receipt (when an email was given) + the
   // owner's new-order email. Best-effort, exactly as after a web capture.
-  const finalized = await finalizePaidOrder(service, orderId);
+  await finalizePaidOrder(service, orderId);
+
+  // Report what actually happened to the receipt, not finalizePaidOrder's
+  // overall flag: that flag also covers the invoice upsert, and on 2026-09-16
+  // the very first live test showed "Not emailed" while the receipt HAD been
+  // sent — the invoice write had failed on a missing service_role grant.
+  const { data: receiptRows } = sale.customer.email
+    ? await service.from('order_emails').select('id').eq('order_id', orderId).eq('email_type', 'receipt').limit(1)
+    : { data: [] as { id: string }[] };
 
   return NextResponse.json({
     orderId,
     orderNumber,
-    receiptEmailed: Boolean(sale.customer.email && process.env.RESEND_API_KEY && finalized),
+    receiptEmailed: Boolean(receiptRows?.length),
   });
 }

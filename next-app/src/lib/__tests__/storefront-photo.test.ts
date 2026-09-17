@@ -27,7 +27,7 @@ describe('storefront photo surfaces', () => {
     ['homepage Visit Us (square, beside the square map — mockup V2)', ['src', 'app', '[locale]', '(home)', 'page.tsx'], 'aspect="1:1"'],
     ['contact Visit Us panel', ['src', 'components', 'contact', 'VisitUsPanel.tsx'], 'aspect="4:3"'],
     ['Naples showroom band', ['src', 'app', '[locale]', 'sell', '[city]', 'page.tsx'], 'aspect="4:3"'],
-    ['/card thumbnail', ['src', 'app', '[locale]', 'card', 'page.tsx'], 'aspect="16:9"'],
+    ['/card thumbnail', ['src', 'components', 'card', 'CardLanding.tsx'], 'aspect="16:9"'],
   ];
   for (const [name, path, aspect] of surfaces) {
     it(`${name} renders <StorefrontPhoto> with ${aspect} and a sizes attribute`, () => {
