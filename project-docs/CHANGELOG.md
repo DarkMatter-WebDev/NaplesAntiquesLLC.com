@@ -1,7 +1,45 @@
 
 # Changelog
 
-## 2026-09-16 (late night, 2) — `/kittcard`: a second business-card landing page for the new employee, identical to `/card` today — ONE shared component, per-person values in one file — BUILT + STAGED (no SQL, no env vars)
+## 2026-09-16 (late night, 3) — Orders Recycle Bin: checkbox per row, select-all in the header, one "Delete … Forever" button for the selection — BUILT + STAGED (no SQL, no env vars)
+
+Owner: "add a checkbox to each listing in the recycle bin, including one to
+select all at the top of the column, and then a button to delete from the
+recycle bin, if all are selected it should delete all." (Asked after I
+declined to empty the bin myself — permanent deletion stays the owner's
+click.) Built straight from that spec, no mockup: an extra column and one
+button in the existing panel.
+
+- `src/lib/trash-selection.ts` (pure): `selectionState(visibleIds,
+  selected)` (count / all / some against the rows CURRENTLY SHOWN — search
+  and filters applied — never off-screen rows), `toggleId`, `toggleAll`
+  (partial or empty → select all shown; all → clear; hidden ids untouched),
+  `bulkDeleteLabel` ("Delete Selected Forever" / "Delete 3 Forever" /
+  "Delete All 20 Forever"), `bulkDeleteConfirmText`.
+- `OrdersPanel.tsx` (trash view only): desktop table gets a first column
+  with a checkbox per row and a select-all box in the header
+  (`indeterminate` when partial); phone cards get a checkbox beside the
+  order number and the count line becomes the select-all box ("3
+  selected"); a red outline **Delete … Forever** button sits beside "Back to
+  Orders", disabled at 0, always `window.confirm`s ("Permanently delete 20
+  orders — everything in the Recycle Bin that is shown? This cannot be
+  undone."), then ONE `delete().in('id', ids)`; single Restore / Delete
+  Forever drop the row from the selection. Nothing changes in the normal
+  Orders view.
+- Tests: `lib/__tests__/trash-selection.test.ts` (5: visible-only counting,
+  toggle, header semantics, labels + confirm text, panel wiring).
+
+**Gate:** `npx tsc --noEmit` 0 · `npm run lint` 0 (3 known `<img>`
+warnings) · `npx vitest run` **1435/1435 (145 files)** · `npm run build`
+exit 0 from a deleted `.next`, no Turbopack build cache. **Not verified in
+a browser** (admin login) — the owner's first use on the 20-order bin is the
+test; the delete query is the same one the existing single Delete Forever
+uses, with `.in()` instead of `.eq()`.
+
+## 2026-09-16 (late night, 2) — `/kittcard`: a second business-card landing page for the new employee, identical to `/card` today — ONE shared component, per-person values in one file — DEPLOYED + live-verified (no SQL, no env vars)
+
+**Later the same night — DEPLOYED + live-verified** (owner pushed; "verify it live"): `/card`, `/kittcard`, `/es/card`, `/es/kittcard` all 200 on production; the markup diff EN and ES shows only the page's own URL (canonical, hreflang, og:url) and the two language-toggle links; all four `noindex, nofollow`, canonical = own URL, `tel:2394048505`, "Hi Chris" prefill; `sitemap.xml` has 0 card entries (216 URLs). ⚠️ The very first fetch of `/kittcard` and `/es/kittcard` returned 404 while `/card` was 200 — the deploy was still rolling out (Netlify edge served the previous build for ~1 minute); the next fetch was 200 with `Cache-Status: fwd=uri-miss; stored`. Not a routing issue — re-check before diagnosing a fresh route's 404. **QR codes** for `/es/card` and `/es/kittcard` generated (segno, error level H, SVG + PNG) and handed to the owner; nothing stored in the repo.
+**Branded (octopus) QR, same night:** owner asked for a code that "looks like the octopus logo". Built in the scratchpad (segno matrix → hand-drawn SVG/PNG): rounded navy or gold modules, mildly rounded finder eyes, the `nav-logo` octopus on a white disc = 22% of the code width, error level H. Verified with OpenCV's decoder at full size, 500, 300 and 220 px — all decode. Learned: **rounded finder eyes break decoding** (corner radius ≥ 0.8 module fails; 0.5 is safe) — the first draft failed every size for that reason, not the logo; the logo disc alone up to 26% was fine. A code whose whole shape IS the octopus (art-QR / halftone) was not attempted: unreliable on a business-card-sized print. Files (SVG + PNG for `/es/card` navy + gold, `/es/kittcard` navy) handed over in chat; the octopus is raster (157 px `nav-logo.webp`) — fine at card size, a vector octopus from the designer would make it all-vector.
 
 Owner: a second employee (Kitt) is getting business cards; his QR should
 land on the same page customers see today, but be switchable to his own

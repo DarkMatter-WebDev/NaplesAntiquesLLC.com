@@ -15,7 +15,14 @@ pending on our side, no rejection, no console notification; the email will
 land at **info@** (check spam). Details `CHANGELOG.md` 2026-09-16. Still
 the only open item.
 
-🟡 **09-16 late night (2) — BUILT + STAGED, in the pending push: `/kittcard`**,
+🟡 **09-16 late night (3) — BUILT + STAGED, ready to push: Orders Recycle
+Bin multi-select** — checkbox per row (desktop + phone), select-all in the
+header, one "Delete … Forever" button for the selection (confirm first, one
+query). Pure helpers + 5 tests in `lib/trash-selection.ts`. Gate tsc 0 ·
+lint 0 · 1435/1435 · build 0; admin screen unverified until the owner uses
+it. `CHANGELOG.md` 2026-09-16 (late night, 3).
+
+🟢 **09-16 late night (2) — DEPLOYED + live-verified: `/kittcard`**,
 the second employee's business-card landing page — identical to `/card`
 (one shared `CardLanding` component; the name + number per card live in
 `lib/card-holders.ts`, Kitt's entry = Chris's values until his line is
@@ -24,7 +31,7 @@ lint 0 · 1430/1430 · build 0; dev diff shows only the page URL differs.
 `CHANGELOG.md` 2026-09-16 (late night, 2). ✅ Owner ran the invoices grant
 SQL the same night.
 
-🟢 **09-16 late night — In-Store Sale LIVE and TESTED** (a $1 unlisted Cash sale recorded on production: order paid / picked up / `in_store_cash`, product-less line, automatic receipt row, then moved to the Recycle Bin). 🟡 **Two small follow-ups:** the "Receipt: Not emailed" label bug is fixed + STAGED (push when convenient), and a **pre-existing** gap surfaced — automatic invoices have NEVER been written because `service_role` has no grant on `invoices` → owner runs `supabase/invoices-service-role-grant-2026-09.sql` once (`TASKS.md` top). `CHANGELOG.md` 2026-09-16 (late night). Earlier: DEPLOYED + live-verified (gates 307/401 on production): Admin → In-Store Sale**, a one-screen recorder for showroom
+🟢 **09-16 late night — In-Store Sale LIVE and TESTED** (a $1 unlisted Cash sale recorded on production: order paid / picked up / `in_store_cash`, product-less line, automatic receipt row, then moved to the Recycle Bin). ✅ **Both follow-ups closed the same night:** the "Receipt: Not emailed" label fix is DEPLOYED (in the `/kittcard` batch), and the **pre-existing** invoices gap — automatic invoices had NEVER been written because `service_role` had no grant on `invoices` — is fixed: the owner ran `supabase/invoices-service-role-grant-2026-09.sql`, verified 09-16 late night (service role reads `invoices`; `INV-20260916-OFM07` was written automatically at 01:52Z). `CHANGELOG.md` 2026-09-16 (late night). Earlier: DEPLOYED + live-verified (gates 307/401 on production): Admin → In-Store Sale**, a one-screen recorder for showroom
 sales — the card is taken on PayPal Zettle (owner decision), the page
 records the sale as a paid, picked-up order (listed item by inventory # or
 an unlisted piece by description), marks a listed item sold through the

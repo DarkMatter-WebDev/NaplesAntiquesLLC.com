@@ -14,6 +14,7 @@ import { buildAddressObject, generateOrderNumber, getProductImages, getProductMe
 import { calculateFlSalesTax, isFloridaState } from '@/lib/checkout-pricing';
 import { adminGetManualOrderProducts, adminUpdateProductsStatus } from '@/app/actions/admin-products';
 import { AppIcon } from '@/components/AppIcon';
+import { EMPTY_SELECTION, bulkDeleteConfirmText, bulkDeleteLabel, selectionState, toggleAll, toggleId } from '@/lib/trash-selection';
 
 const GOLD = '#735c00';
 const BORDER = 'var(--color-outline-variant)';
@@ -107,6 +108,10 @@ export default function OrdersPanel({
   const [returnToInventory, setReturnToInventory] = useState(true);
   const [deleting, setDeleting] = useState(false);
   const [actingOrderId, setActingOrderId] = useState<string | null>(null);
+  // Recycle Bin multi-select (owner, 2026-09-16): ids ticked in the trash
+  // view. Read through selectionState() so only rows still on screen count.
+  const [selectedTrashIds, setSelectedTrashIds] = useState<Set<string>>(() => new Set());
+  const [purgingSelected, setPurgingSelected] = useState(false);
 
   if (initialOrders !== syncedFrom) {
     setSyncedFrom(initialOrders);
@@ -401,6 +406,7 @@ export default function OrdersPanel({
       return;
     }
     setOrders((current) => current.filter((existing) => existing.id !== order.id));
+    setSelectedTrashIds((current) => (current.has(order.id) ? toggleId(current, order.id) : current));
     setMessage({ text: `Order ${order.order_number} restored. Inventory statuses were not changed.`, ok: true });
     router.refresh();
   }
@@ -416,7 +422,30 @@ export default function OrdersPanel({
       return;
     }
     setOrders((current) => current.filter((existing) => existing.id !== order.id));
+    setSelectedTrashIds((current) => (current.has(order.id) ? toggleId(current, order.id) : current));
     setMessage({ text: `Order ${order.order_number} permanently deleted.`, ok: true });
+    router.refresh();
+  }
+
+  // The selection as it stands against the rows currently shown (search and
+  // filters applied). "Select all" and "Delete All" mean these rows.
+  const trashSelection = isTrash ? selectionState(filteredOrders.map((order) => order.id), selectedTrashIds) : EMPTY_SELECTION;
+
+  async function purgeSelectedOrders() {
+    if (trashSelection.count === 0 || purgingSelected) return;
+    if (!window.confirm(bulkDeleteConfirmText(trashSelection))) return;
+    setPurgingSelected(true);
+    setMessage(null);
+    const { error } = await supabase.from('orders').delete().in('id', trashSelection.ids);
+    setPurgingSelected(false);
+    if (error) {
+      setMessage({ text: `Could not permanently delete the selected orders: ${error.message}`, ok: false });
+      return;
+    }
+    const removed = new Set(trashSelection.ids);
+    setOrders((current) => current.filter((existing) => !removed.has(existing.id)));
+    setSelectedTrashIds(new Set());
+    setMessage({ text: `${trashSelection.count} ${trashSelection.count === 1 ? 'order' : 'orders'} permanently deleted.`, ok: true });
     router.refresh();
   }
 
@@ -441,9 +470,20 @@ export default function OrdersPanel({
           </div>
           <div className="flex flex-col gap-2 md:flex-row md:items-center">
             {isTrash ? (
-              <Link href={ordersPath} className="outline-button w-full justify-center text-sm md:w-auto">
-                Back to Orders
-              </Link>
+              <>
+                <button
+                  type="button"
+                  onClick={() => void purgeSelectedOrders()}
+                  disabled={trashSelection.count === 0 || purgingSelected}
+                  className="w-full rounded-full border px-5 py-2.5 text-xs font-bold uppercase tracking-[0.14em] disabled:opacity-40 md:w-auto"
+                  style={{ borderColor: 'var(--color-error)', color: 'var(--color-error)', fontFamily: 'var(--font-label)', background: 'white' }}
+                >
+                  {purgingSelected ? 'Deleting…' : bulkDeleteLabel(trashSelection)}
+                </button>
+                <Link href={ordersPath} className="outline-button w-full justify-center text-sm md:w-auto">
+                  Back to Orders
+                </Link>
+              </>
             ) : (
               <>
                 <Link href={`${ordersPath}?view=trash`} className="outline-button w-full justify-center gap-1.5 text-sm md:w-auto">
@@ -507,13 +547,35 @@ export default function OrdersPanel({
 
         <div className="mb-3 flex items-center justify-between text-xs md:hidden" style={{ color: 'var(--color-on-surface-variant)' }}>
           <span>{filteredOrders.length} {filteredOrders.length === 1 ? 'order' : 'orders'}</span>
-          <span>{isTrash ? 'Restore or delete forever' : 'Tap View for details'}</span>
+          {isTrash ? (
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                aria-label="Select all shown"
+                checked={trashSelection.all}
+                ref={(el) => { if (el) el.indeterminate = trashSelection.some; }}
+                onChange={() => setSelectedTrashIds((current) => toggleAll(current, filteredOrders.map((order) => order.id)))}
+              />
+              <span>{trashSelection.count > 0 ? `${trashSelection.count} selected` : 'Select all'}</span>
+            </label>
+          ) : (
+            <span>Tap View for details</span>
+          )}
         </div>
 
         <div className="grid gap-3 md:hidden">
           {filteredOrders.map((order) => (
             <article key={order.id} className="rounded-lg border bg-white p-4 shadow-sm" style={{ borderColor: BORDER }}>
               <div className="flex items-start justify-between gap-3">
+                {isTrash && (
+                  <input
+                    type="checkbox"
+                    aria-label={`Select ${order.order_number}`}
+                    checked={selectedTrashIds.has(order.id)}
+                    onChange={() => setSelectedTrashIds((current) => toggleId(current, order.id))}
+                    className="mt-1 h-5 w-5 shrink-0"
+                  />
+                )}
                 <div className="min-w-0">
                   <p className="text-[0.62rem] font-bold uppercase tracking-[0.18em]" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
                     Order
@@ -608,6 +670,17 @@ export default function OrdersPanel({
           <table className="w-full min-w-[1100px] text-left text-sm">
             <thead style={{ background: 'var(--color-surface-container-low)' }}>
               <tr>
+                {isTrash && (
+                  <th className="w-10 px-4 py-3">
+                    <input
+                      type="checkbox"
+                      aria-label="Select all shown"
+                      checked={trashSelection.all}
+                      ref={(el) => { if (el) el.indeterminate = trashSelection.some; }}
+                      onChange={() => setSelectedTrashIds((current) => toggleAll(current, filteredOrders.map((order) => order.id)))}
+                    />
+                  </th>
+                )}
                 {['Order', 'Date', 'Customer', 'Email / Phone', 'Items', 'Total', 'Payment', 'Fulfillment', 'Status', 'Actions'].map((heading) => (
                   <th key={heading} className="px-4 py-3 text-[0.68rem] uppercase tracking-widest font-bold"
                     style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
@@ -634,6 +707,16 @@ export default function OrdersPanel({
                     router.push(`${adminBasePath}/orders/${order.id}`);
                   }}
                 >
+                  {isTrash && (
+                    <td className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${order.order_number}`}
+                        checked={selectedTrashIds.has(order.id)}
+                        onChange={() => setSelectedTrashIds((current) => toggleId(current, order.id))}
+                      />
+                    </td>
+                  )}
                   <td className="px-4 py-3 font-bold" style={{ color: GOLD }}>{order.order_number}</td>
                   <td className="px-4 py-3 whitespace-nowrap" style={{ color: 'var(--color-on-surface-variant)' }}>{formatOrderDate(order.created_at)}</td>
                   <td className="px-4 py-3" style={{ color: 'var(--color-on-surface)' }}>{order.customer_name || '-'}</td>
@@ -691,7 +774,7 @@ export default function OrdersPanel({
               ))}
               {filteredOrders.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="px-4 py-12 text-center" style={{ color: 'var(--color-on-surface-variant)' }}>
+                  <td colSpan={isTrash ? 11 : 10} className="px-4 py-12 text-center" style={{ color: 'var(--color-on-surface-variant)' }}>
                     No orders found.
                   </td>
                 </tr>

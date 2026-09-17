@@ -32,18 +32,54 @@ verification (the 🟢 Step 2 block below, step 5).
 
 **Staging (iOS zoom):** ✅ synced 2026-09-15 (late night) — dry run listed exactly the 4 touched files (globals.css, home-subscribe-modal.test.ts, CHANGELOG, TASKS), 0 Extras, 1119 total; real run copied 4 / 0 FAILED (robocopy exit 1 = copied only); follow-up dry run 0/0/0, exit 0; leak check 0 `.env*` / `.log`, 0 `.git`, no node_modules / .next / worktrees, launch.json present; positive control 210 = 210 `.tsx`; SHA-256 MATCH on all 4. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
 
-### 🟡 2026-09-16 late night (2) — DEPLOY batch: `/kittcard` + the receipt-label fix (no SQL, no env vars)
+### 🟡 2026-09-16 late night (3) — DEPLOY: Orders Recycle Bin multi-select (no SQL, no env vars)
+
+Built per `CHANGELOG.md` 2026-09-16 (late night, 3). Files:
+`src/lib/trash-selection.ts` (NEW), `src/lib/__tests__/trash-selection.test.ts`
+(NEW), `src/components/admin/OrdersPanel.tsx`.
+
+**Gate:** tsc 0 · lint 0 (3 known warnings) · vitest **1435/1435 (145
+files)** · build exit 0 from a deleted `.next`, no Turbopack build cache.
+⚠️ Unverified in a browser (admin login).
+
+**Owner:**
+1. ◻ Push.
+2. ◻ Admin → Orders → Recycle Bin: tick the $1 test order
+   NEJ-20260917-MFK96 → "Delete 1 Forever" → confirm. (Or tick the header
+   box → "Delete All 20 Forever" if you want the whole bin gone — the
+   confirm names the count.) Expect the row(s) to vanish and "N orders
+   permanently deleted."
+
+**Claude, after the push (on your word):** in the owner's Chrome, open the
+Recycle Bin, confirm the checkbox column, the header box and the button
+render; read back that the test order is gone.
+
+**Staging (recycle-bin multi-select):** ✅ synced 2026-09-16 late night — dry
+run listed exactly the 7 touched files (2 NEW: `lib/trash-selection.ts`,
+`__tests__/trash-selection.test.ts`; 5 modified: OrdersPanel.tsx,
+CHANGELOG, CURRENT_STATUS, STRUCTURE, TASKS), 0 Extras, 1133 total (= 1131
++ 2); real run copied 7 / 0 FAILED (exit 1 = copied only); follow-up dry run
+0/0/0, exit 0; leak check 0 `.env*` / `.log`, 0 `.git`, no node_modules /
+.next / worktrees; positive control 215 = 215 `.tsx`; SHA-256 MATCH on the 3
+code files + CHANGELOG, TASKS. Docs-only re-sync after this line: dry run 1
+(TASKS.md) → copied → follow-up 0.
+
+### 🟢 2026-09-16 late night (2) — DEPLOYED + live-verified: `/kittcard` + the receipt-label fix
 
 `/kittcard` built per `CHANGELOG.md` 2026-09-16 (late night, 2); rule
 `DECISIONS.md` → *"Business-card pages: one component, per-holder values…"*.
 
 **Owner:**
-1. ◻ Push. Files: `components/card/CardLanding.tsx` (NEW),
+1. ✅ Pushed + deployed 09-16 late night; live: all four card URLs 200, diff = own URL only, noindex, sitemap 0 card entries (first fetch of the new routes 404'd for ~1 min while the deploy rolled out). Files: `components/card/CardLanding.tsx` (NEW),
    `lib/card-holders.ts` (NEW), `[locale]/card/page.tsx` (now a wrapper),
    `[locale]/kittcard/page.tsx` (NEW), 4 test files, and the in-store
    route's receipt-label fix from the block below.
 2. ◻ Print Kitt's cards with the QR pointing at
-   `https://naplesestatejewelry.com/kittcard`.
+   `https://naplesestatejewelry.com/kittcard`. QR files for the SPANISH
+   pages (`/es/card`, `/es/kittcard`; SVG + PNG, error level H) were
+   generated 09-16 and handed over in chat — scan-test on a phone before
+   printing; for English cards use the same method with `/card` /
+   `/kittcard` (or Chrome's address-bar share → "Create QR code").
 3. ◻ Later, when Kitt has his own number: tell me the name + number and I
    change the `kittcard` entry in `lib/card-holders.ts` (one push; the
    printed cards keep working).
@@ -54,6 +90,21 @@ own URL); confirm `sitemap.xml` has neither.
 
 **Gate:** tsc 0 · lint 0 (3 known warnings) · vitest 1430/1430 (144 files)
 · build exit 0 from a deleted `.next`, no Turbopack build cache.
+
+**Staging (wrap-up, docs only):** ✅ synced 2026-09-16 wrap-up — dry run
+listed exactly the 2 touched files (CURRENT_STATUS, TASKS), 0 Extras, 1131
+total; real run copied 2 / 0 FAILED; follow-up dry run 0/0/0, exit 0; leak
+check 0 `.env*` / `.log`, 0 `.git`; positive control 215 = 215 `.tsx`;
+SHA-256 MATCH on both. Docs-only re-sync after this line: dry run 1
+(TASKS.md) → copied → follow-up 0.
+
+**Staging (`/kittcard` live-verified, docs only):** ✅ synced 2026-09-16 late
+night — dry run listed exactly the 3 touched files (CHANGELOG,
+CURRENT_STATUS, TASKS), 0 Extras, 1131 total; real run copied 3 / 0 FAILED
+(exit 1 = copied only); follow-up dry run 0/0/0, exit 0; leak check 0
+`.env*` / `.log`, 0 `.git`; positive control 215 = 215 `.tsx`; SHA-256
+MATCH on all 3. Docs-only re-sync after this line: dry run 1 (TASKS.md) →
+copied → follow-up 0.
 
 **Staging (`/kittcard` batch):** ✅ synced 2026-09-16 late night — dry run
 listed exactly the 14 touched files (3 NEW: `components/card/CardLanding.tsx`,
@@ -67,7 +118,7 @@ worktrees; positive control 215 = 215 `.tsx`; SHA-256 MATCH on the 5 code
 files + CHANGELOG, DECISIONS, TASKS. Docs-only re-sync after this line: dry
 run 1 (TASKS.md) → copied → follow-up 0.
 
-### 🟡 2026-09-16 late night — In-Store Sale TESTED LIVE ✅ · two follow-ups: push the receipt-label fix + run the invoices grant SQL
+### 🟢 2026-09-16 late night — In-Store Sale TESTED LIVE ✅ · receipt-label fix DEPLOYED · invoices grant SQL RUN + verified (service role reads `invoices`; `INV-20260916-OFM07` written 01:52Z)
 
 **Owner, in this order:**
 1. ✅ **Run `supabase/invoices-service-role-grant-2026-09.sql`** — done by the owner 2026-09-16 late night ("ran the sql"). Original: in the
@@ -80,10 +131,12 @@ run 1 (TASKS.md) → copied → follow-up 0.
    `select privilege_type from information_schema.role_table_grants where
    table_name = 'invoices' and grantee = 'service_role';` → SELECT, INSERT,
    UPDATE.
-2. ◻ Push — folded into the `/kittcard` batch above (one file: `api/admin/in-store-sales/route.ts` — the "Receipt"
+2. ✅ Deployed 09-16 late night in the `/kittcard` batch (one file: `api/admin/in-store-sales/route.ts` — the "Receipt"
    line on the Sale-recorded panel now reads from the real `order_emails`
    row, so it says "Emailed" when it was). Gate below.
-3. ◻ Optional: Admin → Orders → Recycle Bin → empty it (the $1 test order
+3. ◻ Optional: Admin → Orders → Recycle Bin → empty it — now the multi-select block at the top of this file (the $1 test order
+   NEJ-20260917-MFK96 was still there at wrap-up 09-16, `deleted_at` set;
+   harmless) — original note: (the $1 test order
    NEJ-20260917-MFK96 is there).
 
 **Gate (label fix):** tsc 0 · lint 0 (3 known `<img>` warnings) · vitest
