@@ -78,7 +78,7 @@ texts in two threads — "+1 (888) 423-7522" for the plain texts and
 
 **Rules:**
 - The sign-up confirmation, the YES reply and the sold auto-reply carry
-  `brandMediaUrl()` (`public/assets/images/branding/text-brand-wordmark-v4.jpg`); deals
+  `brandMediaUrl()` (`public/assets/images/branding/text-brand-wordmark-v5.jpg`); deals
   carry their own card. So every message a CUSTOMER receives is an MMS and
   threads together. ⛔ Do not add a new customer-facing text without the
   picture.

@@ -38,7 +38,9 @@ function siteUrl(): string {
  * "8884237522"). Making every customer text an MMS keeps the whole
  * conversation in one thread. The forwards to the owner's own cell stay
  * plain texts. The image is the gold "NAPLES / ESTATE JEWELRY" wordmark on
- * navy, 800×400 JPEG (~17 KB), served from the site so Twilio can fetch it.
+ * navy with "DEALS" as a third line (owner, 2026-09-18: the picture reads
+ * "Naples Estate Jewelry Deals"), 800×400 JPEG (~22 KB), served from the site
+ * so Twilio can fetch it.
  * Shape matters (rounds on the owner's phone, 2026-09-18): the iPhone preview
  * bubble shows a picture at its own ratio up to roughly 16:9 and CROPS anything
  * wider to 16:9 (a 800×300 banner with a 700 px mark lost its N and S); 4:3
@@ -51,7 +53,7 @@ function siteUrl(): string {
  * the old bytes would keep going out under the old name.
  */
 export function brandMediaUrl(): string {
-  return `${siteUrl()}/assets/images/branding/text-brand-wordmark-v4.jpg`;
+  return `${siteUrl()}/assets/images/branding/text-brand-wordmark-v5.jpg`;
 }
 
 export function twilioConfig(): TwilioConfig | null {
