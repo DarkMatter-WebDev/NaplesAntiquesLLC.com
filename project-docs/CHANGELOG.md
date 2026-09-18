@@ -1,7 +1,19 @@
 
 # Changelog
 
-## 2026-09-18 (2) — Text Deals admin: "Reopen — edit & resend" for a sale that falls through, a real "Choose photo" button, and "Delete deal" — BUILT + STAGED (no SQL, no env vars)
+## 2026-09-18 (3) — Text-message brand picture swapped to the wordmark banner — BUILT + STAGED (no SQL, no env vars)
+
+**Why:** the square octopus logo showed cropped in the message bubble; the owner sent the gold "NAPLES / ESTATE JEWELRY" wordmark on navy ("hopefully it renders fully on the text"). A wide banner is shown whole.
+
+**What:** `public/assets/images/branding/text-brand-wordmark.jpg` (800×300, JPEG q88, 19 KB — the 569×146 source with its JPEG noise flattened to one navy, scaled to 700 wide with 50/60 px navy padding so nothing touches the edge); `text-brand.jpg` (octopus) deleted. ⛔ New file NAME on purpose: `/assets/*` is `immutable, max-age=1y` (netlify.toml) and Twilio caches media by URL, so the same path would keep sending the old bytes. `lib/text-alerts/config.ts` `brandMediaUrl()` + the existence guard in `lib/__tests__/text-alerts.test.ts` repointed; `DECISIONS.md` rule corrected ("a changed picture needs a NEW file name"). Deals keep their own card — unaffected.
+
+**Verify after the deploy:** `curl -sI https://naplesestatejewelry.com/assets/images/branding/text-brand-wordmark.jpg` → 200, `Content-Length: 19146`; then one late reply to TEST 3 from the personal cell → the auto-reply arrives with the wordmark.
+
+**Verification:** `vitest run src/lib/__tests__/text-alerts.test.ts` 20/20; `npx tsc --noEmit` + `npm run lint` clean (see below).
+
+## 2026-09-18 (2) — Text Deals admin: "Reopen — edit & resend" for a sale that falls through, a real "Choose photo" button, and "Delete deal" — DEPLOYED + live-verified (no SQL, no env vars)
+
+**DEPLOYED + live-verified 02:47–02:55Z** (owner pushed; Claude drove Admin → Text Deals): "TEST 3 · 14K gold pendant" $1,240 — photo uploaded through the new **Choose photo** button ("Change photo · Photo saved"), Preview, Send to 1 (02:47Z); owner replied "I want it" (02:51Z, forwarded `1ST`); **Mark sold → notice "Marked sold. The buyer got a confirmation text. 0 others told it's taken."** and `text_system_messages` id 4 kind `deal_winner`, MMS SID `MM5eba…`, **delivered**; **Reopen — edit & resend** filled the composer (heading "Reopened deal — edit & resend", same photo + $1,240 + the back-available message, new DRAFT in the list); **Delete deal** removed the reopened draft, then the old "TEST · 14K rope chain" and "TEST 2" ("Deal deleted." ×3) — TEST 3's photo and picture survived the shared-photo delete (both 200), only its folder remains under `text-deals/`, and the old replies kept their rows with `deal_id` cleared. Late reply verified 02:58Z: "Still available?" attached to TEST 3, `auto_reply_sent_at` + `forwarded_at` stamped the same second, owner got the "spoken for" picture in the one thread. **Batch fully verified; nothing pending.**
 
 Owner: (1) "add a button to reopen after an item has been marked sold… allow
 admin to alter the message and re-send if the sale falls thru"; (2) "the
@@ -37,7 +49,7 @@ warnings) · `npx vitest run` **1457/1457 (148 files)** · `npm run build`
 exit 0 from a deleted `.next`, no Turbopack build cache. Admin UI
 unverified in a browser until the push.
 
-## 2026-09-18 — Mark sold now texts the buyer ("It's yours") and everyone else who got the deal ("spoken for") — BUILT + STAGED (no SQL, no env vars)
+## 2026-09-18 — Mark sold now texts the buyer ("It's yours") and everyone else who got the deal ("spoken for") — DEPLOYED + live-verified (buyer MMS delivered on TEST 3)
 
 Owner, mid re-test of the logo flow: "when we mark it sold, it sends a
 confirmation text to the winner / buyer… also send a 'sold' type text to

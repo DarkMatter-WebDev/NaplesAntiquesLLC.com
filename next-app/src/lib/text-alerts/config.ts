@@ -37,12 +37,17 @@ function siteUrl(): string {
  * toll-free number land in TWO threads on the iPhone ("+1 (888) 423-7522" vs
  * "8884237522"). Making every customer text an MMS keeps the whole
  * conversation in one thread. The forwards to the owner's own cell stay
- * plain texts. The image is the owner's navy/gold octopus logo, 800 px JPEG
- * (~110 KB; JPEG because the illustration has gradients — a palette PNG was
- * 3× the size), served from the site so Twilio can fetch it.
+ * plain texts. The image is the gold "NAPLES / ESTATE JEWELRY" wordmark on
+ * navy, 800×300 JPEG (~19 KB), served from the site so Twilio can fetch it.
+ * (2026-09-18: replaced the square octopus logo — a wide banner shows whole
+ * in the message bubble instead of being cropped.)
+ *
+ * A changed picture needs a NEW file name: `/assets/*` is served
+ * `immutable, max-age=1y` (netlify.toml) and Twilio caches media by URL, so
+ * the old bytes would keep going out under the old name.
  */
 export function brandMediaUrl(): string {
-  return `${siteUrl()}/assets/images/branding/text-brand.jpg`;
+  return `${siteUrl()}/assets/images/branding/text-brand-wordmark.jpg`;
 }
 
 export function twilioConfig(): TwilioConfig | null {

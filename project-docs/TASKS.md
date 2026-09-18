@@ -5,7 +5,13 @@
 
 ## ◻ OPEN — needs a human
 
-### 🟡 2026-09-18 — DEPLOY: Mark sold → buyer confirmation + "spoken for" notices · Reopen / Choose photo / Delete deal (no SQL, no env vars)
+### 🟡 2026-09-18 (3) — DEPLOY: text-message picture = wordmark banner (no SQL, no env vars)
+
+**Owner:**
+1. ◻ Push.
+2. ◻ Say "deployed" — Claude checks the new picture URL (200, 19 KB) and asks for one late reply to TEST 3 from the personal cell → the auto-reply should show the full wordmark, still in the one thread.
+
+### 🟢 2026-09-18 — DEPLOYED + live-verified: Mark sold → buyer confirmation (MMS delivered) · Reopen / Choose photo / Delete deal all exercised on production — late-reply auto-reply verified 02:58Z; nothing pending
 
 Also in this push (`CHANGELOG.md` 2026-09-18 (2)): **Reopen — edit &
 resend** on a sold deal (new draft, same photo + price, editable "back
@@ -23,8 +29,8 @@ Built per `CHANGELOG.md` 2026-09-18. Files: `lib/text-alerts/messages.ts`,
 files)** · build exit 0 from a deleted `.next`, no Turbopack build cache.
 
 **Owner:**
-1. ◻ Push.
-2. ◻ Say "deployed" — Claude sends a fresh TEST deal (photo, price, line)
+1. ✅ Pushed + deployed 09-18; TEST 3 sent, replied, marked sold (buyer MMS `deal_winner` delivered), reopened (draft verified) and cleaned up (3 deletes). Original: Push.
+2. ✅ Say "deployed" — Claude sends a fresh TEST deal (photo, price, line)
    to the one confirmed number (your personal cell).
 3. ◻ Reply from the personal cell → Claude clicks Mark sold → your personal
    cell should get **"It's yours - … We'll text you shortly…"** as a

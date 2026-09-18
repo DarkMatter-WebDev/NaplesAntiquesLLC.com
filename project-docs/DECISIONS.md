@@ -78,15 +78,19 @@ texts in two threads — "+1 (888) 423-7522" for the plain texts and
 
 **Rules:**
 - The sign-up confirmation, the YES reply and the sold auto-reply carry
-  `brandMediaUrl()` (`public/assets/images/branding/text-brand.jpg`); deals
+  `brandMediaUrl()` (`public/assets/images/branding/text-brand-wordmark.jpg`); deals
   carry their own card. So every message a CUSTOMER receives is an MMS and
   threads together. ⛔ Do not add a new customer-facing text without the
   picture.
 - The forwards to the owner's own cell stay plain SMS.
 - The brand image says "Naples Estate Jewelry" only — never the retired
   "Naples Antiques & Estate Jewelry" wordmark (`logo2.webp`).
-- Keep the image ≤ 800 px and well under 600 KB (carrier MMS limits); a
-  changed picture keeps the same path, so no code change.
+- Keep the image ≤ 800 px and well under 600 KB (carrier MMS limits). Wide
+  beats square: the bubble shows a banner whole (2026-09-18 swap to the
+  wordmark). ⛔ A changed picture needs a NEW file name (`/assets/*` is
+  `immutable, max-age=1y` at the CDN and Twilio caches media by URL) — change
+  `brandMediaUrl()` in `lib/text-alerts/config.ts` + the test guard, delete the
+  old file.
 
 ## Business-card pages: one component, per-holder values — a card URL is printed once and never moves (2026-09-16)
 
