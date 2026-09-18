@@ -84,7 +84,7 @@ describe('the words on file with Twilio', () => {
     expect(inbound).toContain('DEFAULT_SOLD_REPLY, brandMediaUrl())');
     expect(inbound).not.toMatch(/forwardText\([^)]*\)[^;]*mediaUrl/);
     expect(confirmations).toContain('body: confirmationText(), mediaUrl: brandMediaUrl()');
-    expect(existsSync(join(process.cwd(), 'public', 'assets', 'images', 'branding', 'text-brand-wordmark.jpg'))).toBe(true);
+    expect(existsSync(join(process.cwd(), 'public', 'assets', 'images', 'branding', 'text-brand-wordmark-v2.jpg'))).toBe(true);
   });
 
   it('Mark sold texts: the buyer hears it is theirs, everyone else hears it is taken, STOP once (owner 2026-09-17)', () => {

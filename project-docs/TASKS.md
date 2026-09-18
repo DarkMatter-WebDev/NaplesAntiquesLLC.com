@@ -9,7 +9,7 @@
 
 **Owner:**
 1. ◻ Push.
-2. ◻ Say "deployed" — Claude checks the new picture URL (200, 19 KB) and asks for one late reply to TEST 3 from the personal cell → the auto-reply should show the full wordmark, still in the one thread.
+2. ◻ Say "deployed" — Claude checks the new picture URL (200, 17 KB); then text YES from the personal cell → the "You're in" reply should show the whole wordmark with navy around it. (First cut deployed 09-18 03:0xZ: picture delivered but edges cropped by the iPhone bubble → v2.)
 
 ### 🟢 2026-09-18 — DEPLOYED + live-verified: Mark sold → buyer confirmation (MMS delivered) · Reopen / Choose photo / Delete deal all exercised on production — late-reply auto-reply verified 02:58Z; nothing pending
 
