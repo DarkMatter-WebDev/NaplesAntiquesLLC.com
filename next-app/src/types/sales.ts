@@ -93,8 +93,13 @@ export function orderStatusLabel(value: string | null | undefined): string {
 export function formatOrderAddress(address: Record<string, unknown> | null): string | null {
   if (!address) return null;
 
-  const addressParts = ['address_line1', 'address_line2', 'city', 'state', 'postal_code']
-    .map((key) => address[key])
+  // Checkout stores the street as `line1` / `line2` (buildAddressObject);
+  // older rows and the manual admin form use `address_line1` / `address_line2`.
+  // Reading only the latter dropped the street from every checkout order on
+  // the account page and the guest lookup (found 2026-09-17).
+  const street1 = address.address_line1 ?? address.line1;
+  const street2 = address.address_line2 ?? address.line2;
+  const addressParts = [street1, street2, address.city, address.state, address.postal_code]
     .filter((value): value is string | number => typeof value === 'string' || typeof value === 'number')
     .map((value) => String(value).trim())
     .filter(Boolean);

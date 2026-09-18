@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
@@ -66,6 +66,22 @@ describe('the words on file with Twilio', () => {
       .toBe('Maria Alvarez (239) 555-0148 on "14K rope chain" [1st]: I\'ll take it');
     expect(forwardText({ fromPhone: '+12395550177', name: null, dealTitle: null, body: '', isFirst: false }))
       .toBe('(239) 555-0177: (photo or empty message)');
+  });
+
+  it('attaches the brand picture to every customer-facing text that is not a deal (one phone thread, owner 2026-09-17)', () => {
+    const withMedia = twiml('Hi & bye', 'https://naplesestatejewelry.com/assets/images/branding/text-brand.jpg?a=1&b=2');
+    expect(withMedia).toContain('<Message><Body>Hi &amp; bye</Body><Media>https://naplesestatejewelry.com/assets/images/branding/text-brand.jpg?a=1&amp;b=2</Media></Message>');
+    expect(twiml('plain')).toBe('<?xml version="1.0" encoding="UTF-8"?><Response><Message>plain</Message></Response>');
+    expect(twiml(null, 'https://x/y.png')).toBe('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+    // Source guard: the three non-deal customer texts carry the picture; the
+    // owner forward does not (their own cell, plain text is fine).
+    const inbound = readFileSync(join(process.cwd(), 'src', 'lib', 'text-alerts', 'inbound.ts'), 'utf8');
+    const confirmations = readFileSync(join(process.cwd(), 'src', 'lib', 'text-alerts', 'confirmations.ts'), 'utf8');
+    expect(inbound).toContain('twiml(optInReplyText(), brandMediaUrl())');
+    expect(inbound).toContain('DEFAULT_SOLD_REPLY, brandMediaUrl())');
+    expect(inbound).not.toMatch(/forwardText\([^)]*\)[^;]*mediaUrl/);
+    expect(confirmations).toContain('body: confirmationText(), mediaUrl: brandMediaUrl()');
+    expect(existsSync(join(process.cwd(), 'public', 'assets', 'images', 'branding', 'text-brand.jpg'))).toBe(true);
   });
 
   it('escapes the TwiML reply', () => {

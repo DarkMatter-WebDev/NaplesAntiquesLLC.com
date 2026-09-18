@@ -1,9 +1,104 @@
 # Tasks
 
 > Actionable open work plus a short recent-completions summary. Full history is
-> in `CHANGELOG.md`. Last reconciled: **2026-09-16**.
+> in `CHANGELOG.md`. Last reconciled: **2026-09-17**.
 
 ## ◻ OPEN — needs a human
+
+### 🔴 2026-09-17 — Twilio APPROVED → run the text-alerts grant SQL, then the first live text test
+
+Trust Hub → Toll-free → HH `eab4c178…` **Approved** Sep 17 (read in the
+owner's Chrome). Both phone rows are `pending` with the 09-16 confirmation
+stamped "sent" (Twilio accepted it, the carrier refused the unverified
+number), so the 15-minute sweep will NOT resend — use Resend YES.
+
+**Owner, in this order:**
+1. ✅ **Run `supabase/text-alerts-service-role-grant-2026-09.sql`** — done by the owner 09-17; re-probed: all four `text_*` tables answer 200 (empty) to the service key. Original: in the
+   Supabase SQL Editor (once; safe to re-run). Without it the confirmation
+   log, Text Deals drafts, deal sends and both Twilio webhooks fail
+   "permission denied" (`CHANGELOG.md` 2026-09-17). Verify: the query in the
+   file's footer → SELECT/INSERT/UPDATE/DELETE for each `text_*` table.
+2. ✅ Done 09-17 (both old rows deleted). Admin → Subscribers → the **(239) 404-8505** row (your business cell)
+   → Delete — your own phone must never be a "customer" (it would get every
+   deal and have its replies forwarded to itself). Decision recorded 09-15.
+3. ✅ Done 09-17 22:44–22:45Z — re-joined from the live site, confirmation delivered (SID `SM84c8…`, status webhook wrote `delivered`), YES received, row `confirmed`. Original: Admin → Subscribers → the **(239) 304-6229** row (personal cell) →
+   **Resend YES**. Expect the confirmation text on that phone within a
+   minute. Reply **YES** from it → the row flips to *Confirmed*.
+4. 🟡 Claude ran it 09-17: draft "TEST · 14K rope chain…" $1,460 created, Preview rendered, **test sent to (239) 404-8505 ✅**, **Send to 1 FAILED** ("permission denied for sequence text_deal_sends_id_seq"). ✅ Owner re-ran rev 2; **Send to 1 → "Sent to 1." 22:53Z** (`text_deal_sends` id 1 `sent`, MMS SID, status callback wrote back). ✅ **Full loop PASSED 23:01–23:08Z** (personal-cell reply attached + forwarded `1ST`, Mark sold clicked, late reply auto-replied — `text_inbound` ids 2–3). Text alerts are LIVE end to end. ✅ Owner chose (b) → BUILT + STAGED 09-17 evening (`CHANGELOG.md` 2026-09-17 evening): confirmation, YES reply and sold auto-reply are MMS with `text-brand.jpg`. ✅ Owner's logo (`OneDrive/Pictures/ChatGPT Image Jul 8, 2026, 03_55_46 PM.png`) converted to `text-brand.jpg` (800 px JPEG q85, 113 KB) 09-17 evening. ◻ Push (this batch also carries **`/order-lookup`** + the new order-email footer — `CHANGELOG.md` 2026-09-17 night; after the push Claude curls `/order-lookup` (200, noindex) and opens `/order-lookup?order=NEJ-20260917-ZIZCI` with Arthur's email in the owner's Chrome — and the shipping-SERVICE label on the admin order page — `CHANGELOG.md` 2026-09-17 evening, 3; after the push open Arthur's order NEJ-20260917-ZIZCI: Summary should read "Shipping: Insured Shipping (Standard)" with the Priority Mail line — and the `logo2.webp` deletion + `/logo2.png` redirect repoint, `CHANGELOG.md` 2026-09-17 evening, 2 — after the push Claude checks `/logo2.png` → 301 nav-logo, old `.webp` → 404). ◻ Then send one more late reply to the TEST deal from the personal cell: the auto-reply should land as a picture in the SAME thread as the deal. Original: Admin → Text Deals → photo + price + one line → Preview → **Send a
+
+**Staging (MMS on every customer text):** ✅ synced 2026-09-17 evening — dry
+run listed exactly the 11 touched files (NEW `text-brand.jpg`; config.ts,
+confirmations.ts, inbound.ts, messages.ts, text-alerts.test.ts; CHANGELOG,
+CURRENT_STATUS, DECISIONS, STRUCTURE, TASKS), 0 Extras, 1135 total (= 1134
++ 1); real run copied 11 / 0 FAILED; follow-up dry run 0/0/0, exit 0; leak
+check 0 `.env*` / `.log`, 0 `.git`; positive control 215 = 215 `.tsx`;
+SHA-256 MATCH on the 4 lib files, the PNG, CHANGELOG, TASKS. Docs-only
+re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+**Staging (owner's logo swap, `text-brand.jpg`):** ✅ synced 2026-09-17
+evening — dry run listed exactly the 8 touched files (NEW `text-brand.jpg`;
+config.ts, text-alerts.test.ts; CHANGELOG, CURRENT_STATUS, DECISIONS,
+STRUCTURE, TASKS) + the deleted `text-brand.png` as the 1 expected Extra,
+1135 total; real run copied 8 and removed the PNG (exit 3 = copied +
+extras); follow-up dry run 0/0/0, exit 0; PNG confirmed gone on staging;
+leak check 0 `.env*` / `.log`, 0 `.git`; positive control 215 = 215 `.tsx`;
+SHA-256 MATCH on the JPEG, config.ts, the test, CHANGELOG, TASKS. Gate
+re-run: tsc 0 · lint 0 · 1436/1436 · build 0. Docs-only re-sync after this
+line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+**Staging (`/order-lookup` + email footer + address fix):** ✅ synced
+2026-09-17 night — dry run listed exactly the 17 touched files (5 NEW:
+`lib/order-lookup.ts`, `__tests__/order-lookup.test.ts`,
+`api/orders/lookup/route.ts`, `[locale]/order-lookup/page.tsx`,
+`components/orders/OrderLookupForm.tsx`; 12 modified: SiteFooter,
+order-email-branding, order-fulfillment-email, order-invoice-email,
+types/sales, ARCHITECTURE, CHANGELOG, CURRENT_STATUS, DECISIONS, STRUCTURE,
+TASKS, features/paypal-checkout) + 4 new dirs, 0 Extras, 1141 total (= 1136
++ 5); real run copied 17 / 0 FAILED; follow-up dry run 0/0/0, exit 0; leak
+check 0 `.env*` / `.log`, 0 `.git`, no node_modules / .next / worktrees;
+positive control 217 = 217 `.tsx`; SHA-256 MATCH on the 7 code files +
+CHANGELOG, DECISIONS, TASKS. Gate: tsc 0 · lint 0 · 1455/1455 · build 0
+(both new routes listed). Docs-only re-sync after this line: dry run 1
+(TASKS.md) → copied → follow-up 0.
+
+**Staging (shipping service on the order page):** ✅ synced 2026-09-17
+evening — dry run listed exactly the 8 touched files (NEW
+`lib/shipping-service.ts`, `__tests__/shipping-service.test.ts`;
+OrderDetailPanel.tsx, PrintOrderClient.tsx; CHANGELOG, CURRENT_STATUS,
+STRUCTURE, TASKS), 0 Extras, 1136 total (= 1134 + 2); real run copied 8 / 0
+FAILED; follow-up dry run 0/0/0, exit 0; leak check 0 `.env*` / `.log`, 0
+`.git`; positive control 215 = 215 `.tsx`; SHA-256 MATCH on the 4 code
+files, CHANGELOG, TASKS. Gate: tsc 0 · lint 0 · 1443/1443 · build 0.
+Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied →
+follow-up 0.
+
+**Staging (`logo2.webp` deletion + redirect):** ✅ synced 2026-09-17 evening
+— dry run listed exactly the 3 touched files (netlify.toml, CHANGELOG,
+TASKS) + the deleted `logo2.webp` as the 1 expected Extra, 1134 total (=
+1135 − 1); real run copied 3 and removed it (exit 3 = copied + extras);
+follow-up dry run 0/0/0, exit 0; `logo2.webp` confirmed gone on staging;
+leak check 0 `.env*` / `.log`, 0 `.git`; positive control 215 = 215 `.tsx`;
+SHA-256 MATCH on netlify.toml, CHANGELOG, TASKS; vitest 1436/1436. Docs-only
+re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+   test to (239) 404-8505** (owner's view) → **Send to 1** → the deal lands
+   on the personal cell → reply from it → the forward lands on the business
+   cell tagged `[1st]` and the reply shows under the deal → **Mark sold to
+   …** → a second reply from the personal cell gets the auto-reply.
+
+**Claude, after step 1:** re-probe the four tables with the service key
+(expect rows, not 42501). After step 3: `text_system_messages` confirmation
+row + `sms_status = confirmed`. After step 4: the `text_deal_sends` row, the
+`text_inbound` reply, the forward row, the sold auto-reply.
+
+**Staging (grant SQL + docs):** ✅ synced 2026-09-17 — dry run listed exactly
+the 5 touched files (NEW `supabase/text-alerts-service-role-grant-2026-09.sql`,
+CHANGELOG, CURRENT_STATUS, STRUCTURE, TASKS), 0 Extras, 1134 total (= 1133
++ 1); real run copied 5 / 0 FAILED; follow-up dry run 0/0/0, exit 0; leak
+check 0 `.env*` / `.log`, 0 `.git`; positive control 215 = 215 `.tsx`;
+SHA-256 MATCH on the SQL, CHANGELOG, TASKS, CURRENT_STATUS. Docs-only
+re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0. (The
+SQL file is for the owner's editor; nothing needs a push.)
+
 
 ### ✅ DEPLOYED 2026-09-15 late night (owner pushed + checked production manually) — Join the List: iOS focus zoom fix + "monthly-ish" + roomier desktop window + /card tile with a tighter card page
 
@@ -32,7 +127,7 @@ verification (the 🟢 Step 2 block below, step 5).
 
 **Staging (iOS zoom):** ✅ synced 2026-09-15 (late night) — dry run listed exactly the 4 touched files (globals.css, home-subscribe-modal.test.ts, CHANGELOG, TASKS), 0 Extras, 1119 total; real run copied 4 / 0 FAILED (robocopy exit 1 = copied only); follow-up dry run 0/0/0, exit 0; leak check 0 `.env*` / `.log`, 0 `.git`, no node_modules / .next / worktrees, launch.json present; positive control 210 = 210 `.tsx`; SHA-256 MATCH on all 4. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
 
-### 🟡 2026-09-16 late night (3) — DEPLOY: Orders Recycle Bin multi-select (no SQL, no env vars)
+### 🟢 2026-09-16 late night (3) — DEPLOYED + live-verified: Orders Recycle Bin multi-select — owner's delete still to click
 
 Built per `CHANGELOG.md` 2026-09-16 (late night, 3). Files:
 `src/lib/trash-selection.ts` (NEW), `src/lib/__tests__/trash-selection.test.ts`
@@ -43,7 +138,7 @@ files)** · build exit 0 from a deleted `.next`, no Turbopack build cache.
 ⚠️ Unverified in a browser (admin login).
 
 **Owner:**
-1. ◻ Push.
+1. ✅ Pushed + deployed 09-16 late night; verified in Chrome (column, header box, button; one tick → "Delete 1 Forever").
 2. ◻ Admin → Orders → Recycle Bin: tick the $1 test order
    NEJ-20260917-MFK96 → "Delete 1 Forever" → confirm. (Or tick the header
    box → "Delete All 20 Forever" if you want the whole bin gone — the
@@ -53,6 +148,13 @@ files)** · build exit 0 from a deleted `.next`, no Turbopack build cache.
 **Claude, after the push (on your word):** in the owner's Chrome, open the
 Recycle Bin, confirm the checkbox column, the header box and the button
 render; read back that the test order is gone.
+
+**Staging (multi-select live-verified, docs only):** ✅ synced 2026-09-16 —
+dry run listed exactly the 3 touched files (CHANGELOG, CURRENT_STATUS,
+TASKS), 0 Extras, 1133 total; real run copied 3 / 0 FAILED; follow-up dry
+run 0/0/0, exit 0; leak check 0 `.env*` / `.log`, 0 `.git`; positive control
+215 = 215 `.tsx`; SHA-256 MATCH on all 3. Docs-only re-sync after this line:
+dry run 1 (TASKS.md) → copied → follow-up 0.
 
 **Staging (recycle-bin multi-select):** ✅ synced 2026-09-16 late night — dry
 run listed exactly the 7 touched files (2 NEW: `lib/trash-selection.ts`,

@@ -178,6 +178,15 @@ still sent. Run `supabase/invoices-service-role-grant-2026-09.sql` once.
 Until then the order page reads "No invoice generated yet" until an admin
 clicks Generate invoice (which uses the admin's own session and works).
 
+## Guest order lookup (2026-09-17)
+
+`/order-lookup` shows a customer their order from the order number plus the
+email or phone on the order — no account. `POST /api/orders/lookup` returns
+only `toPublicOrderView()` (`lib/order-lookup.ts`), rate-limited per IP and
+per order number, one generic not-found. The receipt and fulfillment emails
+link there with `?order=<number>` and print the domain as
+`NaplesEstateJewelry.com` (`order-email-branding.ts`).
+
 ## In-store sales (2026-09-16)
 
 A sale made in the showroom is paid on **PayPal Zettle** (Tap to Pay on the

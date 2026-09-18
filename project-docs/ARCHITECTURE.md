@@ -143,6 +143,7 @@ Current route families include:
 - `/shop` and `/shop/[id]`
 - `/account`, `/account/sign-in`, `/account/sign-up`
 - `/card`, `/kittcard` (business-card QR landing pages; noindex, one shared component)
+- `/order-lookup` (guest order page: order number + email/phone; noindex) → `POST /api/orders/lookup`
 - `/admin`, `/admin/orders`, `/admin/orders/[id]`, `/admin/in-store-sale`, `/admin/messages`,
   `/admin/inquiries`, `/admin/subscribers`, `/admin/marketing`,
   `/admin/discount-codes`, `/admin/settings`, `/admin/users`,

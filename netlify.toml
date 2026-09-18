@@ -226,9 +226,12 @@
   to = "/assets/images/branding/nav-logo.webp"
   status = 301
 
+# 2026-09-17: logo2.webp (the retired "Naples Antiques & Estate Jewelry"
+# wordmark) deleted at the owner's request — no page used it; only this legacy
+# URL served it. It now resolves to the same octopus mark as /logo.png.
 [[redirects]]
   from = "/logo2.png"
-  to = "/assets/images/branding/logo2.webp"
+  to = "/assets/images/branding/nav-logo.webp"
   status = 301
 
 [[redirects]]

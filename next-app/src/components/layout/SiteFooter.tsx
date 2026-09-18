@@ -49,6 +49,7 @@ export default function SiteFooter({ locale }: Props) {
     { label: isEs ? 'Precios de Metales en Vivo' : 'Live Metal Prices', href: p('/spot-prices') },
     { label: isEs ? 'Contacto' : 'Contact', href: p('/contact') },
     { label: isEs ? 'Mi Cuenta' : 'My Account', href: p('/account') },
+    { label: isEs ? 'Consultar mi pedido' : 'Order Lookup', href: p('/order-lookup') },
   ];
 
   const legalLinks = [

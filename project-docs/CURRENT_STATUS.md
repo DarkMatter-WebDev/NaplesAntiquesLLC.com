@@ -2,11 +2,20 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-09-16**.
+> in `DECISIONS.md`. Last reconciled: **2026-09-17**.
 
 ## Start Here (2026-09-15 — SUPERSEDES the blocks below)
 
 **Read this, then `TASKS.md`.**
+
+🔴 **09-17 — Twilio toll-free registration APPROVED (Sep 17). BLOCKER found
+before the first text: the four text-alert tables (`text_deals`,
+`text_deal_sends`, `text_inbound`, `text_system_messages`) have no
+`service_role` grant → every server path would fail "permission denied" on
+first use. Owner runs `supabase/text-alerts-service-role-grant-2026-09.sql`
+once, then Resend YES on the personal cell (the 09-16 confirmations were
+stamped sent but the carrier refused the unverified number) and the test
+plan in `TASKS.md`. Live gates still 403/403/401.** → ✅ SQL run + re-probed; **first live text round-trip PASSED 22:45Z** (sign-up → confirmation `delivered` → YES → `confirmed`) and **the full deal loop PASSED 23:08Z** (deal MMS → reply forwarded `1ST` → Mark sold → late-reply auto-reply). 🟢 **Text alerts are LIVE end to end.** 🟡 Also STAGED in the same push: **`/order-lookup`** — guests open their order with the order number + the email or phone on it (no account; noindex; rate-limited; public view only), the order emails now link there with the number prefilled and print **NaplesEstateJewelry.com**; the admin order page names the shipping SERVICE bought (Priority / Express / Registered, derived from the fee — `lib/shipping-service.ts`), the `logo2.webp` retired wordmark deleted + its redirect repointed. The iPhone two-thread quirk (SMS vs MMS from the same number) is FIXED + STAGED 09-17 evening: every customer text is now an MMS with the brand image (`text-brand.jpg`); push, then a late reply to the TEST deal proves it. `CHANGELOG.md` 2026-09-17 (evening). `CHANGELOG.md` 2026-09-17.
 
 🟡 **09-16 — Twilio toll-free verification still *In review*** (checked in
 the console; submitted 09-15 late evening = one business day; Twilio says
@@ -15,7 +24,7 @@ pending on our side, no rejection, no console notification; the email will
 land at **info@** (check spam). Details `CHANGELOG.md` 2026-09-16. Still
 the only open item.
 
-🟡 **09-16 late night (3) — BUILT + STAGED, ready to push: Orders Recycle
+🟢 **09-16 late night (3) — DEPLOYED + live-verified (column, header box and button render; ticking one row → "Delete 1 Forever"): Orders Recycle
 Bin multi-select** — checkbox per row (desktop + phone), select-all in the
 header, one "Delete … Forever" button for the selection (confirm first, one
 query). Pure helpers + 5 tests in `lib/trash-selection.ts`. Gate tsc 0 ·

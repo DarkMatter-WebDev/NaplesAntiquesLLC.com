@@ -6,6 +6,47 @@
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
 > compaction. Last reconciled: **2026-09-16**.
 
+## Guest order lookup needs the order number AND the email or phone on the order; order emails point there, as NaplesEstateJewelry.com (2026-09-17)
+
+**Owner (2026-09-17):** "most people never make an account… an order lookup
+with just their order number… update the website url at the bottom to
+NaplesEstateJewelry.com."
+
+**Rules:**
+- `/order-lookup` opens an order with the **order number plus the email or
+  phone on the order** — never the number alone. The number is printed in
+  subject lines and receipts and can be guessed; the page shows a name, a
+  home address and the purchase. Both facts are on the customer's own
+  receipt, so nothing is harder for a real customer. ⛔ Do not relax to
+  number-only.
+- The route returns `toPublicOrderView()` and nothing else: no internal
+  notes, payment references, ids, user id or the email itself. One generic
+  not-found covers "no such order", "wrong contact" and a recycled order.
+  Rate-limited per IP and per order number.
+- The page is noindex and off the sitemap (a utility, like `/card`).
+- **Order emails link to `/order-lookup?order=<number>`** in their footer
+  instead of `/account`, and the domain line reads **`NaplesEstateJewelry.com`**
+  (`SITE_DOMAIN_LABEL`) — the owner's casing everywhere the domain is
+  printed for a customer. Account holders still see orders under My Account.
+
+## Text alerts: every customer-facing text is a picture message (2026-09-17)
+
+**Owner (2026-09-17), after the first live loop:** the iPhone showed the
+texts in two threads — "+1 (888) 423-7522" for the plain texts and
+"8884237522" for the picture deal. Chose: make every customer text an MMS.
+
+**Rules:**
+- The sign-up confirmation, the YES reply and the sold auto-reply carry
+  `brandMediaUrl()` (`public/assets/images/branding/text-brand.jpg`); deals
+  carry their own card. So every message a CUSTOMER receives is an MMS and
+  threads together. ⛔ Do not add a new customer-facing text without the
+  picture.
+- The forwards to the owner's own cell stay plain SMS.
+- The brand image says "Naples Estate Jewelry" only — never the retired
+  "Naples Antiques & Estate Jewelry" wordmark (`logo2.webp`).
+- Keep the image ≤ 800 px and well under 600 KB (carrier MMS limits); a
+  changed picture keeps the same path, so no code change.
+
 ## Business-card pages: one component, per-holder values — a card URL is printed once and never moves (2026-09-16)
 
 **Owner (2026-09-16):** a second employee's cards must land on the same

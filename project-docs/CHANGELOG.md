@@ -1,7 +1,243 @@
 
 # Changelog
 
-## 2026-09-16 (late night, 3) — Orders Recycle Bin: checkbox per row, select-all in the header, one "Delete … Forever" button for the selection — BUILT + STAGED (no SQL, no env vars)
+## 2026-09-17 (night) — Guest order lookup `/order-lookup` (order number + the email or phone on the order, no account) + order emails now point there, with the brand-cased domain — BUILT + STAGED (no SQL, no env vars)
+
+Owner, looking at Arthur's shipping email: "most people never make an
+account… a sort of order lookup with just their order number… also update
+the website url at the bottom from naplesestatejewelry.com to
+NaplesEstateJewelry.com."
+
+**Two facts, not one (deliberate deviation from "just the order number"):**
+an order number travels in subject lines and receipts, and the order page
+shows a name, a home address and what was bought. The lookup needs the
+order number PLUS the email or phone on the order — both are on the
+customer's own receipt, so nothing is harder for them, and a guessed or
+forwarded number alone shows nothing. Recorded in `DECISIONS.md`.
+
+- `src/lib/order-lookup.ts` (pure): `normalizeOrderNumber` (any casing /
+  spacing / missing dashes → `NEJ-YYYYMMDD-XXXXX`), `contactMatches` (email
+  case-insensitive, or phone in any format via `normalizeUsPhone`),
+  `trackingUrl` (USPS / UPS / FedEx / DHL), `toPublicOrderView` — the ONLY
+  shape the route returns: number, date, first name, statuses, delivery
+  kind (from `describeShippingService`), items, totals, shipping address
+  (never for pickup), carrier + tracking + link, customer notes. No internal
+  notes, payment references, ids, user id or email.
+- `POST /api/orders/lookup` — rate-limited per IP (20/h) AND per order
+  number (10/h, so a list of numbers cannot be walked); one generic
+  not-found for "no such order", "wrong contact" and "recycled order"
+  (`deleted_at` set) alike; `Cache-Control: no-store`.
+- `/[locale]/order-lookup` (EN "Order Lookup", ES "Consultar mi pedido"):
+  noindex, off the sitemap, `?order=` prefills the number;
+  `components/orders/OrderLookupForm.tsx` renders the form and the order in
+  place (statuses, a highlighted Shipped/tracking box with a carrier link,
+  items with photos, totals with the delivery service named, address or the
+  pickup line, the phone). Footer link "Order Lookup" / "Consultar mi pedido"
+  under My Account.
+- **Order emails** (`order-email-branding.ts`): the footer line is now "View
+  this order anytime at NaplesEstateJewelry.com/order-lookup — enter your
+  order number and the email or phone on the order. No account needed."
+  linking to `/order-lookup?order=<number>` (both email builders pass the
+  number; the invoice HTML builder uses its own `orderNumber` param);
+  `SITE_DOMAIN_LABEL` is now **`NaplesEstateJewelry.com`** (owner's casing)
+  on the domain line too. The `/account` line is gone from the emails —
+  account holders still see orders under My Account.
+- Tests: `order-lookup.test.ts` (12): normalisation, the second factor
+  (phones in any format; ⚠️ fixtures must avoid the 555-01XX fiction block
+  the normaliser rejects), the public view never leaks internal fields,
+  tracking links, the email footer, the page/route guards.
+
+**Gate:** `npx tsc --noEmit` 0 · `npm run lint` 0 (3 known `<img>`
+warnings) · `npx vitest run` **1455/1455 (148 files)** · `npm run build`
+exit 0 from a deleted `.next`, no Turbopack build cache. **Dev-verified:**
+`/order-lookup`, `?order=…`, `/es/order-lookup` all 200 with `noindex,
+nofollow`; API: bad number → 400, wrong contact → 404, the recycled $1 test
+order → 404, Arthur's number + his email → 200 with exactly the public
+keys (`deliveryKind priority`, 1 item, total 599, `shipped`, tracking
+present). **Two fixes found while reviewing the result on dev:** (1) the
+shipping address showed no street — `formatOrderAddress` (`types/sales.ts`)
+read only `address_line1`/`address_line2`, but checkout stores the street as
+`line1`/`line2` (`buildAddressObject`), so every checkout order's street was
+missing on the account page too; it now reads either key (guarded in
+`order-lookup.test.ts`); (2) purity showed "14" — the lookup now formats it
+with `formatPublicPurity` ("14K") like the account page. ⚠️ After the push: `curl -I …/order-lookup` 200, then open
+`/order-lookup?order=NEJ-20260917-ZIZCI` with Arthur's email to see the
+live page; the next receipt/shipping email shows the new footer.
+
+## 2026-09-17 (evening, 3) — Admin order page now names the shipping SERVICE bought (Priority vs Express vs Registered), derived from the fee — STAGED (no SQL, no env vars)
+
+Owner, fulfilling Arthur Anderson's NEJ-20260917-ZIZCI ($570 brooch to NH):
+"what speed shipping did we promise him?" The order page said only
+"Shipping: Shipping" — `orders.shipping_method` stores `pickup` /
+`shipping` / `local_delivery`, so the checkout's two paid services (Insured
+Shipping = USPS Priority Mail, Express Overnight Insured = Priority Mail
+Express) are indistinguishable there. The fee is the fingerprint: no
+subtotal band has the same fee for both services (standard 19–165 vs
+express 55/79/119), so fee + merchandise subtotal identifies the service for
+every order since the tiers went live 2026-07-30.
+
+- NEW `src/lib/shipping-service.ts` — `describeShippingService(order)` →
+  `{ kind, label, detail }`: pickup · local delivery · **Express Overnight
+  Insured** (Priority Mail Express, padded envelope, ship same/next business
+  day) · **Insured Shipping (Standard)** (Priority Mail small flat-rate box,
+  insurance, signature; no delivery date promised) · **Insured Shipping
+  (Registered Mail)** at $5,000+ (2–10 business days was promised) · unknown
+  (fee matches no tier — manual or pre-tier order — "check the receipt").
+- `OrderDetailPanel.tsx` Summary: the "Shipping:" line is now a boxed label +
+  the postage instruction; the box turns red for Express so an overnight
+  order cannot be missed. `PrintOrderClient.tsx` shows the same label +
+  detail. Nothing changes in the DB or the checkout.
+- Tests: `shipping-service.test.ts` (7): Arthur's order → Standard; same
+  subtotal with $55 → Express; $5,000+ → Registered; pickup/local; unknown
+  fee reported honestly; the fee fingerprint is unique in every band; both
+  admin views call the helper.
+
+**Gate:** `npx tsc --noEmit` 0 · `npm run lint` 0 (3 known `<img>`
+warnings) · `npx vitest run` **1443/1443 (147 files)** · `npm run build`
+exit 0 from a deleted `.next`, no Turbopack build cache. Admin view
+unverified in a browser until the push (owner login). Arthur's order reads
+**Insured Shipping (Standard)** = USPS Priority Mail; Express would have
+been $55.
+
+## 2026-09-17 (evening, 2) — Retired "Naples Antiques & Estate Jewelry" wordmark deleted; its legacy redirect repointed to the octopus mark — STAGED (no SQL, no env vars)
+
+Owner asked what the "Naples Antiques" wordmark was and whether the site
+used it. `public/assets/images/branding/logo2.webp` (1065×418, June 2) was
+referenced by NO page, component, stylesheet or message file — only the
+legacy redirect `/logo2.png → logo2.webp` in `netlify.toml` still served it
+(HTTP 200 on production), the sibling of the "Naples Jewelry Buyers"
+artwork removed 09-01. Owner: "delete it and repoint the redirect." Done:
+file deleted; `/logo2.png` now 301s to `nav-logo.webp` like `/logo.png`.
+Gate: `npx vitest run` 1436/1436 (no TS change; tsc/lint/build unaffected —
+the last build on this tree is the logo-swap build above). After the push:
+`curl -I https://naplesestatejewelry.com/logo2.png` → 301 to
+`/assets/images/branding/nav-logo.webp`; the old `.webp` URL → 404.
+
+## 2026-09-17 (evening) — Every customer-facing text is now a picture message, so the whole conversation stays in ONE thread on the phone — BUILT + STAGED (no SQL, no env vars)
+
+Owner, after the live test: "the texts are coming from two separate
+numbers… +1 (888) 423-7522 and 8884237522… any way to make them the same?"
+Cause: the iPhone threads a plain SMS and an MMS from the same toll-free
+number separately (and shows the MMS sender as bare digits). Owner chose
+option 1: make every customer text an MMS.
+
+- `lib/text-alerts/config.ts` → `brandMediaUrl()` =
+  `<SITE_URL>/assets/images/branding/text-brand.jpg`.
+- `messages.ts` → `twiml(message, mediaUrl?)` emits `<Message><Body>…</Body>
+  <Media>…</Media></Message>` when a media URL is given (XML-escaped both).
+- Attached to the three non-deal customer texts: the sign-up confirmation
+  (`confirmations.ts`, `sendTwilioMessage` with `mediaUrl`), the YES reply
+  and the sold auto-reply (`inbound.ts`, TwiML). Deals were already MMS.
+  **The forwards to the owner's cell stay plain SMS** (their own phone; a
+  logo on every forward would be noise). HELP/STOP are Twilio's own replies
+  and untouched.
+- Image: `public/assets/images/branding/text-brand.jpg` — 800×440 PNG,
+  ~90 KB, octopus + "NAPLES ESTATE JEWELRY" + the buyers line, rendered
+  from `nav-logo.webp` and the vendored Caslon/Hanken fonts (Pillow). ⚠️
+  The old `logo2.webp` says "Naples Antiques & Estate Jewelry" — the retired
+  name — and was deliberately NOT used. The owner then supplied a clean
+  navy/gold octopus logo in chat; it is swapped in as soon as the file is
+  on disk, downscaled to ≤ 800 px and kept under ~150 KB for carriers.
+  **Done the same evening:** the owner's file (`OneDrive/Pictures/ChatGPT
+  Image Jul 8, 2026, 03_55_46 PM.png`, 1254 px, 1.7 MB) → 800 px JPEG
+  q85 = 113 KB (a 256-colour PNG was 346 KB; JPEG wins on this gradient
+  illustration), saved as `text-brand.jpg`; the generated PNG deleted; URL,
+  test guard and docs switched to `.jpg`.
+- Cost: MMS ≈ 2¢ vs SMS ≈ 0.8¢ per message on the three texts — pennies.
+- Tests: `text-alerts.test.ts` +1 (TwiML with media, escaping, empty
+  response ignores media; source guard: the three texts carry
+  `brandMediaUrl()`, the forward does not, the PNG exists).
+
+**Gate:** `npx tsc --noEmit` 0 · `npm run lint` 0 (3 known `<img>`
+warnings) · `npx vitest run` **1436/1436 (145 files)** · `npm run build`
+exit 0 from a deleted `.next`, no Turbopack build cache. **Verify after the
+push:** a late reply to the sold TEST deal from the personal cell → the
+auto-reply arrives as a picture message in the same thread as the deal;
+`curl -I …/text-brand.jpg` 200 `image/png`.
+
+## 2026-09-17 — Twilio verification email arrived; before the first text: the four text-alert tables had NO service-role grant (found by probing) → `supabase/text-alerts-service-role-grant-2026-09.sql` (owner runs once)
+
+Owner: "I got the Twilio verification email we were waiting for." Before
+touching the test plan I probed the live tables the text code writes, with
+the service key (read-only): `text_deals`, `text_deal_sends`, `text_inbound`
+and `text_system_messages` all answer **"permission denied for table …"**
+for `service_role`; `homepage_subscribers` is fine. Cause:
+`text-deals-2026-09.sql` created them with RLS on and `revoke all … from
+anon, authenticated` (right) but never granted `service_role`, and the
+service role bypasses RLS, not privileges — the same gap the invoices table
+had (2026-09-16). Effect if left: the sweep's confirmation SEND would reach
+Twilio but its log insert fails; creating a draft in Admin → Text Deals
+would 500; a deal send and both Twilio webhooks (YES / replies / STOP) would
+fail on their first insert. Nothing had failed yet only because the number
+was unverified until today. Fix: **`supabase/text-alerts-service-role-grant-2026-09.sql`**
+(select/insert/update/delete on the four tables + usage on the
+`text_system_messages_id_seq` sequence; a harmless re-grant on
+`homepage_subscribers`). Live gates re-checked the same minute: inbound and
+status webhooks 403 unsigned, sweep 401 without the secret. The Twilio
+console session in the owner's Chrome had expired; once the owner signed
+in: Trust Hub → Toll-free → HH `eab4c178…` **Approved**, last updated Sep
+17, 2026 (submitted 09-15 late evening = ~1.5 business days). Both phone
+rows (`+1 239 404 8505` owner, `+1 239 304 6229` personal) sit `pending`
+with `sms_confirmation_sent_at` already stamped from 09-16 (Twilio
+accepted the API call, the carrier then refused the unverified number), so
+the sweep will NOT resend them — the owner uses **Resend YES** (force) in
+Admin → Subscribers after the grant. **Owner ran the grant SQL the same
+hour; re-probe: `text_deals`, `text_deal_sends`, `text_inbound`,
+`text_system_messages` all 200 (empty) with the service key.** The sequence
+grant is proven by the first confirmation insert.
+
+**First live text round-trip — PASSED (22:44–22:45Z):** the owner deleted
+both old phone rows, re-joined from the live site with the personal cell
+(`+1 239 304 6229`, source `homepage_hero`), the confirmation went out on
+the sign-up request itself (`text_system_messages` id 1, kind
+`confirmation`, SID `SM84c8…`, **status `delivered`** — so the status
+webhook wrote back too), the YES reply landed 34 s later and the row is
+**`sms_status = confirmed`**. `text_inbound` is empty as designed (YES is a
+confirmation, not a deal reply).
+
+**Deal test, run by Claude in the owner's Chrome (owner: "do the deal test
+for me"):** Admin → Text Deals — price 1460, line "TEST · 14K rope chain ·
+22 in · 18.4 g", photo `pages/gold.webp` (uploaded with the Chrome
+`file_upload` tool; the composer read it, the input then reports 0 files —
+normal), Preview rendered the picture (form submitted via
+`requestSubmit()`), **"Send a test to (239) 404-8505" → "Test sent"**
+(`text_system_messages` kind `deal_test`). **"Send to 1" FAILED:**
+"permission denied for sequence text_deal_sends_id_seq" — the grant SQL
+rev 1 only granted the `text_system_messages` sequence; `text_deal_sends`
+and `text_inbound` are bigserial too (so a deal reply's insert would have
+failed the same way). **Rev 2 of
+`supabase/text-alerts-service-role-grant-2026-09.sql`** grants every
+sequence owned by the four tables via a `pg_depend` loop; owner re-runs it,
+then "Send to 1" again (the deal is still a draft, nothing queued).
+**Owner re-ran rev 2 → "Send to 1" → "Sent to 1." (22:53:00Z):**
+`text_deal_sends` id 1, `status sent`, MMS SID `MM76b5…`, `updated_at`
+22:53:17 (the status callback wrote back); the deal reads *Sent · Sep 17,
+6:53 PM · 1 sent* with the Replies panel ("first one flagged") open.
+Remaining hops need the owner's phone: reply → forward `[1st]` → Mark sold
+→ late-reply auto-reply.
+
+**Full loop PASSED (23:01–23:08Z).** First the owner replied from the
+BUSINESS cell by mistake: `text_inbound` id 1 from `+1 239 404 8505`,
+`subscriber_id null`, `deal_id null`, forwarded to itself — correctly NOT
+attached to the deal ("No replies yet"), which is exactly why that number
+must never be a subscriber. Then from the PERSONAL cell: id 2 "I'll take
+it" attached to the subscriber + deal, forwarded (SID `SM818f…`), shown
+under Replies as *chris · 1ST*; **Mark sold to Chris** clicked by Claude →
+"Marked sold. Late replies get the auto-reply.", deal *Sold · 1 delivered*;
+second reply "Hi" (id 3) → `auto_reply_sent_at` 23:07:53 and forwarded.
+Every Step 2 path is now live-proven: sign-up confirmation, YES, deal MMS,
+status callback, reply forward, Mark sold, late-reply auto-reply.
+**Owner observation:** on the iPhone the texts arrive in TWO threads —
+"+1 (888) 423-7522" (the SMS: confirmation, auto-reply) and "8884237522"
+(the MMS deal). Known iPhone/carrier behaviour: SMS and MMS from the same
+toll-free number can be threaded separately. Options recorded in TASKS.
+⚠️ Chrome-driving notes: screenshots of this tab time out (background
+window); drive with `javascript_tool` (`button.click()`, override
+`window.confirm` for the send) and read `[role=status]`.
+
+## 2026-09-16 (late night, 3) — Orders Recycle Bin: checkbox per row, select-all in the header, one "Delete … Forever" button for the selection — DEPLOYED + live-verified (no SQL, no env vars)
+
+**Later — DEPLOYED + live-verified** in the owner's Chrome (`/admin/orders?view=trash`, 20 orders): the checkbox column, the header "Select all shown" box and the red "Delete Selected Forever" button (greyed at 0) all render; ticking the $1 test order's box flips the button to "Delete 1 Forever" and enables it (then unticked — the permanent delete stays the owner's click). Single-row Restore / Delete Forever links unchanged.
 
 Owner: "add a checkbox to each listing in the recycle bin, including one to
 select all at the top of the column, and then a button to delete from the

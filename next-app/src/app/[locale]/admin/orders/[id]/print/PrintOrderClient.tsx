@@ -7,6 +7,7 @@ import type { Order, OrderItem } from '@/types/sales';
 import { formatCurrency, formatOrderDate, formatPublicPurity, orderStatusLabel } from '@/types/sales';
 import { formatProductItemYear } from '@/types/product';
 import { paymentMethodLabel } from '@/lib/in-store-sale';
+import { describeShippingService } from '@/lib/shipping-service';
 
 type PrintableOrder = Order & { order_items: OrderItem[] };
 
@@ -99,7 +100,8 @@ export default function PrintOrderClient({
             <p>
               Method: {paymentMethodLabel(order.payment_method)}<br />
               Reference: {order.payment_reference || '-'}<br />
-              Shipping: {orderStatusLabel(order.shipping_method)}
+              Shipping: {describeShippingService(order).label}
+              {describeShippingService(order).detail ? <><br /><span style={{ fontSize: '0.85em' }}>{describeShippingService(order).detail}</span></> : null}
             </p>
           </InfoBlock>
           {shippingAddress.length > 0 && (

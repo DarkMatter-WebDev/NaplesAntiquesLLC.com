@@ -14,6 +14,7 @@ import { buildFulfillmentUpdateEmailContent } from '@/lib/order-fulfillment-emai
 import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
 import { formatUsdPrice } from '@/lib/pricing';
 import { paymentMethodLabel } from '@/lib/in-store-sale';
+import { describeShippingService } from '@/lib/shipping-service';
 import { adminUpdateProductsStatus } from '@/app/actions/admin-products';
 import { AppIcon } from '@/components/AppIcon';
 
@@ -1130,7 +1131,19 @@ export default function OrderDetailPanel({
             <div className="border-t mt-4 pt-4 text-sm" style={{ borderColor: BORDER, color: 'var(--color-on-surface-variant)' }}>
               <div>Payment method: {paymentMethodLabel(order.payment_method)}</div>
               <div>Reference: {order.payment_reference || '-'}</div>
-              <div>Shipping: {orderStatusLabel(order.shipping_method)}</div>
+              {(() => {
+                // Which SERVICE was bought (Priority vs Express vs Registered) —
+                // the DB only stores 'shipping'; the fee is the fingerprint.
+                const service = describeShippingService(order);
+                return (
+                  <div className="mt-2 rounded-md border px-3 py-2" style={{ borderColor: service.kind === 'express' ? 'var(--color-error)' : BORDER, background: service.kind === 'express' ? 'color-mix(in srgb, var(--color-error) 8%, white)' : 'var(--color-surface-container-low)' }}>
+                    <div className="font-bold" style={{ color: service.kind === 'express' ? 'var(--color-error)' : 'var(--color-on-surface)' }}>
+                      Shipping: {service.label}
+                    </div>
+                    {service.detail && <div className="mt-0.5 text-xs leading-snug">{service.detail}</div>}
+                  </div>
+                );
+              })()}
             </div>
           </aside>
 

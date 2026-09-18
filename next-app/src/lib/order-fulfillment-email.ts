@@ -60,7 +60,7 @@ export function buildFulfillmentUpdateEmailContent(
     note,
     closing,
     '',
-    ...buildOrderEmailFooterTextLines(),
+    ...buildOrderEmailFooterTextLines(order.order_number),
   ].join('\n');
 
   const html = `
@@ -83,7 +83,7 @@ export function buildFulfillmentUpdateEmailContent(
                   ${shipmentHtml}
                   <p style="margin:0 0 18px;font-size:15px;line-height:1.55;">${pinPhoneToOneLine(escapeHtml(note))}</p>
                   <p style="margin:0;font-size:15px;line-height:1.55;">${escapeHtml(closing)}</p>
-                  ${buildOrderEmailFooterHtml()}
+                  ${buildOrderEmailFooterHtml(order.order_number)}
                 </td>
               </tr>
             </table>

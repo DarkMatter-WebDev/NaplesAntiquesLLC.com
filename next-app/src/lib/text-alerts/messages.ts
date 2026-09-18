@@ -101,13 +101,18 @@ export function classifyInbound(body: string | null | undefined): InboundKind {
   return 'reply';
 }
 
-/** TwiML for a webhook response: an empty <Response/> or one <Message>. */
-export function twiml(message?: string | null): string {
-  const escaped = (message ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-  return message
-    ? `<?xml version="1.0" encoding="UTF-8"?><Response><Message>${escaped}</Message></Response>`
-    : '<?xml version="1.0" encoding="UTF-8"?><Response></Response>';
+function escapeXml(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/**
+ * TwiML for a webhook response: an empty <Response/> or one <Message>. With
+ * `mediaUrl` the message is an MMS (<Body> + <Media>), which keeps it in the
+ * same phone thread as the picture deals — see `brandMediaUrl()` in config.
+ */
+export function twiml(message?: string | null, mediaUrl?: string | null): string {
+  if (!message) return '<?xml version="1.0" encoding="UTF-8"?><Response></Response>';
+  const body = escapeXml(message);
+  const inner = mediaUrl ? `<Body>${body}</Body><Media>${escapeXml(mediaUrl)}</Media>` : body;
+  return `<?xml version="1.0" encoding="UTF-8"?><Response><Message>${inner}</Message></Response>`;
 }

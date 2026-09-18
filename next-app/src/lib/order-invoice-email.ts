@@ -270,7 +270,7 @@ export function buildInvoiceEmailContent(order: InvoiceEmailOrder, fallbackInvoi
       contactNote,
       closing,
       '',
-      ...buildOrderEmailFooterTextLines(),
+      ...buildOrderEmailFooterTextLines(order.order_number),
     ].join('\n'),
   };
 }
@@ -378,7 +378,7 @@ function buildInvoiceEmailHtml({
                   ${pickup ? pickupBlockHtml(pickup) : ''}
                   <p style="margin:0 0 18px;font-size:15px;line-height:1.55;">${pinPhoneToOneLine(escapeHtml(contactNote))}</p>
                   <p style="margin:0;font-size:15px;line-height:1.55;">${escapeHtml(closing)}</p>
-                  ${buildOrderEmailFooterHtml()}
+                  ${buildOrderEmailFooterHtml(orderNumber)}
                 </td>
               </tr>
             </table>

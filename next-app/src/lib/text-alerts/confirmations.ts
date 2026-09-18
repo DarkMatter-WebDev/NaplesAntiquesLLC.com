@@ -1,7 +1,7 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createServiceClient } from '@/lib/supabase/service';
-import { twilioConfigured } from './config';
+import { brandMediaUrl, twilioConfigured } from './config';
 import { confirmationText } from './messages';
 import { sendTwilioMessage, TwilioError } from './twilio';
 
@@ -73,7 +73,8 @@ export async function sendConfirmation(phone: string, options: { force?: boolean
     .eq('id', subscriber.id);
 
   try {
-    const sent = await sendTwilioMessage({ to: subscriber.phone_e164, body: confirmationText() });
+    // MMS on purpose: see brandMediaUrl() — one thread on the customer's phone.
+    const sent = await sendTwilioMessage({ to: subscriber.phone_e164, body: confirmationText(), mediaUrl: brandMediaUrl() });
     await service
       .from('homepage_subscribers')
       .update({ sms_confirmation_sent_at: new Date().toISOString() })

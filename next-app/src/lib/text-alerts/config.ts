@@ -29,6 +29,22 @@ function siteUrl(): string {
   return (process.env.SITE_URL || 'https://naplesestatejewelry.com').replace(/\/+$/, '');
 }
 
+/**
+ * The picture attached to every customer-facing text that is not a deal
+ * (the sign-up confirmation, the YES reply, the sold auto-reply).
+ *
+ * Why (owner, 2026-09-17): a plain text and a picture message from the same
+ * toll-free number land in TWO threads on the iPhone ("+1 (888) 423-7522" vs
+ * "8884237522"). Making every customer text an MMS keeps the whole
+ * conversation in one thread. The forwards to the owner's own cell stay
+ * plain texts. The image is the owner's navy/gold octopus logo, 800 px JPEG
+ * (~110 KB; JPEG because the illustration has gradients — a palette PNG was
+ * 3× the size), served from the site so Twilio can fetch it.
+ */
+export function brandMediaUrl(): string {
+  return `${siteUrl()}/assets/images/branding/text-brand.jpg`;
+}
+
 export function twilioConfig(): TwilioConfig | null {
   const accountSid = process.env.TWILIO_ACCOUNT_SID?.trim();
   const authToken = process.env.TWILIO_AUTH_TOKEN?.trim();

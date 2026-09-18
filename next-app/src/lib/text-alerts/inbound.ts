@@ -1,7 +1,7 @@
 import 'server-only';
 import { createServiceClient } from '@/lib/supabase/service';
 import { normalizeUsPhone } from '@/lib/subscriber-phone';
-import { twilioConfig } from './config';
+import { brandMediaUrl, twilioConfig } from './config';
 import { classifyInbound, DEFAULT_SOLD_REPLY, forwardText, optInReplyText, twiml } from './messages';
 import { sendTwilioMessage } from './twilio';
 
@@ -77,7 +77,7 @@ export async function handleInbound(params: InboundParams): Promise<{ twiml: str
         .from('homepage_subscribers')
         .update({ sms_status: 'confirmed', sms_confirmed_at: now, sms_stopped_at: null, updated_at: now })
         .eq('id', subscriber.id);
-      return { twiml: twiml(optInReplyText()), kind };
+      return { twiml: twiml(optInReplyText(), brandMediaUrl()), kind };
     }
     // Not on the list: they never signed up on the site, so there is no consent record to confirm.
     return { twiml: twiml(), kind: 'confirm_unknown' };
@@ -151,7 +151,7 @@ export async function handleInbound(params: InboundParams): Promise<{ twiml: str
       .not('auto_reply_sent_at', 'is', null);
     if ((count ?? 0) === 0) {
       if (inboundId) await service.from('text_inbound').update({ auto_reply_sent_at: now }).eq('id', inboundId);
-      return { twiml: twiml(deal.sold_reply_text || DEFAULT_SOLD_REPLY), kind: 'reply_sold' };
+      return { twiml: twiml(deal.sold_reply_text || DEFAULT_SOLD_REPLY, brandMediaUrl()), kind: 'reply_sold' };
     }
   }
 
