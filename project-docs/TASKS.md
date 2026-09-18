@@ -9,7 +9,7 @@
 
 **Owner:**
 1. ◻ Push.
-2. ◻ Say "deployed" — Claude checks the new picture URL (200, 17 KB); then text YES from the personal cell → the "You're in" reply should show the whole wordmark with navy around it. (First cut deployed 09-18 03:0xZ: picture delivered but edges cropped by the iPhone bubble → v2.)
+2. ◻ Say "deployed" — Claude checks the new picture URL (200, 17 KB); then text YES from the personal cell → the "You're in" reply should show the whole wordmark in a 16:9 bubble, the shortest the phone draws. (v1 banner 03:0xZ: edges cropped; v2 4:3 03:3xZ: whole but too tall; v3 5:3 skipped → v4 2:1 with the mark inside the crop-safe band.)
 
 ### 🟢 2026-09-18 — DEPLOYED + live-verified: Mark sold → buyer confirmation (MMS delivered) · Reopen / Choose photo / Delete deal all exercised on production — late-reply auto-reply verified 02:58Z; nothing pending
 

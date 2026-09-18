@@ -38,17 +38,20 @@ function siteUrl(): string {
  * "8884237522"). Making every customer text an MMS keeps the whole
  * conversation in one thread. The forwards to the owner's own cell stay
  * plain texts. The image is the gold "NAPLES / ESTATE JEWELRY" wordmark on
- * navy, 800×600 JPEG (~17 KB), served from the site so Twilio can fetch it.
- * The wordmark sits inside the central two-thirds: the iPhone preview bubble
- * crops a picture to roughly 16:9 (a 800×300 banner lost its N and S on the
- * owner's phone, 2026-09-18), so keep the artwork away from the edges.
+ * navy, 800×400 JPEG (~17 KB), served from the site so Twilio can fetch it.
+ * Shape matters (rounds on the owner's phone, 2026-09-18): the iPhone preview
+ * bubble shows a picture at its own ratio up to roughly 16:9 and CROPS anything
+ * wider to 16:9 (a 800×300 banner with a 700 px mark lost its N and S); 4:3
+ * showed whole but "too tall". So: a 2:1 canvas — the bubble is as short as
+ * it gets (16:9) — with the wordmark on the central 600 px, which survives
+ * the 800→711 px crop. Never let the artwork leave that central band.
  *
  * A changed picture needs a NEW file name: `/assets/*` is served
  * `immutable, max-age=1y` (netlify.toml) and Twilio caches media by URL, so
  * the old bytes would keep going out under the old name.
  */
 export function brandMediaUrl(): string {
-  return `${siteUrl()}/assets/images/branding/text-brand-wordmark-v2.jpg`;
+  return `${siteUrl()}/assets/images/branding/text-brand-wordmark-v4.jpg`;
 }
 
 export function twilioConfig(): TwilioConfig | null {

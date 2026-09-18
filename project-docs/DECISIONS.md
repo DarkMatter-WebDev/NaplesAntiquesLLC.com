@@ -78,7 +78,7 @@ texts in two threads — "+1 (888) 423-7522" for the plain texts and
 
 **Rules:**
 - The sign-up confirmation, the YES reply and the sold auto-reply carry
-  `brandMediaUrl()` (`public/assets/images/branding/text-brand-wordmark-v2.jpg`); deals
+  `brandMediaUrl()` (`public/assets/images/branding/text-brand-wordmark-v4.jpg`); deals
   carry their own card. So every message a CUSTOMER receives is an MMS and
   threads together. ⛔ Do not add a new customer-facing text without the
   picture.
@@ -86,9 +86,12 @@ texts in two threads — "+1 (888) 423-7522" for the plain texts and
 - The brand image says "Naples Estate Jewelry" only — never the retired
   "Naples Antiques & Estate Jewelry" wordmark (`logo2.webp`).
 - Keep the image ≤ 800 px and well under 600 KB (carrier MMS limits). The
-  iPhone preview bubble CROPS to roughly 16:9 (a 800×300 banner lost its
-  first and last letters on the owner's phone, 2026-09-18): use a 4:3 canvas
-  and keep the artwork inside the central two-thirds. ⛔ A changed picture needs a NEW file name (`/assets/*` is
+  iPhone preview bubble shows a picture at its own ratio up to roughly 16:9
+  and CROPS anything wider to 16:9 (a 800×300 banner with a 700 px mark lost
+  its first and last letters on the owner's phone, 2026-09-18; 4:3 showed
+  whole but "too tall"): the canvas is 2:1 (800×400, the bubble is then as
+  short as it gets) with the artwork inside the central 600 px, which
+  survives the crop to ~711 px. Never widen the artwork past that band. ⛔ A changed picture needs a NEW file name (`/assets/*` is
   `immutable, max-age=1y` at the CDN and Twilio caches media by URL) — change
   `brandMediaUrl()` in `lib/text-alerts/config.ts` + the test guard, delete the
   old file.
