@@ -2,11 +2,20 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-09-17**.
+> in `DECISIONS.md`. Last reconciled: **2026-09-18**.
 
 ## Start Here (2026-09-15 — SUPERSEDES the blocks below)
 
 **Read this, then `TASKS.md`.**
+
+🟡 **09-18 (2) — also BUILT + STAGED in the same push: Text Deals admin gets "Reopen — edit & resend" (clones a sold deal into a new draft with the photo + price and a "back available" message), a real "Choose photo" button, and "Delete deal" (never mid-send; shared photos kept). `CHANGELOG.md` 2026-09-18 (2).**
+
+🟡 **09-18 — BUILT + STAGED, ready to push: Mark sold texts the buyer
+("It's yours…") and tells everyone else who got the deal it's taken** —
+picture messages, idempotent per phone, best-effort. Gate tsc 0 · lint 0 ·
+1456/1456 · build 0. After the push: a fresh TEST deal end to end.
+`CHANGELOG.md` 2026-09-18. The 09-17 logo re-test PASSED (confirmation
+now arrives as an MMS).
 
 🔴 **09-17 — Twilio toll-free registration APPROVED (Sep 17). BLOCKER found
 before the first text: the four text-alert tables (`text_deals`,
@@ -15,7 +24,7 @@ before the first text: the four text-alert tables (`text_deals`,
 first use. Owner runs `supabase/text-alerts-service-role-grant-2026-09.sql`
 once, then Resend YES on the personal cell (the 09-16 confirmations were
 stamped sent but the carrier refused the unverified number) and the test
-plan in `TASKS.md`. Live gates still 403/403/401.** → ✅ SQL run + re-probed; **first live text round-trip PASSED 22:45Z** (sign-up → confirmation `delivered` → YES → `confirmed`) and **the full deal loop PASSED 23:08Z** (deal MMS → reply forwarded `1ST` → Mark sold → late-reply auto-reply). 🟢 **Text alerts are LIVE end to end.** 🟡 Also STAGED in the same push: **`/order-lookup`** — guests open their order with the order number + the email or phone on it (no account; noindex; rate-limited; public view only), the order emails now link there with the number prefilled and print **NaplesEstateJewelry.com**; the admin order page names the shipping SERVICE bought (Priority / Express / Registered, derived from the fee — `lib/shipping-service.ts`), the `logo2.webp` retired wordmark deleted + its redirect repointed. The iPhone two-thread quirk (SMS vs MMS from the same number) is FIXED + STAGED 09-17 evening: every customer text is now an MMS with the brand image (`text-brand.jpg`); push, then a late reply to the TEST deal proves it. `CHANGELOG.md` 2026-09-17 (evening). `CHANGELOG.md` 2026-09-17.
+plan in `TASKS.md`. Live gates still 403/403/401.** → ✅ SQL run + re-probed; **first live text round-trip PASSED 22:45Z** (sign-up → confirmation `delivered` → YES → `confirmed`) and **the full deal loop PASSED 23:08Z** (deal MMS → reply forwarded `1ST` → Mark sold → late-reply auto-reply). 🟢 **Text alerts are LIVE end to end.** 🟢 DEPLOYED + live-verified 09-17 night (all five): **`/order-lookup`** — guests open their order with the order number + the email or phone on it (no account; noindex; rate-limited; public view only), the order emails now link there with the number prefilled and print **NaplesEstateJewelry.com**; the admin order page names the shipping SERVICE bought (Priority / Express / Registered, derived from the fee — `lib/shipping-service.ts`), the `logo2.webp` retired wordmark deleted + its redirect repointed. The iPhone two-thread quirk (SMS vs MMS from the same number) is FIXED + DEPLOYED 09-17: every customer text is now an MMS with the owner's logo (`text-brand.jpg`, live 200); ◻ owner: one late reply to the TEST deal from the personal cell proves the one-thread result. `CHANGELOG.md` 2026-09-17 (evening). `CHANGELOG.md` 2026-09-17.
 
 🟡 **09-16 — Twilio toll-free verification still *In review*** (checked in
 the console; submitted 09-15 late evening = one business day; Twilio says

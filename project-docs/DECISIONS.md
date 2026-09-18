@@ -6,6 +6,47 @@
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
 > compaction. Last reconciled: **2026-09-16**.
 
+## A fallen-through sale is reopened as a NEW deal; deleting a deal never touches a photo another deal shares (2026-09-18)
+
+**Owner (2026-09-18):** reopen after Mark sold, edit the message, resend;
+delete past deals; make the photo picker look like a button.
+
+**Rules:**
+- **Reopen = clone into a new draft** (`reopenDealAsDraft`): same title,
+  price and photo object, `REOPEN_MESSAGE` prefilled, new picture on
+  Preview. Never a resend on the old row — `text_deal_sends` is once per
+  phone per deal, replies attach to the subscriber's last deal, and the
+  sold row is history. *Mark still available* remains the no-text status
+  flip for a mis-click.
+- **Delete** refuses a deal that is `sending`; send rows cascade, replies
+  and system messages keep their rows (`deal_id` null); stored objects are
+  removed only when no other deal references them. ⛔ Never delete storage
+  objects by deal folder — a reopened deal shares the source photo.
+- File inputs in the admin are hidden (`sr-only`) behind a labelled
+  `outline-button`; the input stays in the DOM for automation.
+
+## Mark sold texts the buyer and everyone else who got the deal — once, as picture messages (2026-09-18)
+
+**Owner (2026-09-17/18):** "when we mark it sold, it sends a confirmation
+text to the winner… also send a 'sold' type text to all people that got a
+message and didn't buy it."
+
+**Rules:**
+- Marking a deal sold stays a manual click (the reply is the claim, the
+  owner closes the sale), but the click now sends two texts: the buyer gets
+  `winnerText` ("It's yours - <line> - <price>. We'll text you shortly to
+  arrange pickup at our Naples showroom or shipping."), everyone else the
+  deal was delivered to gets `soldNoticeText` — the deal's own late-reply
+  line, so the broadcast and the auto-reply say the same thing.
+- Both are picture messages (`brandMediaUrl()`), like every customer text.
+- **Once per phone per deal**, guarded by `text_system_messages` kinds
+  `deal_winner` / `deal_sold`: Mark sold twice, or Mark available → Mark
+  sold, never re-texts anyone. Mark available sends nothing.
+- Best-effort: a failed send is logged (`status failed`) and the click
+  still succeeds; the admin notice says "text them yourself" when the
+  buyer text failed. Sends go in batches of 10 to stay inside Netlify's
+  function limit.
+
 ## Guest order lookup needs the order number AND the email or phone on the order; order emails point there, as NaplesEstateJewelry.com (2026-09-17)
 
 **Owner (2026-09-17):** "most people never make an account… an order lookup

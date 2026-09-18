@@ -2,12 +2,13 @@ import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
 import { createServiceClient } from '@/lib/supabase/service';
 import { normalizeUsPhone } from '@/lib/subscriber-phone';
-import { loadDeal, markDealAvailable, markDealSold } from '@/lib/text-alerts/deals';
+import { deleteDeal, loadDeal, markDealAvailable, markDealSold, notifyDealSold } from '@/lib/text-alerts/deals';
 import { normalizeDealInput } from '@/lib/text-alerts/deal-input';
 
 /**
  * GET: one deal with its send tally and the replies in clock order (the first
  * one flagged). PATCH: edit a draft's words, or { action: 'sold' | 'available' }.
+ * DELETE: remove a past deal and its unshared pictures (never mid-send).
  */
 export const runtime = 'nodejs';
 
@@ -53,6 +54,19 @@ export async function GET(_req: Request, context: Context) {
   return NextResponse.json({ deal: { ...deal, card_url: card, photo_url: photo }, tally, replies: withNames });
 }
 
+export async function DELETE(_req: Request, context: Context) {
+  const { error } = await requireAdmin();
+  if (error) return error;
+  const { id } = await context.params;
+  try {
+    const result = await deleteDeal(id);
+    return NextResponse.json({ ok: true, ...result });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Could not delete the deal.';
+    return NextResponse.json({ error: message }, { status: /not found/i.test(message) ? 404 : /still sending/i.test(message) ? 409 : 500 });
+  }
+}
+
 export async function PATCH(req: Request, context: Context) {
   const { error } = await requireAdmin();
   if (error) return error;
@@ -64,7 +78,9 @@ export async function PATCH(req: Request, context: Context) {
     if (body.action === 'sold') {
       const soldTo = body.soldToPhone ? normalizeUsPhone(body.soldToPhone) : null;
       const deal = await markDealSold(id, { soldToPhone: soldTo, replyText: typeof body.replyText === 'string' ? body.replyText : null });
-      return NextResponse.json({ deal });
+      // Buyer confirmation + "spoken for" notices — best-effort, never fails the click.
+      const notified = await notifyDealSold(id);
+      return NextResponse.json({ deal, notified });
     }
     if (body.action === 'available') {
       return NextResponse.json({ deal: await markDealAvailable(id) });

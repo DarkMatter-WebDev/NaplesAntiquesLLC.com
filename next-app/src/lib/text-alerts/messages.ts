@@ -31,6 +31,31 @@ export function helpText(): string {
 /** The polite line for anyone who answers after the piece is spoken for. */
 export const DEFAULT_SOLD_REPLY = `${BRAND}: Sorry, that one is spoken for. Next one soon.`;
 
+/** Append the STOP line exactly once (a text the owner wrote may already carry it). */
+export function withStopLine(text: string): string {
+  const body = text.replace(/\s+/g, ' ').trim();
+  return /reply stop/i.test(body) ? body : `${body} ${STOP_LINE}`;
+}
+
+/**
+ * Sent to the buyer the moment the owner clicks "Mark sold to …" (owner,
+ * 2026-09-17): it is theirs, and the owner will follow up on pickup or
+ * shipping. Goes out as a picture message like every customer text.
+ */
+export function winnerText(copy: { title: string; price: string }): string {
+  const what = [copy.title, copy.price].map((s) => s.replace(/\s+/g, ' ').trim()).filter(Boolean).join(' - ');
+  return withStopLine(`${BRAND}: It's yours - ${what}. We'll text you shortly to arrange pickup at our Naples showroom or shipping. Thank you!`);
+}
+
+/**
+ * Sent to everyone ELSE who received the deal when it is marked sold (owner,
+ * 2026-09-17: "so they know it's been taken"). Same words as the late-reply
+ * auto-reply the owner chose for the deal, so the two never disagree.
+ */
+export function soldNoticeText(soldReplyText: string | null | undefined): string {
+  return withStopLine(soldReplyText?.trim() || DEFAULT_SOLD_REPLY);
+}
+
 export type DealCopy = {
   /** The one line drawn on the photo, e.g. "14K rope chain · 22 in · 18.4 g". */
   title: string;

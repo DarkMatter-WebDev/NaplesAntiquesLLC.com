@@ -1,9 +1,60 @@
 # Tasks
 
 > Actionable open work plus a short recent-completions summary. Full history is
-> in `CHANGELOG.md`. Last reconciled: **2026-09-17**.
+> in `CHANGELOG.md`. Last reconciled: **2026-09-18**.
 
 ## ◻ OPEN — needs a human
+
+### 🟡 2026-09-18 — DEPLOY: Mark sold → buyer confirmation + "spoken for" notices · Reopen / Choose photo / Delete deal (no SQL, no env vars)
+
+Also in this push (`CHANGELOG.md` 2026-09-18 (2)): **Reopen — edit &
+resend** on a sold deal (new draft, same photo + price, editable "back
+available" message → Preview → Send), the photo picker as a real
+**Choose photo** button, and **Delete deal** (any status but sending).
+After the push, on the TEST deals: open a sold one → Reopen → the composer
+fills with its photo/price and the heading reads "Reopened deal — edit &
+resend"; then delete the old TEST deals with Delete deal.
+
+Built per `CHANGELOG.md` 2026-09-18. Files: `lib/text-alerts/messages.ts`,
+`lib/text-alerts/deals.ts` (`notifyDealSold`), `api/admin/text-deals/[id]/route.ts`,
+`components/admin/TextDealsManager.tsx`, `__tests__/text-alerts.test.ts`.
+
+**Gate:** tsc 0 · lint 0 (3 known warnings) · vitest **1456/1456 (148
+files)** · build exit 0 from a deleted `.next`, no Turbopack build cache.
+
+**Owner:**
+1. ◻ Push.
+2. ◻ Say "deployed" — Claude sends a fresh TEST deal (photo, price, line)
+   to the one confirmed number (your personal cell).
+3. ◻ Reply from the personal cell → Claude clicks Mark sold → your personal
+   cell should get **"It's yours - … We'll text you shortly…"** as a
+   picture, and the admin notice should read "Marked sold. The buyer got a
+   confirmation text. 0 others told it's taken…".
+4. ◻ One late reply from the personal cell → the "spoken for" auto-reply
+   picture. Then say so and Claude reads the `deal_winner` row.
+
+**Staging (Reopen / Choose photo / Delete deal):** ✅ synced 2026-09-18 —
+dry run listed exactly the 10 touched files (NEW
+`api/admin/text-deals/[id]/reopen/route.ts`; `[id]/route.ts`, deals.ts,
+TextDealsManager.tsx, text-alerts.test.ts; CHANGELOG, CURRENT_STATUS,
+DECISIONS, STRUCTURE, TASKS) + 1 new dir, 0 Extras, 1142 total (= 1141 +
+1); real run copied 10 / 0 FAILED; follow-up dry run 0/0/0, exit 0; leak
+check 0 `.env*` / `.log`, 0 `.git`, no node_modules / .next / worktrees;
+positive control 217 = 217 `.tsx`; SHA-256 MATCH on the 5 code files +
+CHANGELOG, TASKS, DECISIONS. Gate: tsc 0 · lint 0 · 1457/1457 · build 0
+(reopen route listed). Docs-only re-sync after this line: dry run 1
+(TASKS.md) → copied → follow-up 0.
+
+**Staging (Mark-sold notifications):** ✅ synced 2026-09-18 — dry run
+listed exactly the 10 touched files (deals.ts, messages.ts,
+`text-deals/[id]/route.ts`, TextDealsManager.tsx, text-alerts.test.ts;
+CHANGELOG, CURRENT_STATUS, DECISIONS, STRUCTURE, TASKS), 0 Extras, 1141
+total; real run copied 10 / 0 FAILED; follow-up dry run 0/0/0, exit 0; leak
+check 0 `.env*` / `.log`, 0 `.git`; positive control 217 = 217 `.tsx`;
+SHA-256 MATCH on the 4 code files + CHANGELOG, TASKS, DECISIONS,
+CURRENT_STATUS. Gate: tsc 0 · lint 0 · 1456/1456 · build 0. Docs-only
+re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
 
 ### 🔴 2026-09-17 — Twilio APPROVED → run the text-alerts grant SQL, then the first live text test
 
@@ -24,7 +75,7 @@ number), so the 15-minute sweep will NOT resend — use Resend YES.
 3. ✅ Done 09-17 22:44–22:45Z — re-joined from the live site, confirmation delivered (SID `SM84c8…`, status webhook wrote `delivered`), YES received, row `confirmed`. Original: Admin → Subscribers → the **(239) 304-6229** row (personal cell) →
    **Resend YES**. Expect the confirmation text on that phone within a
    minute. Reply **YES** from it → the row flips to *Confirmed*.
-4. 🟡 Claude ran it 09-17: draft "TEST · 14K rope chain…" $1,460 created, Preview rendered, **test sent to (239) 404-8505 ✅**, **Send to 1 FAILED** ("permission denied for sequence text_deal_sends_id_seq"). ✅ Owner re-ran rev 2; **Send to 1 → "Sent to 1." 22:53Z** (`text_deal_sends` id 1 `sent`, MMS SID, status callback wrote back). ✅ **Full loop PASSED 23:01–23:08Z** (personal-cell reply attached + forwarded `1ST`, Mark sold clicked, late reply auto-replied — `text_inbound` ids 2–3). Text alerts are LIVE end to end. ✅ Owner chose (b) → BUILT + STAGED 09-17 evening (`CHANGELOG.md` 2026-09-17 evening): confirmation, YES reply and sold auto-reply are MMS with `text-brand.jpg`. ✅ Owner's logo (`OneDrive/Pictures/ChatGPT Image Jul 8, 2026, 03_55_46 PM.png`) converted to `text-brand.jpg` (800 px JPEG q85, 113 KB) 09-17 evening. ◻ Push (this batch also carries **`/order-lookup`** + the new order-email footer — `CHANGELOG.md` 2026-09-17 night; after the push Claude curls `/order-lookup` (200, noindex) and opens `/order-lookup?order=NEJ-20260917-ZIZCI` with Arthur's email in the owner's Chrome — and the shipping-SERVICE label on the admin order page — `CHANGELOG.md` 2026-09-17 evening, 3; after the push open Arthur's order NEJ-20260917-ZIZCI: Summary should read "Shipping: Insured Shipping (Standard)" with the Priority Mail line — and the `logo2.webp` deletion + `/logo2.png` redirect repoint, `CHANGELOG.md` 2026-09-17 evening, 2 — after the push Claude checks `/logo2.png` → 301 nav-logo, old `.webp` → 404). ◻ Then send one more late reply to the TEST deal from the personal cell: the auto-reply should land as a picture in the SAME thread as the deal. Original: Admin → Text Deals → photo + price + one line → Preview → **Send a
+4. 🟡 Claude ran it 09-17: draft "TEST · 14K rope chain…" $1,460 created, Preview rendered, **test sent to (239) 404-8505 ✅**, **Send to 1 FAILED** ("permission denied for sequence text_deal_sends_id_seq"). ✅ Owner re-ran rev 2; **Send to 1 → "Sent to 1." 22:53Z** (`text_deal_sends` id 1 `sent`, MMS SID, status callback wrote back). ✅ **Full loop PASSED 23:01–23:08Z** (personal-cell reply attached + forwarded `1ST`, Mark sold clicked, late reply auto-replied — `text_inbound` ids 2–3). Text alerts are LIVE end to end. ✅ Owner chose (b) → BUILT + STAGED 09-17 evening (`CHANGELOG.md` 2026-09-17 evening): confirmation, YES reply and sold auto-reply are MMS with `text-brand.jpg`. ✅ Owner's logo (`OneDrive/Pictures/ChatGPT Image Jul 8, 2026, 03_55_46 PM.png`) converted to `text-brand.jpg` (800 px JPEG q85, 113 KB) 09-17 evening. ✅ Pushed + deployed 09-17 night; live-verified by Claude (lookup page/API, brand image, wordmark redirect, Arthur's admin Summary = Insured Shipping (Standard)). Original: Push (this batch also carries **`/order-lookup`** + the new order-email footer — `CHANGELOG.md` 2026-09-17 night; after the push Claude curls `/order-lookup` (200, noindex) and opens `/order-lookup?order=NEJ-20260917-ZIZCI` with Arthur's email in the owner's Chrome — and the shipping-SERVICE label on the admin order page — `CHANGELOG.md` 2026-09-17 evening, 3; after the push open Arthur's order NEJ-20260917-ZIZCI: Summary should read "Shipping: Insured Shipping (Standard)" with the Priority Mail line — and the `logo2.webp` deletion + `/logo2.png` redirect repoint, `CHANGELOG.md` 2026-09-17 evening, 2 — after the push Claude checks `/logo2.png` → 301 nav-logo, old `.webp` → 404). ◻ Then send one more late reply to the TEST deal from the personal cell: the auto-reply should land as a picture in the SAME thread as the deal. Original: Admin → Text Deals → photo + price + one line → Preview → **Send a
 
 **Staging (MMS on every customer text):** ✅ synced 2026-09-17 evening — dry
 run listed exactly the 11 touched files (NEW `text-brand.jpg`; config.ts,
@@ -45,6 +96,13 @@ leak check 0 `.env*` / `.log`, 0 `.git`; positive control 215 = 215 `.tsx`;
 SHA-256 MATCH on the JPEG, config.ts, the test, CHANGELOG, TASKS. Gate
 re-run: tsc 0 · lint 0 · 1436/1436 · build 0. Docs-only re-sync after this
 line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+**Staging (five-item batch live-verified, docs only):** ✅ synced
+2026-09-17 night — dry run listed exactly the 3 touched files (CHANGELOG,
+CURRENT_STATUS, TASKS), 0 Extras, 1141 total; real run copied 3 / 0 FAILED;
+follow-up dry run 0/0/0, exit 0; leak check 0 `.env*` / `.log`, 0 `.git`;
+positive control 217 = 217 `.tsx`; SHA-256 MATCH on all 3. Docs-only
+re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
 
 **Staging (`/order-lookup` + email footer + address fix):** ✅ synced
 2026-09-17 night — dry run listed exactly the 17 touched files (5 NEW:

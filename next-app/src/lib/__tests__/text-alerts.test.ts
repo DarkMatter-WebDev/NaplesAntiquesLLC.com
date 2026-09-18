@@ -10,8 +10,11 @@ import {
   forwardText,
   helpText,
   optInReplyText,
+  soldNoticeText,
   STOP_LINE,
   twiml,
+  winnerText,
+  withStopLine,
 } from '../text-alerts/messages';
 import { expectedTwilioSignature, formBodyToParams, isValidTwilioSignature } from '../text-alerts/signature';
 import { DEFAULT_DEAL_MESSAGE, formatDealPrice, normalizeDealInput } from '../text-alerts/deal-input';
@@ -82,6 +85,41 @@ describe('the words on file with Twilio', () => {
     expect(inbound).not.toMatch(/forwardText\([^)]*\)[^;]*mediaUrl/);
     expect(confirmations).toContain('body: confirmationText(), mediaUrl: brandMediaUrl()');
     expect(existsSync(join(process.cwd(), 'public', 'assets', 'images', 'branding', 'text-brand.jpg'))).toBe(true);
+  });
+
+  it('Mark sold texts: the buyer hears it is theirs, everyone else hears it is taken, STOP once (owner 2026-09-17)', () => {
+    const win = winnerText({ title: '14K gold bracelet · 7 in · 11.2 g', price: '$890' });
+    expect(win).toContain(`${BRAND}: It's yours - 14K gold bracelet · 7 in · 11.2 g - $890.`);
+    expect(win).toContain('pickup at our Naples showroom or shipping');
+    expect(win.match(/Reply STOP/gi)?.length).toBe(1);
+    expect(soldNoticeText(null)).toBe(`${BRAND}: Sorry, that one is spoken for. Next one soon. ${STOP_LINE}`);
+    expect(soldNoticeText('Gone already! Reply STOP to opt out.')).toBe('Gone already! Reply STOP to opt out.');
+    expect(withStopLine('  two   spaces  ')).toBe(`two spaces ${STOP_LINE}`);
+    // Source guards: the route notifies after marking sold; both texts are
+    // picture messages, logged under their own kinds so nobody is texted twice.
+    const route = readFileSync(join(process.cwd(), 'src', 'app', 'api', 'admin', 'text-deals', '[id]', 'route.ts'), 'utf8');
+    expect(route).toContain('await notifyDealSold(id)');
+    const deals = readFileSync(join(process.cwd(), 'src', 'lib', 'text-alerts', 'deals.ts'), 'utf8');
+    expect(deals).toContain("sendOne('deal_winner', winner, winnerText(");
+    expect(deals).toContain("sendOne('deal_sold', phone, notice)");
+    expect(deals).toContain('const mediaUrl = brandMediaUrl();');
+    expect(deals).toContain(".in('kind', ['deal_winner', 'deal_sold'])");
+  });
+
+  it('reopen clones into a new draft, delete keeps shared photos and refuses mid-send; the photo picker is a real button (owner 2026-09-18)', () => {
+    const deals = readFileSync(join(process.cwd(), 'src', 'lib', 'text-alerts', 'deals.ts'), 'utf8');
+    expect(deals).toContain("status: 'draft',\n      sold_reply_text: source.sold_reply_text,");
+    expect(deals).toContain("if (deal.status === 'sending') throw new Error('This deal is still sending");
+    expect(deals).toContain('removable = candidates.filter((p) => !stillUsed.has(p));');
+    const route = readFileSync(join(process.cwd(), 'src', 'app', 'api', 'admin', 'text-deals', '[id]', 'route.ts'), 'utf8');
+    expect(route).toContain('export async function DELETE(');
+    const reopen = readFileSync(join(process.cwd(), 'src', 'app', 'api', 'admin', 'text-deals', '[id]', 'reopen', 'route.ts'), 'utf8');
+    expect(reopen).toContain('reopenDealAsDraft(id)');
+    const manager = readFileSync(join(process.cwd(), 'src', 'components', 'admin', 'TextDealsManager.tsx'), 'utf8');
+    expect(manager).toContain('className="sr-only"');
+    expect(manager).toContain("photoUrl ? 'Change photo' : 'Choose photo'");
+    expect(manager).toContain('Reopen — edit & resend');
+    expect(manager).toContain("method: 'DELETE'");
   });
 
   it('escapes the TwiML reply', () => {

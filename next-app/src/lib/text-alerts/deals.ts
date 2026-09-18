@@ -4,9 +4,9 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { createServiceClient } from '@/lib/supabase/service';
 import { PRODUCT_IMAGES_BUCKET } from '@/lib/product-image-storage';
 import { encodeProductImageToWebp } from '@/lib/product-image-encode';
-import { twilioConfigured } from './config';
+import { brandMediaUrl, twilioConfigured } from './config';
 import { renderDealCard } from './card';
-import { dealText, DEFAULT_SOLD_REPLY } from './messages';
+import { dealText, DEFAULT_SOLD_REPLY, soldNoticeText, winnerText } from './messages';
 import { sendTwilioMessage, TwilioError } from './twilio';
 
 /**
@@ -246,6 +246,139 @@ export async function markDealSold(dealId: string, input: { soldToPhone?: string
     .single<DealRow>();
   if (error || !data) throw new Error(`Could not mark the deal sold: ${error?.message ?? 'no row'}`);
   return data;
+}
+
+export type SoldNotifyOutcome = {
+  winner: 'sent' | 'already' | 'failed' | 'none';
+  others: { sent: number; failed: number; already: number };
+};
+
+/**
+ * The texts that go out when a deal is marked sold (owner, 2026-09-17):
+ *   - the buyer (`sold_to_phone`) gets "It's yours …";
+ *   - everyone else the deal was delivered to gets the "spoken for" line.
+ * Both are picture messages (brand logo) so they stay in the one thread.
+ * Idempotent per phone via `text_system_messages` (kinds `deal_winner` /
+ * `deal_sold`): clicking Mark sold twice, or Mark available → Mark sold
+ * again, never texts anyone twice. Best-effort — a failed send is logged on
+ * its row and never fails the Mark sold click. Sends run in batches of 10.
+ */
+export async function notifyDealSold(dealId: string): Promise<SoldNotifyOutcome> {
+  const outcome: SoldNotifyOutcome = { winner: 'none', others: { sent: 0, failed: 0, already: 0 } };
+  if (!twilioConfigured()) return outcome;
+  const service = createServiceClient();
+  const deal = await loadDeal(service, dealId);
+  if (!deal || deal.status !== 'sold') return outcome;
+
+  const { data: priorRows } = await service
+    .from('text_system_messages')
+    .select('kind, to_phone')
+    .eq('deal_id', dealId)
+    .in('kind', ['deal_winner', 'deal_sold']);
+  const already = new Set((priorRows ?? []).map((row) => `${row.kind}:${row.to_phone}`));
+  const mediaUrl = brandMediaUrl();
+
+  async function sendOne(kind: 'deal_winner' | 'deal_sold', to: string, body: string): Promise<'sent' | 'failed' | 'already'> {
+    if (already.has(`${kind}:${to}`)) return 'already';
+    try {
+      const sent = await sendTwilioMessage({ to, body, mediaUrl });
+      await service.from('text_system_messages').insert({ kind, to_phone: to, deal_id: dealId, message_sid: sent.sid, status: sent.status });
+      return 'sent';
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'send failed';
+      await service.from('text_system_messages').insert({ kind, to_phone: to, deal_id: dealId, status: 'failed', error: message });
+      console.error(`[text-alerts] ${kind} to ${to} failed:`, message);
+      return 'failed';
+    }
+  }
+
+  const winner = deal.sold_to_phone;
+  if (winner) {
+    outcome.winner = await sendOne('deal_winner', winner, winnerText({ title: deal.title, price: deal.price_text }));
+  }
+
+  // Everyone the deal actually reached (accepted by Twilio or delivered), minus the buyer.
+  const { data: sends } = await service
+    .from('text_deal_sends')
+    .select('phone_e164, status')
+    .eq('deal_id', dealId)
+    .in('status', ['sent', 'delivered']);
+  const others = Array.from(new Set((sends ?? []).map((row) => row.phone_e164 as string).filter((phone) => phone && phone !== winner)));
+  const notice = soldNoticeText(deal.sold_reply_text);
+  for (let i = 0; i < others.length; i += 10) {
+    const results = await Promise.all(others.slice(i, i + 10).map((phone) => sendOne('deal_sold', phone, notice)));
+    for (const result of results) outcome.others[result] += 1;
+  }
+  return outcome;
+}
+
+/** The message a reopened deal starts with (the owner edits it before sending). */
+export const REOPEN_MESSAGE = 'Back available - the earlier sale fell through. First reply takes it. Pickup at our Naples showroom or we ship.';
+
+/**
+ * "Reopen — edit & resend" (owner, 2026-09-18): when a sale falls through,
+ * the deal goes out again as a NEW draft that copies the title, price and
+ * photo (same stored object), with a fresh message the owner can edit. A new
+ * row — not a status flip — because every send is once-per-phone-per-deal
+ * (`text_deal_sends`), replies attach to a subscriber's LAST deal, and the
+ * sold deal keeps its history. The old row stays as it was.
+ */
+export async function reopenDealAsDraft(dealId: string): Promise<DealRow> {
+  const service = createServiceClient();
+  const source = await loadDeal(service, dealId);
+  if (!source) throw new Error('Deal not found.');
+  const { data, error } = await service
+    .from('text_deals')
+    .insert({
+      title: source.title,
+      price_text: source.price_text,
+      message: REOPEN_MESSAGE,
+      photo_path: source.photo_path,
+      card_path: null,
+      status: 'draft',
+      sold_reply_text: source.sold_reply_text,
+    })
+    .select('*')
+    .single<DealRow>();
+  if (error || !data) throw new Error(`Could not reopen the deal: ${error?.message ?? 'no row'}`);
+  return data;
+}
+
+/**
+ * Delete a past deal (owner, 2026-09-18). Refused while it is still sending.
+ * Its send rows go with it (cascade); replies and system messages keep their
+ * rows with `deal_id` cleared (set null). The stored photo/picture objects are
+ * removed only when no OTHER deal still points at them (a reopened copy
+ * shares the photo), so the storage GC reference set stays honest.
+ */
+export async function deleteDeal(dealId: string): Promise<{ removedObjects: number }> {
+  const service = createServiceClient();
+  const deal = await loadDeal(service, dealId);
+  if (!deal) throw new Error('Deal not found.');
+  if (deal.status === 'sending') throw new Error('This deal is still sending — wait for it to finish, then delete it.');
+
+  const candidates = [deal.photo_path, deal.card_path].filter((p): p is string => Boolean(p));
+  let removable: string[] = [];
+  if (candidates.length > 0) {
+    const { data: others } = await service
+      .from('text_deals')
+      .select('photo_path, card_path')
+      .neq('id', dealId);
+    const stillUsed = new Set<string>();
+    for (const row of others ?? []) {
+      if (row.photo_path) stillUsed.add(row.photo_path);
+      if (row.card_path) stillUsed.add(row.card_path);
+    }
+    removable = candidates.filter((p) => !stillUsed.has(p));
+  }
+
+  const { error } = await service.from('text_deals').delete().eq('id', dealId);
+  if (error) throw new Error(`Could not delete the deal: ${error.message}`);
+  if (removable.length > 0) {
+    const { error: storageError } = await service.storage.from(PRODUCT_IMAGES_BUCKET).remove(removable);
+    if (storageError) console.error('[text-alerts] deal object cleanup failed', storageError.message);
+  }
+  return { removedObjects: removable.length };
 }
 
 export async function markDealAvailable(dealId: string): Promise<DealRow> {

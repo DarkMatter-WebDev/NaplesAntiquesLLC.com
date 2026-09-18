@@ -77,6 +77,7 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
   const [cardUrl, setCardUrl] = useState<string | null>(null);
   const [cardBytes, setCardBytes] = useState<number | null>(null);
   const [soldReply, setSoldReply] = useState(DEFAULT_SOLD_REPLY);
+  const [reopenedFrom, setReopenedFrom] = useState<string | null>(null);
 
   const loadList = useCallback(async () => {
     const data = await readJson(await fetch('/api/admin/text-deals'));
@@ -183,7 +184,7 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
       const data = await readJson(await fetch(`/api/admin/text-deals/${draftId}/send`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) }));
       setNotice({ text: data.finished ? `Sent to ${data.sent}${data.failed ? `, ${data.failed} failed` : ''}.` : `Sending: ${data.sent} so far, ${data.remaining} to go (the sweep finishes it).`, ok: true });
       const id = draftId;
-      setDraftId(null); setTitle(''); setPrice(''); setMessage(DEFAULT_DEAL_MESSAGE); setPhotoUrl(null); setCardUrl(null); setCardBytes(null);
+      setDraftId(null); setTitle(''); setPrice(''); setMessage(DEFAULT_DEAL_MESSAGE); setPhotoUrl(null); setCardUrl(null); setCardBytes(null); setReopenedFrom(null);
       await loadList();
       setSelectedId(id);
     } catch (err) {
@@ -198,11 +199,57 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
     setBusy(action);
     setNotice(null);
     try {
-      await readJson(await fetch(`/api/admin/text-deals/${detail.deal.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, soldToPhone, replyText: soldReply }) }));
+      const result = await readJson(await fetch(`/api/admin/text-deals/${detail.deal.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, soldToPhone, replyText: soldReply }) })) as { notified?: { winner: string; others: { sent: number; failed: number; already: number } } };
       await Promise.all([loadList(), loadDetail(detail.deal.id)]);
-      setNotice({ text: action === 'sold' ? 'Marked sold. Late replies get the auto-reply.' : 'Marked available again.', ok: true });
+      if (action === 'sold') {
+        const n = result.notified;
+        const buyer = n?.winner === 'sent' ? 'The buyer got a confirmation text.' : n?.winner === 'already' ? 'The buyer was already texted.' : n?.winner === 'failed' ? 'The buyer text FAILED — text them yourself.' : 'No buyer number on this deal.';
+        const others = n ? `${n.others.sent} other${n.others.sent === 1 ? '' : 's'} told it's taken${n.others.failed ? ` (${n.others.failed} failed)` : ''}${n.others.already ? ` (${n.others.already} already told)` : ''}.` : '';
+        setNotice({ text: `Marked sold. ${buyer} ${others} Late replies get the auto-reply.`.replace(/\s+/g, ' '), ok: n?.winner !== 'failed' });
+      } else {
+        setNotice({ text: 'Marked available again.', ok: true });
+      }
     } catch (err) {
       setNotice({ text: err instanceof Error ? err.message : 'Could not update the deal.', ok: false });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onReopen() {
+    if (!detail) return;
+    setBusy('reopen');
+    setNotice(null);
+    try {
+      const data = await readJson(await fetch(`/api/admin/text-deals/${detail.deal.id}/reopen`, { method: 'POST' }));
+      const d = data.deal;
+      setDraftId(d.id); setTitle(d.title); setPrice(d.price_text); setMessage(d.message);
+      setPhotoUrl(d.photo_url ?? null); setCardUrl(null); setCardBytes(null);
+      setReopenedFrom(detail.deal.id);
+      await loadList();
+      setSelectedId(null); setDetail(null);
+      setNotice({ text: 'Reopened as a new draft with the same photo and price. Edit the message, Preview, then Send.', ok: true });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (err) {
+      setNotice({ text: err instanceof Error ? err.message : 'Could not reopen the deal.', ok: false });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onDelete() {
+    if (!detail) return;
+    if (!window.confirm(`Delete "${detail.deal.title}"? Its replies stay on file but lose the link to this deal. This cannot be undone.`)) return;
+    setBusy('delete');
+    setNotice(null);
+    try {
+      await readJson(await fetch(`/api/admin/text-deals/${detail.deal.id}`, { method: 'DELETE' }));
+      if (draftId === detail.deal.id) { setDraftId(null); setTitle(''); setPrice(''); setMessage(DEFAULT_DEAL_MESSAGE); setPhotoUrl(null); setCardUrl(null); setCardBytes(null); setReopenedFrom(null); }
+      setSelectedId(null); setDetail(null);
+      await loadList();
+      setNotice({ text: 'Deal deleted.', ok: true });
+    } catch (err) {
+      setNotice({ text: err instanceof Error ? err.message : 'Could not delete the deal.', ok: false });
     } finally {
       setBusy(null);
     }
@@ -222,13 +269,19 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
       <div className="grid gap-6 lg:grid-cols-[1.1fr_1fr]">
         <form className="rounded-[1.25rem] border bg-white p-5 grid gap-4" style={{ borderColor: 'var(--color-outline-variant)' }} onSubmit={onPreview}>
           <div className="flex items-baseline justify-between gap-3">
-            <h2 className="text-lg font-bold" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>New text deal</h2>
+            <h2 className="text-lg font-bold" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>{reopenedFrom ? 'Reopened deal — edit & resend' : 'New text deal'}</h2>
             <span className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>{confirmed} confirmed · {pending} pending YES</span>
           </div>
 
           <label className="block">
             <span className={label} style={labelStyle}>Photo</span>
-            <input type="file" accept="image/*" onChange={onPhoto} disabled={busy !== null} className="block w-full text-sm" />
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="outline-button text-xs cursor-pointer" style={busy !== null ? { opacity: 0.5, pointerEvents: 'none' } : undefined}>
+                {busy === 'photo' ? 'Uploading…' : photoUrl ? 'Change photo' : 'Choose photo'}
+                <input type="file" accept="image/*" onChange={onPhoto} disabled={busy !== null} className="sr-only" />
+              </label>
+              <span className="text-xs" style={{ color: photoUrl ? 'var(--color-primary)' : 'var(--color-on-surface-variant)' }}>{photoUrl ? 'Photo saved' : 'No photo yet'}</span>
+            </div>
             <span className="mt-1 block text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>Any phone photo. It is resized and kept small enough for every carrier.</span>
           </label>
 
@@ -334,7 +387,10 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
                   </label>
                   <div className="flex flex-wrap gap-2">
                     {detail.deal.status === 'sold' ? (
-                      <button type="button" className="outline-button text-xs" onClick={() => setSold('available')} disabled={busy !== null}>Mark still available</button>
+                      <>
+                        <button type="button" className="outline-button text-xs" onClick={() => setSold('available')} disabled={busy !== null}>Mark still available</button>
+                        <button type="button" className="gold-button text-xs" onClick={onReopen} disabled={busy !== null}>{busy === 'reopen' ? 'Reopening…' : 'Reopen — edit & resend'}</button>
+                      </>
                     ) : (
                       <button type="button" className="gold-button text-xs" onClick={() => setSold('sold', detail.replies.find((r) => r.first)?.from_phone)} disabled={busy !== null}>
                         {detail.replies.find((r) => r.first) ? `Mark sold to ${detail.replies.find((r) => r.first)?.name ?? formatUsPhone(detail.replies.find((r) => r.first)!.from_phone)}` : 'Mark sold'}
@@ -343,6 +399,18 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
                   </div>
                 </div>
               )}
+              <div className="flex justify-end border-t pt-3" style={{ borderColor: 'var(--color-outline-variant)' }}>
+                <button
+                  type="button"
+                  onClick={onDelete}
+                  disabled={busy !== null || detail.deal.status === 'sending'}
+                  className="rounded-full border px-4 py-2 text-[0.65rem] font-bold uppercase tracking-[0.14em] disabled:opacity-40"
+                  style={{ borderColor: 'var(--color-error)', color: 'var(--color-error)', fontFamily: 'var(--font-label)', background: 'white' }}
+                  title={detail.deal.status === 'sending' ? 'Wait for the send to finish' : ''}
+                >
+                  {busy === 'delete' ? 'Deleting…' : 'Delete deal'}
+                </button>
+              </div>
             </div>
           )}
         </div>

@@ -1,7 +1,91 @@
 
 # Changelog
 
-## 2026-09-17 (night) — Guest order lookup `/order-lookup` (order number + the email or phone on the order, no account) + order emails now point there, with the brand-cased domain — BUILT + STAGED (no SQL, no env vars)
+## 2026-09-18 (2) — Text Deals admin: "Reopen — edit & resend" for a sale that falls through, a real "Choose photo" button, and "Delete deal" — BUILT + STAGED (no SQL, no env vars)
+
+Owner: (1) "add a button to reopen after an item has been marked sold… allow
+admin to alter the message and re-send if the sale falls thru"; (2) "the
+button to choose file doesn't look like a button"; (3) "add a button to
+delete past text deals".
+
+- **Reopen — edit & resend** (gold button beside *Mark still available* on
+  a sold deal): `POST /api/admin/text-deals/[id]/reopen` →
+  `reopenDealAsDraft()` clones the title, price and photo (same stored
+  object) into a NEW draft with `REOPEN_MESSAGE` ("Back available - the
+  earlier sale fell through. First reply takes it. Pickup at our Naples
+  showroom or we ship."), loads it into the composer (heading "Reopened
+  deal — edit & resend"), the owner edits, Previews (new picture) and
+  Sends. A new row, not a status flip: sends are once-per-phone-per-deal,
+  replies attach to a subscriber's LAST deal, and the sold deal keeps its
+  history. *Mark still available* (status flip, no texts) stays for the
+  "I marked it sold by mistake" case.
+- **Choose photo**: the native file input is now `sr-only` inside an
+  `outline-button` label ("Choose photo" / "Change photo" / "Uploading…")
+  with a "Photo saved / No photo yet" line beside it. Same handler.
+- **Delete deal** (red outline, bottom of the deal panel, any status but
+  *sending*): `DELETE /api/admin/text-deals/[id]` → `deleteDeal()` — refuses
+  mid-send (409), deletes the row (send rows cascade; replies and system
+  messages keep their rows with `deal_id` set null), and removes the stored
+  photo/picture ONLY when no other deal still points at them (a reopened
+  copy shares the photo), so the storage GC reference set stays honest.
+  Confirm dialog names the deal.
+- Tests: `text-alerts.test.ts` +1 (clone shape, mid-send refusal, shared-
+  object guard, DELETE + reopen routes, the sr-only picker, the buttons).
+
+**Gate:** `npx tsc --noEmit` 0 · `npm run lint` 0 (3 known `<img>`
+warnings) · `npx vitest run` **1457/1457 (148 files)** · `npm run build`
+exit 0 from a deleted `.next`, no Turbopack build cache. Admin UI
+unverified in a browser until the push.
+
+## 2026-09-18 — Mark sold now texts the buyer ("It's yours") and everyone else who got the deal ("spoken for") — BUILT + STAGED (no SQL, no env vars)
+
+Owner, mid re-test of the logo flow: "when we mark it sold, it sends a
+confirmation text to the winner / buyer… also send a 'sold' type text to
+all people that got a message and didn't buy it, so they know it's been
+taken."
+
+- `messages.ts`: `winnerText({title, price})` → "Naples Estate Jewelry:
+  It's yours - <line> - <price>. We'll text you shortly to arrange pickup at
+  our Naples showroom or shipping. Thank you! Reply STOP to opt out.";
+  `soldNoticeText(deal.sold_reply_text)` → the deal's own late-reply line
+  (default "Sorry, that one is spoken for. Next one soon.") + STOP once
+  (`withStopLine`), so the broadcast and the auto-reply never disagree.
+- `deals.ts` → `notifyDealSold(dealId)`: after the row is `sold`, sends the
+  winner text to `sold_to_phone` and the notice to every `text_deal_sends`
+  phone with status sent/delivered except the buyer, in batches of 10, all
+  as picture messages (`brandMediaUrl()`). Idempotent per phone via
+  `text_system_messages` kinds `deal_winner` / `deal_sold` (Mark sold twice,
+  or Mark available → Mark sold again, never re-texts). Best-effort: a
+  failed send is logged with `status failed` and never fails the click.
+- `PATCH /api/admin/text-deals/[id]` `{ action: 'sold' }` calls it and
+  returns `{ deal, notified }`; the admin notice now reads e.g. "Marked
+  sold. The buyer got a confirmation text. 3 others told it's taken. Late
+  replies get the auto-reply." (a failed buyer text turns the notice red:
+  "text them yourself").
+- Tests: `text-alerts.test.ts` +1 (both texts, STOP once, route + module
+  guards).
+
+**Gate:** `npx tsc --noEmit` 0 · `npm run lint` 0 (3 known `<img>`
+warnings) · `npx vitest run` **1456/1456 (148 files)** · `npm run build`
+exit 0 from a deleted `.next`, no Turbopack build cache. **Live test after
+the push:** a new TEST deal → the owner replies from the personal cell →
+Mark sold → the personal cell gets "It's yours…" as a picture. With one
+subscriber there is nobody else to notify; the "others" path uses the same
+send/log function and is covered by the unit guard.
+
+**Re-test of the logo flow, same night, all PASSED:** personal cell
+deleted from Subscribers (admin UI, "Subscriber deleted."), re-joined from
+the live homepage (Claude drove the window; ⚠️ `form_input` on the consent
+checkbox sets the DOM but not React — click it by coordinate), confirmation
+delivered as an **MMS** (`text_system_messages` id 3, SID `MM9b66…`, vs the
+`SM` of the 17th), YES → `confirmed` 02:14Z, deal "TEST 2 · 14K gold
+bracelet" sent 02:15Z, reply "I want it" forwarded `1ST` 02:16Z, Mark sold
+by Claude. The late-reply auto-reply picture and the one-thread result are
+the owner's phone check.
+
+## 2026-09-17 (night) — Guest order lookup `/order-lookup` (order number + the email or phone on the order, no account) + order emails now point there, with the brand-cased domain — DEPLOYED + live-verified (no SQL, no env vars)
+
+**DEPLOYED + live-verified** (owner pushed the five-item batch; "verify it live"): `/order-lookup`, `?order=…`, `/es/order-lookup` 200 + `noindex, nofollow`; API: wrong contact → 404, Arthur's number + email → 200 (`deliveryKind priority`, street present in the address, tracking link); `sitemap.xml` 0 `order-lookup`; footer link `/order-lookup` on `/`. Same pass: `text-brand.jpg` 200 image/jpeg 113 KB; `/logo2.png` → 301 `nav-logo.webp`, old `logo2.webp` → 404; Arthur's admin order Summary reads **"Shipping: Insured Shipping (Standard) — USPS Priority Mail — small flat-rate box, USPS insurance, signature required. No delivery date was promised."** Left for the owner's phone: a late reply to the TEST deal → the auto-reply as a picture in one thread.
 
 Owner, looking at Arthur's shipping email: "most people never make an
 account… a sort of order lookup with just their order number… also update
@@ -64,7 +148,7 @@ with `formatPublicPurity` ("14K") like the account page. ⚠️ After the push: 
 `/order-lookup?order=NEJ-20260917-ZIZCI` with Arthur's email to see the
 live page; the next receipt/shipping email shows the new footer.
 
-## 2026-09-17 (evening, 3) — Admin order page now names the shipping SERVICE bought (Priority vs Express vs Registered), derived from the fee — STAGED (no SQL, no env vars)
+## 2026-09-17 (evening, 3) — Admin order page now names the shipping SERVICE bought (Priority vs Express vs Registered), derived from the fee — DEPLOYED + live-verified (Arthur's order reads Insured Shipping (Standard))
 
 Owner, fulfilling Arthur Anderson's NEJ-20260917-ZIZCI ($570 brooch to NH):
 "what speed shipping did we promise him?" The order page said only
@@ -99,7 +183,7 @@ unverified in a browser until the push (owner login). Arthur's order reads
 **Insured Shipping (Standard)** = USPS Priority Mail; Express would have
 been $55.
 
-## 2026-09-17 (evening, 2) — Retired "Naples Antiques & Estate Jewelry" wordmark deleted; its legacy redirect repointed to the octopus mark — STAGED (no SQL, no env vars)
+## 2026-09-17 (evening, 2) — Retired "Naples Antiques & Estate Jewelry" wordmark deleted; its legacy redirect repointed to the octopus mark — DEPLOYED + live-verified (301 → nav-logo, old file 404)
 
 Owner asked what the "Naples Antiques" wordmark was and whether the site
 used it. `public/assets/images/branding/logo2.webp` (1065×418, June 2) was
@@ -113,7 +197,7 @@ the last build on this tree is the logo-swap build above). After the push:
 `curl -I https://naplesestatejewelry.com/logo2.png` → 301 to
 `/assets/images/branding/nav-logo.webp`; the old `.webp` URL → 404.
 
-## 2026-09-17 (evening) — Every customer-facing text is now a picture message, so the whole conversation stays in ONE thread on the phone — BUILT + STAGED (no SQL, no env vars)
+## 2026-09-17 (evening) — Every customer-facing text is now a picture message, so the whole conversation stays in ONE thread on the phone — DEPLOYED (image live; the owner's late-reply phone test still to run)
 
 Owner, after the live test: "the texts are coming from two separate
 numbers… +1 (888) 423-7522 and 8884237522… any way to make them the same?"
